@@ -1,0 +1,17 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Local environment variables
+.env
+
+# Project specific
+tests/temp_test.html
+dist/
+build/
+*.egg-info/
+server.log
+.DS_Store
