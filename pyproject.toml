@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shadow-web"
+version = "0.1.0"
+description = "Shadow Web: Agent-facing web interaction suite"
+requires-python = ">=3.10"
+dependencies = [
+    "lxml>=5.1.0",
+    "fastapi>=0.110.0",
+    "uvicorn>=0.28.0",
+    "requests>=2.31.0",
+    "playwright>=1.42.0",
+    "openai>=1.14.0",
+    "pydantic>=2.6.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
