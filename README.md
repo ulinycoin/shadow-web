@@ -12,14 +12,14 @@ Shadow Web is an open-source Python SDK for LLM/AI agents. It flattens Shadow DO
 
 ## Benchmarks (measured)
 
-Запуск локально:
+Run locally:
 
 ```bash
-pip install tiktoken           # опционально: для точного подсчета токенов (cl100k_base)
-python benchmarks/run.py       # запуск бенчмарков через Playwright (Hacker News, Wikipedia, GitHub)
+pip install tiktoken           # optional: accurate token counts (cl100k_base)
+python benchmarks/run.py       # live Playwright benchmarks (Hacker News, Wikipedia, GitHub)
 ```
 
-**Метод подсчета:** По умолчанию используется оценка `chars/4`. При установленном пакете `tiktoken` подсчет токенов производится с помощью кодировщика `cl100k_base` (GPT-4 / DeepSeek).
+**Counting method:** Defaults to `chars/4` estimate. With `tiktoken` installed, counts use the `cl100k_base` encoder (GPT-4 / DeepSeek).
 
 | Page | Raw HTML (tokens) | Grouped XML (tokens) | Actions | Token Reduction |
 |------|-------------------|----------------------|---------|-----------------|
@@ -27,10 +27,10 @@ python benchmarks/run.py       # запуск бенчмарков через Pl
 | Wikipedia (Web Scraping) | 99,343 | 16,462 | 501 | **-83.4% (6.0x)** |
 | GitHub Trending | 167,875 | 37,833 | 1,290 | **-77.5% (4.4x)** |
 
-**Примечания:**
-- **Grouped XML** — это структурированная XML-карта действий (`xml_map`), которая отправляется LLM-агенту.
-- **Actions** — количество интерактивных элементов на странице.
-- Бенчмарки используют модуль `dom_capture` для выпрямления Shadow DOM и same-origin iframe-ов в реальном времени перед сжатием.
+**Notes:**
+- **Grouped XML** — the structured action map (`xml_map`) sent to the LLM agent.
+- **Actions** — number of interactive elements on the page.
+- Benchmarks use `dom_capture` to flatten Shadow DOM and same-origin iframes live before compression.
 
 ---
 
