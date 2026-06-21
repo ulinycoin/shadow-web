@@ -1,0 +1,32 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: |
+          python -m pip install -e ".[dev]"
+          python -m playwright install chromium
+      - name: Unit tests
+        run: |
+          python -m unittest \
+            tests.test_compressor \
+            tests.test_dom_capture \
+            tests.test_grouping_heal_query \
+            tests.test_shadow_grep \
+            tests.test_webmcp \
+            tests.test_diff \
+            tests.test_a11y_capture \
+            tests.test_verified_heal \
+            -v

@@ -1,0 +1,17 @@
+<!-- Simulates output from dom_capture.py after flattening an open shadow root -->
+<body>
+  <checkout-widget>
+    <div data-sw-iframe="same-origin">
+      <form action="/pay">
+        <input type="email" placeholder="Email" name="email" data-sw-bind="sw-1"/>
+        <input type="text" placeholder="Card number" name="card" data-sw-bind="sw-2"/>
+        <button type="submit" aria-label="Pay now" data-sw-bind="sw-3">Pay $49.00</button>
+      </form>
+    </div>
+  </checkout-widget>
+  <div data-sw-iframe="cross-origin" data-sw-src="https://analytics.example/embed">[iframe: https://analytics.example/embed]</div>
+  <nav>
+    <a href="/dashboard" data-sw-bind="sw-4">Dashboard</a>
+    <a href="/settings" data-sw-bind="sw-5">Settings</a>
+  </nav>
+</body>

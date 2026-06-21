@@ -1,5 +1,5 @@
 import unittest
-from src.shadow_web.compressor import process_html, generate_xml_map
+from src.shadow_web.compressor import process_html, generate_xml_map, generate_grouped_xml_map
 
 class TestShadowWebCompressor(unittest.TestCase):
     def setUp(self):
@@ -32,7 +32,7 @@ class TestShadowWebCompressor(unittest.TestCase):
         """
 
     def test_strip_dom_removes_unwanted_tags(self):
-        clean_html, _ = process_html(self.sample_html)
+        clean_html, _, _ = process_html(self.sample_html)
         self.assertNotIn("<style>", clean_html)
         self.assertNotIn("console.log", clean_html)
         # header and footer are kept — they contain navigation and semantic context
@@ -40,7 +40,7 @@ class TestShadowWebCompressor(unittest.TestCase):
         self.assertIn("Welcome to our store", clean_html)
 
     def test_strip_dom_keeps_crucial_attributes_and_removes_noise(self):
-        clean_html, _ = process_html(self.sample_html)
+        clean_html, _, _ = process_html(self.sample_html)
         # Class and style attributes should be stripped
         self.assertNotIn("product-card", clean_html)
         self.assertNotIn("border: 1px solid", clean_html)
@@ -53,7 +53,7 @@ class TestShadowWebCompressor(unittest.TestCase):
         self.assertIn('name="user_email"', clean_html)
 
     def test_action_map_generation(self):
-        _, action_map = process_html(self.sample_html)
+        _, action_map, groups = process_html(self.sample_html)
         
         # We expect 4 interactive elements:
         # 1. button (Add to Cart)
@@ -77,14 +77,22 @@ class TestShadowWebCompressor(unittest.TestCase):
         self.assertEqual(action_map[2]["id"], "3")
         self.assertEqual(action_map[2]["type"], "input[email]")
         self.assertEqual(action_map[2]["placeholder"], "Enter your email")
+        self.assertIn("group", action_map[2])
+
+    def test_grouped_xml_generation(self):
+        _, _, groups = process_html(self.sample_html)
+        xml_map = generate_grouped_xml_map("https://example.com", "Test Store", groups)
+        self.assertIn("<group ", xml_map)
+        self.assertIn('<action id="1"', xml_map)
 
     def test_xml_generation(self):
-        _, action_map = process_html(self.sample_html)
+        _, action_map, _ = process_html(self.sample_html)
         xml_map = generate_xml_map("https://example.com", "Test Store", action_map)
         
         self.assertIn('<page url="https://example.com" title="Test Store">', xml_map)
-        self.assertIn('<action id="1" type="button" label="Buy Dog Toy Now"/>', xml_map)
-        self.assertIn('<action id="3" type="input[email]" label="Enter your email" placeholder="Enter your email"/>', xml_map)
+        self.assertIn('<action id="1" type="button" label="Buy Dog Toy Now" group="Main"/>', xml_map)
+        self.assertIn('<action id="3" type="input[email]"', xml_map)
+        self.assertIn('group="Login Form"', xml_map)
 
 if __name__ == "__main__":
     unittest.main()
