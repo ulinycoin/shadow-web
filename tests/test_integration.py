@@ -22,9 +22,9 @@ class TestSelfHealingIntegration(unittest.TestCase):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE
         )
+
         # Give server time to spin up
-        time.sleep(2.5)
-        
+        time.sleep(5.0)
         # Check if server is running
         try:
             res = requests.get("http://127.0.0.1:8000/v1/compress", timeout=2)

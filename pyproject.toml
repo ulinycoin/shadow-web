@@ -1,21 +1,66 @@
 [build-system]
-requires = ["setuptools>=64"]
+requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "shadow-web"
-version = "0.1.0"
-description = "Shadow Web: Agent-facing web interaction suite"
+version = "0.2.0"
+description = "Local-first Python SDK for AI agents: Shadow DOM flatten, Action Map compression, shadow_grep, self-healing selectors"
+readme = "README.md"
+license = "MIT"
 requires-python = ">=3.10"
+authors = [{ name = "ulinycoin", email = "ulinycoin7@gmail.com" }]
+keywords = ["ai-agents", "playwright", "shadow-dom", "browser-automation", "mcp", "llm"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Internet :: WWW/HTTP :: Browsers",
+]
 dependencies = [
     "lxml>=5.1.0",
+    "playwright>=1.42.0",
+    "requests>=2.31.0",
+    "pydantic>=2.6.0",
+    "aiohttp>=3.9.0",
+]
+
+[project.optional-dependencies]
+server = [
     "fastapi>=0.110.0",
     "uvicorn>=0.28.0",
-    "requests>=2.31.0",
-    "playwright>=1.42.0",
     "openai>=1.14.0",
-    "pydantic>=2.6.0",
 ]
+mcp = ["mcp>=1.2.0"]
+browser-use = ["browser-use>=0.1.0"]
+dev = [
+    "build>=1.2.0",
+    "twine>=5.0.0",
+    "tiktoken>=0.6.0",
+]
+all = [
+    "fastapi>=0.110.0",
+    "uvicorn>=0.28.0",
+    "openai>=1.14.0",
+    "mcp>=1.2.0",
+    "browser-use>=0.1.0",
+    "build>=1.2.0",
+    "twine>=5.0.0",
+    "tiktoken>=0.6.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/ulinycoin/shadow-web"
+Repository = "https://github.com/ulinycoin/shadow-web"
+Issues = "https://github.com/ulinycoin/shadow-web/issues"
+Documentation = "https://github.com/ulinycoin/shadow-web#readme"
+
+[project.scripts]
+shadow-web-mcp = "shadow_web.mcp.server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -2,6 +2,8 @@ import re
 from lxml import html, etree
 from typing import Dict, List, Tuple, Any
 
+from .grouping import apply_groups_to_actions, group_action_map
+
 # Tags that are completely useless for LLMs
 REMOVE_TAGS = {
     'script', 'style', 'noscript', 'iframe',
@@ -11,7 +13,8 @@ REMOVE_TAGS = {
 # Attributes to keep for LLM context and functionality
 KEEP_ATTRS = {
     'href', 'src', 'alt', 'type', 'value', 'placeholder',
-    'name', 'for', 'action', 'method', 'aria-label', 'data-sid'
+    'name', 'for', 'action', 'method', 'aria-label',
+    'data-sid', 'data-sw-bind',
 }
 
 # Interactive tag types
@@ -48,13 +51,13 @@ def get_element_label(el) -> str:
             
     return ""
 
-def process_html(html_text: str) -> Tuple[str, List[Dict[str, Any]]]:
+def process_html(html_text: str) -> Tuple[str, List[Dict[str, Any]], List[Dict[str, Any]]]:
     """
     Parses HTML, strips styles/scripts, adds shadow IDs (data-sid) to interactive
-    elements, and extracts an Action Map.
-    
+    elements, extracts an Action Map, and builds semantic groups.
+
     Returns:
-        Tuple of (clean_html_string, action_map_list)
+        Tuple of (clean_html_string, action_map_list, groups_list)
     """
     tree = html.fromstring(html_text)
     
@@ -94,7 +97,8 @@ def process_html(html_text: str) -> Tuple[str, List[Dict[str, Any]]]:
                 "type": el_type,
                 "label": label[:100],  # Truncate long labels
                 "href": el.get('href', ''),
-                "placeholder": el.get('placeholder', '')
+                "placeholder": el.get('placeholder', ''),
+                "bind_id": el.get('data-sw-bind', ''),
             }
             # Remove empty fields
             action_info = {k: v for k, v in action_info.items() if v}
@@ -111,15 +115,33 @@ def process_html(html_text: str) -> Tuple[str, List[Dict[str, Any]]]:
     clean_html = etree.tostring(tree, encoding='unicode', method='html')
     # Clean up double newlines and excessive indentation to save tokens
     clean_html = re.sub(r'\n\s*\n', '\n', clean_html)
-    
-    return clean_html, action_map
+
+    groups = group_action_map(tree, action_map)
+    action_map = apply_groups_to_actions(action_map, groups)
+
+    return clean_html, action_map, groups
 
 def generate_xml_map(url: str, title: str, action_map: List[Dict[str, Any]]) -> str:
-    """Helper to format the Action Map as XML for LLM consumption."""
+    """Flat Action Map as XML (legacy)."""
     root = etree.Element("page", url=url, title=title)
     for action in action_map:
         action_el = etree.SubElement(root, "action")
         for k, v in action.items():
             action_el.set(k, str(v))
-            
+
+    return etree.tostring(root, encoding='unicode', pretty_print=True)
+
+
+def generate_grouped_xml_map(
+    url: str, title: str, groups: List[Dict[str, Any]]
+) -> str:
+    """Grouped Action Map as XML for LLM consumption."""
+    root = etree.Element("page", url=url, title=title)
+    for block in groups:
+        group_el = etree.SubElement(root, "group", name=block.get("name", "Page"))
+        for action in block.get("elements", []):
+            action_el = etree.SubElement(group_el, "action")
+            for k, v in action.items():
+                action_el.set(k, str(v))
+
     return etree.tostring(root, encoding='unicode', pretty_print=True)
