@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from difflib import SequenceMatcher
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
+from .utils import _parse_eval_res
 
 PageLike = Any
 
@@ -223,11 +224,14 @@ def local_heal(
         else:
             return HealResult(selector=cached, confidence=1.0, source="cache")
 
+
     base_tag = action_type.split("[")[0].lower()
-    raw_candidates: List[Dict[str, Any]] = page.evaluate(
+    raw_candidates = _parse_eval_res(page.evaluate(
         _COLLECT_CANDIDATES_SCRIPT,
         {"tag": base_tag, "label": label or ""},
-    )
+    ))
+    if not isinstance(raw_candidates, list):
+        raw_candidates = []
     candidates = rank_candidates(label or "", raw_candidates)
 
     if not candidates:

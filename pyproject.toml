@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "shadow-web"
-version = "0.2.1"
+version = "0.2.2"
 description = "Local-first Python SDK for AI agents: Shadow DOM flatten, Action Map compression, shadow_grep, self-healing selectors"
 readme = "README.md"
 license = "MIT"
@@ -41,6 +41,7 @@ dev = [
     "build>=1.2.0",
     "twine>=5.0.0",
     "tiktoken>=0.6.0",
+    "pytest>=8.0.0",
 ]
 all = [
     "fastapi>=0.110.0",
@@ -64,3 +65,10 @@ shadow-web-mcp = "shadow_web.mcp.server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "integration: live FastAPI + Playwright end-to-end tests (run with pytest -m integration)",
+]
+addopts = "-m 'not integration'"

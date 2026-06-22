@@ -187,6 +187,32 @@ Tools: `navigate`, `snapshot`, `click`, `fill`, `compress_html`, `shadow_query`,
 
 ---
 
+## browser-use Integration
+
+Shadow Web provides out-of-the-box integration with **browser-use** (the popular agentic framework). It drops token usage by up to 90% and allows the agent to interact with elements inside **Shadow DOM** and iframes using a single line setup.
+
+```bash
+pip install "shadow-web[browser-use]"
+```
+
+```python
+from browser_use import Agent
+from shadow_web import ShadowTools
+
+# Default format is "terse" (compact). Use format="xml" in get_xml_action_map when needed.
+tools = ShadowTools(
+    heal_api_url="http://localhost:8000/v1/heal",  # Optional: LLM fallback self-healing API
+)
+
+agent = Agent(task="...", llm=llm, tools=tools)
+```
+
+`get_xml_action_map` also accepts `query` (e.g. `intent:login`) and `format` (`terse` | `xml`) per call.
+
+See [examples/browser_use/](examples/browser_use/) for a complete working implementation.
+
+---
+
 ## Self-healing chain
 
 ```

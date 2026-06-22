@@ -320,11 +320,34 @@ def merge_dom_and_a11y(
     )
 
 
+from .utils import _parse_eval_res
+
+
+def _get_cdp_session_and_id(page: PageLike) -> Tuple[Any, Optional[str]]:
+    if type(page).__name__ == "Page" and "browser_use" in type(page).__module__:
+        return page._client, getattr(page, "_session_id", None)
+    cdp = page.context.new_cdp_session(page)
+    return cdp, None
+
+
+async def _get_cdp_session_and_id_async(page: PageLike) -> Tuple[Any, Optional[str]]:
+    if type(page).__name__ == "Page" and "browser_use" in type(page).__module__:
+        session_id = await page._ensure_session()
+        return page._client, session_id
+    cdp = await page.context.new_cdp_session(page)
+    return cdp, None
+
+
 async def acapture_a11y_interactive(page: PageLike) -> A11yCaptureResult:
     """Async: capture interactive nodes from Chrome Accessibility tree."""
-    cdp = await page.context.new_cdp_session(page)
-    await cdp.send("Accessibility.enable")
-    payload = await cdp.send("Accessibility.getFullAXTree")
+    cdp, session_id = await _get_cdp_session_and_id_async(page)
+    if session_id:
+        await cdp.send("Accessibility.enable", session_id=session_id)
+        payload = await cdp.send("Accessibility.getFullAXTree", session_id=session_id)
+    else:
+        await cdp.send("Accessibility.enable")
+        payload = await cdp.send("Accessibility.getFullAXTree")
+        
     nodes = parse_ax_nodes(payload.get("nodes") or [])
     supplement_html, bindings = build_a11y_supplement(nodes, bind_prefix="sw-a11y")
     return A11yCaptureResult(
@@ -346,7 +369,9 @@ async def acapture_page(
         a11y = await acapture_a11y_interactive(page)
         return merge_dom_and_a11y(FlattenResult(html="<body></body>"), a11y, mode="a11y")
 
-    raw = await page.evaluate(_FLATTEN_SCRIPT)
+    raw = _parse_eval_res(await page.evaluate(_FLATTEN_SCRIPT))
+    if not isinstance(raw, dict):
+        raw = {}
     dom = FlattenResult(
         html=raw.get("html") or "<body></body>",
         bindings=raw.get("bindings") or {},
@@ -391,8 +416,12 @@ def interact_by_a11y_binding(
     if not backend_id:
         raise ValueError("a11y binding missing backend_node_id")
 
-    cdp = page.context.new_cdp_session(page)
-    resolved = cdp.send("DOM.resolveNode", {"backendNodeId": int(backend_id)})
+    cdp, session_id = _get_cdp_session_and_id(page)
+    if session_id:
+        resolved = cdp.send("DOM.resolveNode", {"backendNodeId": int(backend_id)}, session_id=session_id)
+    else:
+        resolved = cdp.send("DOM.resolveNode", {"backendNodeId": int(backend_id)})
+        
     object_id = resolved.get("object", {}).get("objectId")
     if not object_id:
         raise RuntimeError("CDP could not resolve a11y backend node")
@@ -414,15 +443,17 @@ def interact_by_a11y_binding(
     else:
         raise ValueError(f"Unknown action: {action}")
 
-    result = cdp.send(
-        "Runtime.callFunctionOn",
-        {
-            "objectId": object_id,
-            "functionDeclaration": fn,
-            "arguments": args,
-            "returnByValue": True,
-        },
-    )
+    params = {
+        "objectId": object_id,
+        "functionDeclaration": fn,
+        "arguments": args,
+        "returnByValue": True,
+    }
+    if session_id:
+        result = cdp.send("Runtime.callFunctionOn", params, session_id=session_id)
+    else:
+        result = cdp.send("Runtime.callFunctionOn", params)
+        
     if result.get("exceptionDetails"):
         raise RuntimeError(f"a11y {action} failed: {result['exceptionDetails']}")
 
@@ -438,8 +469,12 @@ async def ainteract_by_a11y_binding(
     if not backend_id:
         raise ValueError("a11y binding missing backend_node_id")
 
-    cdp = await page.context.new_cdp_session(page)
-    resolved = await cdp.send("DOM.resolveNode", {"backendNodeId": int(backend_id)})
+    cdp, session_id = await _get_cdp_session_and_id_async(page)
+    if session_id:
+        resolved = await cdp.send("DOM.resolveNode", {"backendNodeId": int(backend_id)}, session_id=session_id)
+    else:
+        resolved = await cdp.send("DOM.resolveNode", {"backendNodeId": int(backend_id)})
+        
     object_id = resolved.get("object", {}).get("objectId")
     if not object_id:
         raise RuntimeError("CDP could not resolve a11y backend node")
@@ -461,15 +496,17 @@ async def ainteract_by_a11y_binding(
     else:
         raise ValueError(f"Unknown action: {action}")
 
-    result = await cdp.send(
-        "Runtime.callFunctionOn",
-        {
-            "objectId": object_id,
-            "functionDeclaration": fn,
-            "arguments": args,
-            "returnByValue": True,
-        },
-    )
+    params = {
+        "objectId": object_id,
+        "functionDeclaration": fn,
+        "arguments": args,
+        "returnByValue": True,
+    }
+    if session_id:
+        result = await cdp.send("Runtime.callFunctionOn", params, session_id=session_id)
+    else:
+        result = await cdp.send("Runtime.callFunctionOn", params)
+        
     if result.get("exceptionDetails"):
         raise RuntimeError(f"a11y {action} failed: {result['exceptionDetails']}")
 

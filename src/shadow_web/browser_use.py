@@ -3,12 +3,12 @@ Async ShadowPage wrapper for asynchronous frameworks like browser-use.
 Provides the same DOM capture, semantic grouping, and self-healing logic but fully async.
 """
 
-from __future__ import annotations
+# from __future__ import annotations
 
 import logging
 import requests
 import aiohttp
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Literal
 
 from shadow_web.compressor import process_html, generate_grouped_xml_map
 from shadow_web.dom_capture import _INTERACT_SCRIPT
@@ -26,6 +26,9 @@ from shadow_web.webmcp import (
 from shadow_web.diff import PageDiff, PageSnapshot, build_snapshot, compute_page_diff, diff_terse, generate_diff_xml
 
 logger = logging.getLogger(__name__)
+
+from shadow_web.utils import _parse_eval_res
+
 
 class AsyncShadowPage:
     def __init__(
@@ -286,10 +289,12 @@ class AsyncShadowPage:
                 return cached
 
         base_tag = action.get("type", "button").split("[")[0].lower()
-        raw_candidates = await self.page.evaluate(
+        raw_candidates = _parse_eval_res(await self.page.evaluate(
             _COLLECT_CANDIDATES_SCRIPT,
             {"tag": base_tag, "label": action.get("label", "")},
-        )
+        ))
+        if not isinstance(raw_candidates, list):
+            raw_candidates = []
         candidates = rank_candidates(action.get("label", ""), raw_candidates)
 
         for candidate in candidates:
@@ -396,12 +401,26 @@ class AsyncShadowPage:
         value: Optional[str],
         timeout_ms: int,
     ) -> None:
-        if action == "click":
-            await self.page.click(selector, timeout=timeout_ms)
-        elif action == "fill":
-            await self.page.fill(selector, value or "", timeout=timeout_ms)
+        if (type(self.page).__name__ != "Page" or "browser_use" not in type(self.page).__module__) and hasattr(self.page, "click") and hasattr(self.page, "fill"):
+            if action == "click":
+                await self.page.click(selector, timeout=timeout_ms)
+            elif action == "fill":
+                await self.page.fill(selector, value or "", timeout=timeout_ms)
+            else:
+                raise ValueError(f"Unknown action: {action}")
         else:
-            raise ValueError(f"Unknown action: {action}")
+            if action == "click":
+                await self.page.evaluate(
+                    "((selector) => { const el = document.querySelector(selector); if (el) el.click(); })",
+                    selector
+                )
+            elif action == "fill":
+                await self.page.evaluate(
+                    "((selector, val) => { const el = document.querySelector(selector); if (el) { el.focus(); el.value = val; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); } })",
+                    selector, value or ""
+                )
+            else:
+                raise ValueError(f"Unknown action: {action}")
 
     async def _perform_action(
         self,
@@ -429,12 +448,14 @@ class AsyncShadowPage:
                 if binding.get("source") == "a11y":
                     await ainteract_by_a11y_binding(self.page, binding, action, value=value)
                 else:
-                    result = await self.page.evaluate(
+                    result = _parse_eval_res(await self.page.evaluate(
                         _INTERACT_SCRIPT,
                         {"path": binding.get("path"), "action": action, "value": value},
-                    )
-                    if not result or not result.get("ok"):
-                        error = (result or {}).get("error", "unknown")
+                    ))
+                    if not isinstance(result, dict):
+                        result = {}
+                    if not result.get("ok"):
+                        error = result.get("error", "unknown")
                         raise RuntimeError(f"Interaction script failed: {error}")
             except Exception as binding_error:
                 self._invalidate_heal_for_sid(sid)
@@ -477,3 +498,142 @@ class AsyncShadowPage:
     async def fill(self, sid: str, value: str, timeout_ms: int = 5000):
         """Fills an input asynchronously by shadow ID (data-sid)."""
         await self._perform_action(sid, "fill", value=value, timeout_ms=timeout_ms)
+
+
+try:
+    from browser_use import Tools, ActionResult, BrowserSession
+    HAS_BROWSER_USE = True
+except ImportError:
+    HAS_BROWSER_USE = False
+
+if HAS_BROWSER_USE:
+    class ShadowTools(Tools):
+        def __init__(
+            self,
+            exclude_actions: Optional[List[str]] = None,
+            heal_api_url: Optional[str] = None,
+            api_key: Optional[str] = None,
+            capture_mode: CaptureMode = "auto",
+            verify_heal: bool = True,
+            prefer_webmcp: bool = True,
+            default_format: Literal["xml", "terse"] = "terse",
+        ):
+            # Exclude standard click and input text actions so the agent uses our optimized ones
+            default_exclude = ["click_element", "input_text"]
+            if exclude_actions is not None:
+                default_exclude.extend(exclude_actions)
+                
+            super().__init__(exclude_actions=default_exclude)
+            self.heal_api_url = heal_api_url
+            self.api_key = api_key
+            self.capture_mode = capture_mode
+            self.verify_heal = verify_heal
+            self.prefer_webmcp = prefer_webmcp
+            self.default_format = default_format
+            
+            # Cache AsyncShadowPage instances per page
+            self._shadow_pages = {}
+            
+            self._register_shadow_actions()
+
+        def _get_shadow_page(self, page: Any) -> AsyncShadowPage:
+            if page not in self._shadow_pages:
+                self._shadow_pages[page] = AsyncShadowPage(
+                    page,
+                    heal_api_url=self.heal_api_url,
+                    api_key=self.api_key,
+                    capture_mode=self.capture_mode,
+                    verify_heal=self.verify_heal,
+                    prefer_webmcp=self.prefer_webmcp,
+                )
+            return self._shadow_pages[page]
+
+        def _register_shadow_actions(self):
+
+            @self.registry.action(
+                description=(
+                    "Captures the current page state as a compressed XML Action Map. "
+                    "Use this tool first to understand what interactive elements (buttons, inputs) "
+                    "exist on the page and get their unique 'id' (data-sid). "
+                    "You can filter the elements using the optional 'query' parameter (e.g. 'intent:login' or 'button') "
+                    "and change the output format using the 'format' parameter ('xml' or 'terse')."
+                )
+            )
+            async def get_xml_action_map(
+                browser_session,
+                query: Optional[str] = None,
+                format: Optional[Literal["xml", "terse"]] = None
+            ) -> ActionResult:
+                page = await browser_session.must_get_current_page()
+                shadow = self._get_shadow_page(page)
+                
+                # Update page state
+                clean_html, xml_map = await shadow.refresh()
+                
+                fmt = format or self.default_format
+                
+                if query:
+                    # If search query is provided, use shadow_grep
+                    result = await shadow.query(query, fmt=fmt)
+                    return ActionResult(
+                        extracted_content=f"Filtered Page Action Map (query: '{query}', format: '{fmt}'):\n\n{result}",
+                        include_in_memory=True
+                    )
+                
+                if fmt == "terse":
+                    # If format is terse, return all elements in terse format
+                    result = await shadow.query("*", fmt="terse")
+                    return ActionResult(
+                        extracted_content=f"Current Page Action Map (format: 'terse'):\n\n{result}",
+                        include_in_memory=True
+                    )
+                
+                return ActionResult(
+                    extracted_content=f"Current Page Grouped Action Map (format: 'xml'):\n\n{xml_map}",
+                    include_in_memory=True
+                )
+
+            @self.registry.action(
+                description=(
+                    "Clicks an interactive element by its unique Shadow ID (data-sid) from the Action Map. "
+                    "Automatically heals if the selector has changed due to design updates."
+                )
+            )
+            async def click_shadow_element(sid: str, browser_session) -> ActionResult:
+                page = await browser_session.must_get_current_page()
+                shadow = self._get_shadow_page(page)
+                try:
+                    await shadow.click(sid)
+                    return ActionResult(
+                        extracted_content=f"Successfully clicked element with ID {sid}. Current URL: {shadow.last_url}"
+                    )
+                except Exception as e:
+                    return ActionResult(
+                        error=f"Failed to click element {sid}: {str(e)}"
+                    )
+
+            @self.registry.action(
+                description=(
+                    "Fills an input/textarea element by its unique Shadow ID (data-sid) with text value. "
+                    "Automatically heals broken selectors."
+                )
+            )
+            async def fill_shadow_element(sid: str, value: str, browser_session) -> ActionResult:
+                page = await browser_session.must_get_current_page()
+                shadow = self._get_shadow_page(page)
+                try:
+                    await shadow.fill(sid, value)
+                    return ActionResult(
+                        extracted_content=f"Successfully filled element {sid} with value."
+                    )
+                except Exception as e:
+                    return ActionResult(
+                        error=f"Failed to fill element {sid}: {str(e)}"
+                    )
+else:
+    class ShadowTools:
+        def __init__(self, *args, **kwargs):
+            raise ImportError(
+                "ShadowTools requires browser-use to be installed. "
+                "Install it using: pip install 'shadow-web[browser-use]'"
+            )
