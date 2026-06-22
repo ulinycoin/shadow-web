@@ -51,6 +51,74 @@ async def _run_shadow_query(shadow, query: str, fmt: Literal["json", "terse", "x
     }
 
 
+def _format_mcp_response(
+    shadow,
+    clean_html: str,
+    xml_map: str,
+    detail: str = "terse",
+    title: str = "Page",
+    diff: bool = False
+) -> dict:
+    # Base response properties
+    res = {
+        "url": shadow.last_url,
+        "title": title,
+        "interaction_mode": shadow.interaction_mode,
+        "webmcp_available": shadow.webmcp.available,
+        "webmcp_tools": [tool.to_dict() for tool in shadow.webmcp.tools],
+        "action_count": len(shadow.action_map),
+        "page_class": getattr(shadow, "page_class", "Static"),
+        "page_class_reason": getattr(shadow, "page_class_reason", ""),
+    }
+    
+    # Include diff context if diff mode is requested
+    if shadow.last_diff and diff:
+        res["diff_mode"] = True
+        res["diff_terse"] = shadow.diff_terse()
+        if detail == "full":
+            res["diff"] = shadow.last_diff.to_dict()
+
+    if detail == "minimal":
+        # Minimal: url, title, action_count, groups_summary (name + count)
+        groups_summary = [
+            {"name": g.get("name", "Page"), "count": len(g.get("elements", []))}
+            for g in shadow.action_groups
+        ]
+        res["groups_summary"] = groups_summary
+        return res
+        
+    if detail == "terse":
+        # Terse: top 15 elements or diff delta list
+        if shadow.last_diff and diff:
+            res["appeared"] = shadow.last_diff.appeared[:15]
+            res["changed"] = shadow.last_diff.changed[:15]
+            res["disappeared"] = shadow.last_diff.disappeared[:15]
+        else:
+            res.update({
+                "action_map": shadow.action_map[:15],
+                "groups_summary": [
+                    {"name": g.get("name", "Page"), "count": len(g.get("elements", []))}
+                    for g in shadow.action_groups
+                ]
+            })
+        return res
+        
+    if detail == "xml":
+        # XML: grouped XML skeleton
+        res["xml_map"] = xml_map
+        return res
+        
+    # Full: debugging layout
+    res.update({
+        "groups": shadow.action_groups,
+        "xml_map": xml_map,
+        "clean_html_preview": clean_html[:500],  # HTML preview limit (500 chars)
+        "capture_stats": shadow.capture_stats,
+        "capture_mode": shadow.capture_mode,
+    })
+    return res
+
+
 def create_mcp_server():
     try:
         from mcp.server.fastmcp import FastMCP
@@ -110,8 +178,11 @@ def create_mcp_server():
         return await _run_shadow_query(shadow, query, fmt="json")
 
     @mcp.tool()
-    async def navigate(url: str, capture_mode: str = "auto") -> dict:
-        """Open URL in Playwright and build grouped XML Action Map snapshot."""
+    async def navigate(url: str, capture_mode: str = "auto", detail: str = "terse") -> dict:
+        """Open URL in Playwright and build grouped XML Action Map snapshot.
+        
+        detail: minimal | terse | xml | full
+        """
         from shadow_web.browser_use import AsyncShadowPage
 
         await _ensure_browser()
@@ -124,19 +195,8 @@ def create_mcp_server():
         _session["shadow_page"] = shadow
 
         title = await page.title()
-        return {
-            "url": shadow.last_url,
-            "title": title,
-            "interaction_mode": shadow.interaction_mode,
-            "capture_mode": shadow.capture_mode,
-            "webmcp_available": shadow.webmcp.available,
-            "webmcp_tools": [tool.to_dict() for tool in shadow.webmcp.tools],
-            "action_count": len(shadow.action_map),
-            "groups": shadow.action_groups,
-            "xml_map": xml_map,
-            "clean_html_preview": clean_html[:2000],
-            "capture_stats": shadow.capture_stats,
-        }
+        detail_mode = detail if detail in ("minimal", "terse", "xml", "full") else "terse"
+        return _format_mcp_response(shadow, clean_html, xml_map, detail=detail_mode, title=title)
 
     @mcp.tool()
     async def web_search(query: str) -> dict:
@@ -175,27 +235,16 @@ def create_mcp_server():
         }
 
     @mcp.tool()
-    async def snapshot(diff: bool = False) -> dict:
-        """Refresh current page snapshot. Set diff=True for delta XML after first snapshot."""
+    async def snapshot(diff: bool = False, detail: str = "terse") -> dict:
+        """Refresh current page snapshot. Set diff=True for delta XML after first snapshot.
+        
+        detail: minimal | terse | xml | full
+        """
         shadow = _get_shadow_page()
         clean_html, xml_map = await shadow.refresh(diff=diff)
-        payload = {
-            "url": shadow.last_url,
-            "interaction_mode": shadow.interaction_mode,
-            "webmcp_available": shadow.webmcp.available,
-            "webmcp_tools": [tool.to_dict() for tool in shadow.webmcp.tools],
-            "action_count": len(shadow.action_map),
-            "groups": shadow.action_groups,
-            "xml_map": xml_map,
-            "clean_html_preview": clean_html[:2000],
-            "capture_stats": shadow.capture_stats,
-            "capture_mode": shadow.capture_mode,
-            "diff_mode": diff,
-        }
-        if shadow.last_diff:
-            payload["diff"] = shadow.last_diff.to_dict()
-            payload["diff_terse"] = shadow.diff_terse()
-        return payload
+        title = await shadow.page.title()
+        detail_mode = detail if detail in ("minimal", "terse", "xml", "full") else "terse"
+        return _format_mcp_response(shadow, clean_html, xml_map, detail=detail_mode, title=title, diff=diff)
 
     @mcp.tool()
     async def webmcp_list_tools() -> dict:

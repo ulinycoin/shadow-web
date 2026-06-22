@@ -3,7 +3,7 @@ import requests
 from typing import List, Dict, Any, Tuple, Optional, Union
 from .compressor import process_html, generate_grouped_xml_map
 from .dom_capture import capture_flattened_dom, interact_by_binding
-from .a11y_capture import CaptureMode, capture_page
+from .a11y_capture import CaptureMode, capture_page, detect_page_class
 from .heal_local import HealCache, local_heal
 from .query import QueryResult, shadow_grep
 from .webmcp import (
@@ -63,6 +63,9 @@ class ShadowPage:
 
         self.heal_cache = HealCache()
         self.healed_selectors: Dict[str, str] = {}
+        
+        self.page_class: str = "Static"
+        self.page_class_reason: str = ""
 
     def refresh(self, diff: bool = False) -> Tuple[str, str]:
         """Captures flattened DOM (read-only), builds clean HTML and Action Map.
@@ -89,13 +92,37 @@ class ShadowPage:
             self.bindings = {}
             self.capture_stats = {"webmcp_tools": self.webmcp.count}
             self.clean_html = ""
+            self.page_class = "WebMCP"
+            self.page_class_reason = "Page exposes WebMCP tools natively."
         else:
             self.interaction_mode = "action_map"
             flattened = capture_page(self.page, mode=self.capture_mode)
             self.bindings = flattened.bindings
             self.capture_stats = flattened.stats
             self.clean_html, self.action_map, self.action_groups = process_html(flattened.html)
+            
+            # SPA Auto-retry logic
+            if len(self.action_map) == 0 and len(flattened.html) > 1000 and self.capture_mode == "auto":
+                logger.info("[Shadow Web] SPA page suspected (0 actions). Waiting for networkidle/loading...")
+                try:
+                    self.page.wait_for_load_state("networkidle", timeout=3000)
+                except Exception:
+                    pass
+                flattened = capture_page(self.page, mode=self.capture_mode)
+                self.bindings = flattened.bindings
+                self.capture_stats = flattened.stats
+                self.clean_html, self.action_map, self.action_groups = process_html(flattened.html)
+                
             self.full_xml_map = generate_grouped_xml_map(self.last_url, title, self.action_groups)
+            
+            # Classify page layout and capture details
+            self.page_class, self.page_class_reason = detect_page_class(
+                self.last_url,
+                title,
+                flattened.html,
+                self.capture_stats,
+                len(self.action_map)
+            )
 
         current_snapshot = build_snapshot(
             self.last_url,
