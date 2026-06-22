@@ -1,7 +1,8 @@
-"""Local MCP server for Shadow Web (stdio, sync Playwright)."""
+"""Local MCP server for Shadow Web (stdio, async Playwright)."""
 
 from __future__ import annotations
 
+import json
 import os
 from typing import Any, Dict, Literal
 
@@ -18,29 +19,30 @@ def _get_shadow_page():
     return _session["shadow_page"]
 
 
-def _ensure_browser():
-    from playwright.sync_api import sync_playwright
+async def _ensure_browser():
+    from playwright.async_api import async_playwright
 
     if "playwright" not in _session:
-        pw = sync_playwright().start()
-        browser = pw.chromium.launch(headless=True)
-        context = browser.new_context()
-        page = context.new_page()
+        pw = await async_playwright().start()
+        browser = await pw.chromium.launch(headless=True)
+        context = await browser.new_context()
+        page = await context.new_page()
         _session["playwright"] = pw
         _session["browser"] = browser
         _session["context"] = context
         _session["page"] = page
 
 
-def _run_shadow_query(shadow, query: str, fmt: Literal["json", "terse", "xml"] = "json") -> dict | str:
-    result = shadow.query(query, fmt="result")
+async def _run_shadow_query(shadow, query: str, fmt: Literal["json", "terse", "xml"] = "json") -> dict | str:
+    result = await shadow.query(query, fmt="result")
     if fmt == "terse":
         return {"query": query, "format": "terse", "text": result.terse()}
     if fmt == "xml":
+        title = await shadow.page.title()
         return {
             "query": query,
             "format": "xml",
-            "xml": result.xml(url=shadow.last_url, title=shadow.page.title()),
+            "xml": result.xml(url=shadow.last_url, title=title),
         }
     return {
         "query": query,
@@ -71,7 +73,7 @@ def create_mcp_server():
         }
 
     @mcp.tool()
-    def shadow_query(query: str, format: str = "terse") -> dict | str:
+    async def shadow_query(query: str, format: str = "terse") -> dict | str:
         """
         shadow_grep — filter current page actions before sending to LLM.
 
@@ -87,7 +89,7 @@ def create_mcp_server():
         """
         shadow = _get_shadow_page()
         fmt = format if format in ("json", "terse", "xml") else "terse"
-        return _run_shadow_query(shadow, query, fmt=fmt)  # type: ignore[arg-type]
+        return await _run_shadow_query(shadow, query, fmt=fmt)  # type: ignore[arg-type]
 
     @mcp.tool()
     def shadow_grep_html(html: str, query: str, format: str = "terse") -> dict | str:
@@ -102,28 +104,29 @@ def create_mcp_server():
         return {"query": query, "format": "json", **result.to_dict()}
 
     @mcp.tool()
-    def query_page(query: str) -> dict:
+    async def query_page(query: str) -> dict:
         """Alias for shadow_query(format=json). Requires navigate first."""
         shadow = _get_shadow_page()
-        return _run_shadow_query(shadow, query, fmt="json")
+        return await _run_shadow_query(shadow, query, fmt="json")
 
     @mcp.tool()
-    def navigate(url: str, capture_mode: str = "auto") -> dict:
-        """Open URL in Playwright and build grouped Action Map snapshot."""
-        from shadow_web.wrapper import ShadowPage
+    async def navigate(url: str, capture_mode: str = "auto") -> dict:
+        """Open URL in Playwright and build grouped XML Action Map snapshot."""
+        from shadow_web.browser_use import AsyncShadowPage
 
-        _ensure_browser()
+        await _ensure_browser()
         page = _session["page"]
-        page.goto(url, wait_until="domcontentloaded")
+        await page.goto(url, wait_until="domcontentloaded")
         heal_url = os.environ.get("SHADOW_WEB_HEAL_URL")
         mode = capture_mode if capture_mode in ("dom", "a11y", "dual", "auto") else "auto"
-        shadow = ShadowPage(page, heal_api_url=heal_url, capture_mode=mode)
-        clean_html, xml_map = shadow.refresh()
+        shadow = AsyncShadowPage(page, heal_api_url=heal_url, capture_mode=mode)
+        clean_html, xml_map = await shadow.refresh()
         _session["shadow_page"] = shadow
 
+        title = await page.title()
         return {
             "url": shadow.last_url,
-            "title": page.title(),
+            "title": title,
             "interaction_mode": shadow.interaction_mode,
             "capture_mode": shadow.capture_mode,
             "webmcp_available": shadow.webmcp.available,
@@ -133,14 +136,13 @@ def create_mcp_server():
             "xml_map": xml_map,
             "clean_html_preview": clean_html[:2000],
             "capture_stats": shadow.capture_stats,
-            "capture_mode": shadow.capture_mode,
         }
 
     @mcp.tool()
-    def snapshot(diff: bool = False) -> dict:
+    async def snapshot(diff: bool = False) -> dict:
         """Refresh current page snapshot. Set diff=True for delta XML after first snapshot."""
         shadow = _get_shadow_page()
-        clean_html, xml_map = shadow.refresh(diff=diff)
+        clean_html, xml_map = await shadow.refresh(diff=diff)
         payload = {
             "url": shadow.last_url,
             "interaction_mode": shadow.interaction_mode,
@@ -160,10 +162,10 @@ def create_mcp_server():
         return payload
 
     @mcp.tool()
-    def webmcp_list_tools() -> dict:
+    async def webmcp_list_tools() -> dict:
         """Detect WebMCP tools on the current page (Chrome 145+ preview)."""
         shadow = _get_shadow_page()
-        snapshot = shadow.list_webmcp_tools()
+        snapshot = await shadow.list_webmcp_tools()
         return {
             "available": snapshot.available,
             "api": snapshot.api,
@@ -173,13 +175,11 @@ def create_mcp_server():
         }
 
     @mcp.tool()
-    def webmcp_execute_tool(name: str, arguments: str = "{}") -> dict:
+    async def webmcp_execute_tool(name: str, arguments: str = "{}") -> dict:
         """Execute a WebMCP tool by name. arguments: JSON object string."""
-        import json
-
         shadow = _get_shadow_page()
         args = json.loads(arguments or "{}")
-        result = shadow.execute_tool(name, args)
+        result = await shadow.execute_tool(name, args)
         return {
             "ok": True,
             "tool": name,
@@ -189,17 +189,17 @@ def create_mcp_server():
         }
 
     @mcp.tool()
-    def click(sid: str) -> dict:
+    async def click(sid: str) -> dict:
         """Click element by data-sid on the current page."""
         shadow = _get_shadow_page()
-        shadow.click(sid)
+        await shadow.click(sid)
         return {"ok": True, "sid": sid, "url": shadow.last_url}
 
     @mcp.tool()
-    def fill(sid: str, value: str) -> dict:
+    async def fill(sid: str, value: str) -> dict:
         """Fill input by data-sid on the current page."""
         shadow = _get_shadow_page()
-        shadow.fill(sid, value)
+        await shadow.fill(sid, value)
         return {"ok": True, "sid": sid, "url": shadow.last_url}
 
     @mcp.tool()
