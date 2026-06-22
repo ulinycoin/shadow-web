@@ -5,8 +5,9 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
-
 from lxml import etree
+
+from .utils import _parse_eval_res
 
 PageLike = Any
 
@@ -108,7 +109,10 @@ def _parse_webmcp_raw(raw: Optional[Dict[str, Any]]) -> WebMcpSnapshot:
 
 def detect_webmcp(page: PageLike) -> WebMcpSnapshot:
     """Detect WebMCP tools exposed by the current page."""
-    return _parse_webmcp_raw(page.evaluate(_DETECT_TOOLS_SCRIPT))
+    raw = _parse_eval_res(page.evaluate(_DETECT_TOOLS_SCRIPT))
+    if not isinstance(raw, dict):
+        raw = {}
+    return _parse_webmcp_raw(raw)
 
 
 def execute_webmcp_tool(page: PageLike, name: str, arguments: Optional[Dict[str, Any]] = None) -> Any:
@@ -116,9 +120,11 @@ def execute_webmcp_tool(page: PageLike, name: str, arguments: Optional[Dict[str,
     if not name:
         raise ValueError("Tool name is required")
 
-    result = page.evaluate(_EXECUTE_TOOL_SCRIPT, {"name": name, "args": arguments or {}})
-    if not result or not result.get("ok"):
-        error = (result or {}).get("error", "unknown")
+    result = _parse_eval_res(page.evaluate(_EXECUTE_TOOL_SCRIPT, {"name": name, "args": arguments or {}}))
+    if not isinstance(result, dict):
+        result = {}
+    if not result.get("ok"):
+        error = result.get("error", "unknown")
         raise RuntimeError(f"WebMCP executeTool('{name}') failed: {error}")
     return result.get("result")
 
@@ -173,7 +179,10 @@ def webmcp_tools_terse(tools: List[WebMcpTool]) -> str:
 
 async def adetect_webmcp(page: PageLike) -> WebMcpSnapshot:
     """Async variant of :func:`detect_webmcp`."""
-    return _parse_webmcp_raw(await page.evaluate(_DETECT_TOOLS_SCRIPT))
+    raw = _parse_eval_res(await page.evaluate(_DETECT_TOOLS_SCRIPT))
+    if not isinstance(raw, dict):
+        raw = {}
+    return _parse_webmcp_raw(raw)
 
 
 async def aexecute_webmcp_tool(
@@ -183,8 +192,10 @@ async def aexecute_webmcp_tool(
     if not name:
         raise ValueError("Tool name is required")
 
-    result = await page.evaluate(_EXECUTE_TOOL_SCRIPT, {"name": name, "args": arguments or {}})
-    if not result or not result.get("ok"):
-        error = (result or {}).get("error", "unknown")
+    result = _parse_eval_res(await page.evaluate(_EXECUTE_TOOL_SCRIPT, {"name": name, "args": arguments or {}}))
+    if not isinstance(result, dict):
+        result = {}
+    if not result.get("ok"):
+        error = result.get("error", "unknown")
         raise RuntimeError(f"WebMCP executeTool('{name}') failed: {error}")
     return result.get("result")

@@ -233,6 +233,9 @@ _INTERACT_SCRIPT = """
 """
 
 
+from .utils import _parse_eval_res
+
+
 def capture_flattened_dom(page: PageLike) -> FlattenResult:
     """
     Flatten open Shadow DOM and same-origin iframes into an HTML string.
@@ -240,7 +243,9 @@ def capture_flattened_dom(page: PageLike) -> FlattenResult:
     The live document is never modified. Use :func:`interact_by_binding` to act
     on elements in the real DOM via stored paths.
     """
-    raw = page.evaluate(_FLATTEN_SCRIPT)
+    raw = _parse_eval_res(page.evaluate(_FLATTEN_SCRIPT))
+    if not isinstance(raw, dict):
+        raw = {}
     return FlattenResult(
         html=raw.get("html") or "<body></body>",
         bindings=raw.get("bindings") or {},
@@ -253,7 +258,7 @@ def resolve_binding(page: PageLike, binding: Dict[str, Any]) -> bool:
     path = binding.get("path")
     if not path:
         return False
-    node = page.evaluate(_RESOLVE_SCRIPT, {"path": path})
+    node = _parse_eval_res(page.evaluate(_RESOLVE_SCRIPT, {"path": path}))
     return node is not None
 
 
@@ -274,12 +279,14 @@ def interact_by_binding(
     if not path:
         raise ValueError("Binding has no path")
 
-    result = page.evaluate(
+    result = _parse_eval_res(page.evaluate(
         _INTERACT_SCRIPT,
         {"path": path, "action": action, "value": value},
-    )
-    if not result or not result.get("ok"):
-        error = (result or {}).get("error", "unknown")
+    ))
+    if not isinstance(result, dict):
+        result = {}
+    if not result.get("ok"):
+        error = result.get("error", "unknown")
         tag = binding.get("tag", "?")
         raise RuntimeError(
             f"Failed to {action} element <{tag}> via binding path: {error}"

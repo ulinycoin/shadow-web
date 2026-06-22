@@ -1,41 +1,42 @@
-# Интеграция с browser-use (Shadow Web)
+# Integration with browser-use (Shadow Web)
 
-Этот пример демонстрирует, как использовать **Shadow Web** (`AsyncShadowPage`) внутри самого популярного фреймворка для ИИ-браузинга — **browser-use**.
-
----
-
-## В чём ценность интеграции?
-
-1. **Экономия токенов до 80-90%:** Вместо передачи гигантского сырого дерева DOM или тяжелого текстового представления агенту в каждом шаге, мы передаем сжатую **XML карту действий** (`xml_map`) с семантическими группами.
-2. **Самовосстановление (Self-Healing):** Агент взаимодействует с элементами через их уникальные `data-sid` (идентификаторы привязки). Если верстка изменилась, `AsyncShadowPage` прозрачно восстанавливает сломанный селектор локально или через облачное API, не прерывая выполнение агента.
-3. **Shadow DOM и Iframe:** Позволяет `browser-use` видеть интерактивные элементы внутри открытых Shadow Roots и same-origin iframe-ов.
+This example demonstrates how to use **Shadow Web** (`ShadowTools`) inside **browser-use**, the most popular framework for AI web browsing.
 
 ---
 
-## Быстрый запуск
+## Why use this integration?
 
-### 1. Установка зависимостей
+1. **Save up to 80-90% of tokens:** The agent receives a compact **terse Action Map** by default (full grouped XML available via `format="xml"`).
+2. **Self-Healing Selectors:** The agent interacts with elements using their unique `data-sid` (binding identifiers). If the page layout changes, `ShadowTools` transparently heals broken selectors locally (fuzzy match) or via the cloud API, without interrupting the agent's execution.
+3. **Shadow DOM & Iframe Support:** Allows `browser-use` to see and interact with elements inside open Shadow Roots and same-origin iframes.
 
-Установите `shadow-web` в режиме редактирования, а также библиотеки `browser-use` и `langchain-openai`:
+---
+
+## Quick Start
+
+### 1. Install Dependencies
+
+Install `shadow-web` in editable mode, along with `browser-use` and `langchain-openai`:
 
 ```bash
-pip install -e .
-pip install browser-use langchain-openai
+pip install -e ".[browser-use]"
+# or: pip install "shadow-web[browser-use]"
+pip install langchain-openai
 ```
 
-### 2. Настройка окружения
+### 2. Configure Environment
 
-Задайте ключи API для LLM и сервиса восстановления в вашем `.env` или экспортируйте в терминале:
+Set up your API keys for the LLM and the healing service in your `.env` file or export them in your terminal:
 
 ```bash
 export OPENAI_API_KEY="your-openai-key"
-# Если вы используете сервис восстановления:
+# If you are using the self-healing API:
 export SHADOW_WEB_HEAL_URL="http://localhost:8000/v1/heal"
 ```
 
-### 3. Запуск демо
+### 3. Run the Demo
 
-Запустите пример:
+Run the example script:
 
 ```bash
 python examples/browser_use/demo.py
@@ -43,12 +44,26 @@ python examples/browser_use/demo.py
 
 ---
 
-## Как это устроено?
+## How It Works
 
-В примере [demo.py](./demo.py):
-* Мы инициализируем `AsyncShadowPage`, передавая в него асинхронный Playwright-объект `page` из `browser-use`.
-* Регистрируем 3 инструмента для агента через `@tools.action`:
-  * `get_xml_action_map`: возвращает сжатую карту страницы.
-  * `click_shadow_element`: кликает по `data-sid` с поддержкой локального/облачного восстановления селекторов.
-  * `fill_shadow_element`: заполняет текстовые поля по `data-sid` с авто-восстановлением.
-* Инструктируем агента общаться с веб-страницей только через наши кастомные инструменты.
+In the [demo.py](./demo.py) example, integration takes only a few lines:
+
+```python
+from browser_use import Agent
+from shadow_web import ShadowTools
+
+# Initialize optimized tools (terse by default; use default_format="xml" for full grouped XML)
+tools = ShadowTools()
+
+# Pass them to the agent
+agent = Agent(
+    task="Go to news.ycombinator.com and search for 'Agent' using our custom shadow tools.",
+    llm=llm,
+    tools=tools
+)
+```
+
+`ShadowTools` automatically:
+* Disables `browser-use`'s default `click_element` and `input_text` actions (which cannot interact with Shadow DOM or read the compressed tree).
+* Registers `get_xml_action_map` (supports `query` + `format`), `click_shadow_element`, and `fill_shadow_element` instead.
+* Under the hood, binds `AsyncShadowPage` to active browser session tabs for DOM compression and local fuzzy self-healing.

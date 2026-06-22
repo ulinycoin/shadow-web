@@ -3,8 +3,31 @@ import sys
 import time
 import subprocess
 import unittest
+
+import pytest
 import requests
 from playwright.sync_api import sync_playwright
+
+pytestmark = pytest.mark.integration
+
+
+def _wait_for_server(url: str, proc: subprocess.Popen, timeout_s: float = 30.0) -> None:
+    """Poll until the FastAPI server accepts connections."""
+    deadline = time.monotonic() + timeout_s
+    last_error: Exception | None = None
+    while time.monotonic() < deadline:
+        if proc.poll() is not None:
+            stderr = proc.stderr.read().decode("utf-8", errors="replace") if proc.stderr else ""
+            raise RuntimeError(f"FastAPI server exited early:\n{stderr}")
+        try:
+            res = requests.get(url, timeout=2)
+            print(f"[Test] Server check status: {res.status_code} (Alive)")
+            return
+        except Exception as exc:
+            last_error = exc
+            time.sleep(0.5)
+    proc.kill()
+    raise RuntimeError(f"Failed to connect to local FastAPI server: {last_error}")
 
 # Ensure src is in PYTHONPATH
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
@@ -23,16 +46,7 @@ class TestSelfHealingIntegration(unittest.TestCase):
             stderr=subprocess.PIPE
         )
 
-        # Give server time to spin up
-        time.sleep(5.0)
-        # Check if server is running
-        try:
-            res = requests.get("http://127.0.0.1:8000/v1/compress", timeout=2)
-            # We expect a 400 or 422 because it's a GET, but it proves the server is alive
-            print(f"[Test] Server check status: {res.status_code} (Alive)")
-        except Exception as e:
-            cls.server_proc.kill()
-            raise RuntimeError(f"Failed to connect to local FastAPI server: {e}")
+        _wait_for_server("http://127.0.0.1:8000/v1/compress", cls.server_proc)
 
     @classmethod
     def tearDownClass(cls):
