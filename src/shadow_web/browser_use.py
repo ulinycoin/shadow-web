@@ -158,6 +158,11 @@ class AsyncShadowPage:
             return "# diff: no snapshot yet"
         return diff_terse(self.last_diff)
 
+    async def list_webmcp_tools(self) -> WebMcpSnapshot:
+        """Refresh WebMCP detection without rebuilding the full Action Map."""
+        self.webmcp = await adetect_webmcp(self.page)
+        return self.webmcp
+
     def get_action_by_sid(self, sid: str) -> Optional[Dict[str, Any]]:
         """Finds action metadata from the current Action Map."""
         for action in self.action_map:
