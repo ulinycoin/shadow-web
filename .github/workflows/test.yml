@@ -19,7 +19,7 @@ jobs:
           python -m pip install -e ".[dev,browser-use]"
           python -m playwright install chromium
       - name: Tests (unit + browser-use, no integration)
-        run: pytest tests/ -v --override-ini="addopts="
+        run: pytest tests/ -v
 
   integration:
     runs-on: ubuntu-latest
