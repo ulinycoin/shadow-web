@@ -207,6 +207,50 @@ def labels_from_dom_html(html_text: str) -> List[str]:
     return labels
 
 
+def detect_page_class(
+    url: str,
+    title: str,
+    html_content: str,
+    stats: Dict[str, Any],
+    action_map_len: int
+) -> tuple[str, str]:
+    """Analyze page structure and classify it.
+    
+    Returns:
+        tuple[str, str]: (page_class, reason)
+    """
+    html_len = len(html_content) if html_content else 0
+    shadow_hosts = stats.get("shadow_hosts", 0)
+    cross_origin_iframes = stats.get("cross_origin_iframes", 0)
+    
+    # 1. Anti-bot (Cloudflare, CAPTCHA, block pages)
+    lower_html = html_content.lower() if html_content else ""
+    if html_len < 15000 and any(m in lower_html for m in ["captcha", "cloudflare", "bot detection", "robot check", "just a moment"]):
+        return "Anti-bot", "CAPTCHA or Cloudflare protection detected (small HTML with security markers)."
+        
+    # 2. Auth-gated
+    lower_url = url.lower() if url else ""
+    if "login" in lower_url or "signin" in lower_url or "authorize" in lower_url:
+        return "Auth-gated", "Redirected to a login or sign-in page."
+        
+    # 3. SPA (Single Page Application)
+    if action_map_len == 0 and html_len > 1000:
+        return "SPA", "No interactive elements detected; page might be loading or a dynamic SPA."
+        
+    # 4. Shadow DOM / Closed Shadow
+    if shadow_hosts > 0:
+        if stats.get("a11y_supplement_nodes", 0) > 0:
+            return "Closed Shadow", f"Detected {shadow_hosts} shadow hosts and closed shadow nodes in a11y tree."
+        return "Shadow DOM", f"Detected {shadow_hosts} open shadow hosts."
+        
+    # 5. Iframe-heavy
+    if cross_origin_iframes > 0:
+        return "Iframe-heavy", f"Detected {cross_origin_iframes} cross-origin iframes which are inaccessible to local script."
+        
+    # 6. Static / Standard
+    return "Static", "Standard HTML page with static layout."
+
+
 def needs_a11y_supplement(
     dom: FlattenResult,
     a11y: A11yCaptureResult,
