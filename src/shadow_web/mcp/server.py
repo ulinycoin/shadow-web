@@ -139,6 +139,42 @@ def create_mcp_server():
         }
 
     @mcp.tool()
+    async def web_search(query: str) -> dict:
+        """Search the web via Yahoo Search (no API keys, works out-of-the-box)."""
+        import urllib.parse
+        from shadow_web.browser_use import AsyncShadowPage
+
+        await _ensure_browser()
+        page = _session["page"]
+        
+        encoded_query = urllib.parse.quote_plus(query)
+        url = f"https://search.yahoo.com/search?p={encoded_query}"
+        
+        await page.goto(url, wait_until="domcontentloaded")
+        shadow = AsyncShadowPage(page, capture_mode="auto")
+        await shadow.refresh()
+        
+        results = []
+        for action in shadow.action_map:
+            label = action.get("label", "")
+            href = action.get("href", "")
+            if href and not href.startswith("/") and "yahoo" not in href and len(label) > 10:
+                results.append({
+                    "title": label,
+                    "url": href,
+                    "sid": action["id"]
+                })
+                
+        # Cache the shadow page session so subsequent snapshot/click commands work on search results
+        _session["shadow_page"] = shadow
+        
+        return {
+            "query": query,
+            "results": results[:10],
+            "results_count": len(results),
+        }
+
+    @mcp.tool()
     async def snapshot(diff: bool = False) -> dict:
         """Refresh current page snapshot. Set diff=True for delta XML after first snapshot."""
         shadow = _get_shadow_page()
