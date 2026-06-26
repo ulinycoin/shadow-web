@@ -183,7 +183,7 @@ Run locally: `pip install tiktoken && python benchmarks/run.py`
 }
 ```
 
-Tools: `navigate`, `snapshot`, `click`, `fill`, `compress_html`, `shadow_query`, `webmcp_list_tools`, `webmcp_execute_tool`, `web_search` (built-in out-of-the-box search).
+Tools: `navigate`, `snapshot`, `click`, `fill`, `compress_html`, `shadow_query`, `webmcp_list_tools`, `webmcp_execute_tool`, `web_search` (Brave Search, no API keys).
 
 ---
 

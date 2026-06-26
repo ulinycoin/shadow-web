@@ -12,6 +12,34 @@ from shadow_web.query import shadow_grep
 # Lazy browser session for navigate/snapshot/click tools.
 _session: Dict[str, Any] = {}
 
+_STEALTH_USER_AGENT = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+)
+
+_SEARCH_NAV_JUNK = (
+    "settings",
+    "sign in",
+    "privacy",
+    "terms",
+    "advertise",
+    "help",
+    "report a concern",
+    "suggestions",
+    "cookie",
+    "search again",
+    "see full list",
+    "skip to content",
+    "accessibility",
+    "feedback",
+    "rewards",
+)
+
+_SEARCH_ENGINES = (
+    ("brave", "https://search.brave.com/search?q={query}", ("brave.com", "search.brave.com")),
+    ("yahoo", "https://search.yahoo.com/search?p={query}", ("yahoo.com", "yimg.com")),
+)
+
 
 def _get_shadow_page():
     if "shadow_page" not in _session:
@@ -19,14 +47,54 @@ def _get_shadow_page():
     return _session["shadow_page"]
 
 
+def _extract_search_results(
+    action_map: list[dict[str, Any]],
+    exclude_domains: tuple[str, ...],
+) -> list[dict[str, str]]:
+    seen_urls: set[str] = set()
+    results: list[dict[str, str]] = []
+
+    for action in action_map:
+        label = (action.get("label") or "").strip()
+        href = (action.get("href") or "").strip()
+        if not href.startswith("http"):
+            continue
+        if href.startswith("javascript:"):
+            continue
+        lowered_href = href.lower()
+        if any(domain in lowered_href for domain in exclude_domains):
+            continue
+        if len(label) < 12:
+            continue
+        lowered_label = label.lower()
+        if any(junk in lowered_label for junk in _SEARCH_NAV_JUNK):
+            continue
+        if href in seen_urls:
+            continue
+
+        seen_urls.add(href)
+        results.append({"title": label, "url": href, "sid": str(action["id"])})
+
+    return results
+
+
 async def _ensure_browser():
     from playwright.async_api import async_playwright
 
     if "playwright" not in _session:
         pw = await async_playwright().start()
-        browser = await pw.chromium.launch(headless=True)
-        context = await browser.new_context()
+        browser = await pw.chromium.launch(
+            headless=True,
+            args=["--disable-blink-features=AutomationControlled"],
+        )
+        context = await browser.new_context(
+            user_agent=_STEALTH_USER_AGENT,
+            locale="en-US",
+        )
         page = await context.new_page()
+        await page.add_init_script(
+            "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
+        )
         _session["playwright"] = pw
         _session["browser"] = browser
         _session["context"] = context
@@ -200,38 +268,45 @@ def create_mcp_server():
 
     @mcp.tool()
     async def web_search(query: str) -> dict:
-        """Search the web via Yahoo Search (no API keys, works out-of-the-box)."""
+        """Search the web via Brave Search (Yahoo fallback). No API keys required."""
         import urllib.parse
         from shadow_web.browser_use import AsyncShadowPage
 
         await _ensure_browser()
         page = _session["page"]
-        
+
         encoded_query = urllib.parse.quote_plus(query)
-        url = f"https://search.yahoo.com/search?p={encoded_query}"
-        
-        await page.goto(url, wait_until="domcontentloaded")
-        shadow = AsyncShadowPage(page, capture_mode="auto")
-        await shadow.refresh()
-        
-        results = []
-        for action in shadow.action_map:
-            label = action.get("label", "")
-            href = action.get("href", "")
-            if href and not href.startswith("/") and "yahoo" not in href and len(label) > 10:
-                results.append({
-                    "title": label,
-                    "url": href,
-                    "sid": action["id"]
-                })
-                
-        # Cache the shadow page session so subsequent snapshot/click commands work on search results
-        _session["shadow_page"] = shadow
-        
+        heal_url = os.environ.get("SHADOW_WEB_HEAL_URL")
+        tried_engines: list[str] = []
+
+        for engine_name, url_template, exclude_domains in _SEARCH_ENGINES:
+            tried_engines.append(engine_name)
+            url = url_template.format(query=encoded_query)
+
+            await page.goto(url, wait_until="domcontentloaded")
+            await page.wait_for_timeout(2000)
+
+            shadow = AsyncShadowPage(page, heal_api_url=heal_url, capture_mode="auto")
+            await shadow.refresh()
+            results = _extract_search_results(shadow.action_map, exclude_domains)
+            if not results:
+                continue
+
+            _session["shadow_page"] = shadow
+            return {
+                "query": query,
+                "engine": engine_name,
+                "results": results[:10],
+                "results_count": len(results),
+            }
+
         return {
             "query": query,
-            "results": results[:10],
-            "results_count": len(results),
+            "engine": None,
+            "engines_tried": tried_engines,
+            "results": [],
+            "results_count": 0,
+            "error": "No organic search results captured. Search engines may be blocking headless access.",
         }
 
     @mcp.tool()
