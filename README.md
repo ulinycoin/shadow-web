@@ -58,7 +58,7 @@ Shadow Web is what runs **between** the browser and the LLM: a compression layer
 | You're building … | Why Shadow Web |
 |-------------------|----------------|
 | A browser-based AI agent | Action Map + self-healing + SchemaSnap = fewer failures, structured data |
-| An MCP tool for Cursor/Claude | Built-in MCP server with 15+ tools, one-command setup |
+| An MCP tool for Cursor/Claude | Built-in MCP server with **22 tools**, one-command setup |
 | A Playwright scraper that breaks on every deploy | `heal_local.py` catches DOM drift without LLM cost |
 | A Shadow DOM-heavy app (Web components, Lit, Angular) | Read-only flatten — no React/Vue breakage |
 | **An agent that needs data from web pages** | SchemaSnap parses tables, forms, and lists into clean JSON |
@@ -83,6 +83,25 @@ pip install "shadow-web[all]"           # everything
 ---
 
 ## Demo
+
+### Golden path (recommended — run locally)
+
+Full agent loop with token counts at each step:
+
+```bash
+pip install -e ".[mcp]"
+playwright install chromium
+python examples/golden_path/demo.py
+```
+
+Output: raw HTML vs `navigate(minimal)` + `schema_session_json` + `shadow_query` — side-by-side token table.  
+Playbook: [examples/golden_path/CASE.md](examples/golden_path/CASE.md)
+
+Smoke test (install + unit tests + one live site):
+
+```bash
+bash scripts/smoke_install.sh
+```
 
 ### Compress a page (3 lines)
 
@@ -158,24 +177,39 @@ data = parse_page(raw_html)
 #   ]
 # }
 
-# Or extract only tables with a row limit
-tables = parse_tables(html, max_rows=50)
-# When truncated: adds rows_truncated=True, rows_returned=50
+# Or export table rows directly
+from shadow_web.schema_snap import export_table_json, export_table_csv
+
+records = export_table_json(clean_html, max_rows=50)
+# [{"Name": "Alice", "Age": 30}, ...]
+
+csv_text = export_table_csv(clean_html)
+# "Name,Age\nAlice,30\n..."
 ```
 
-### SchemaSnap in MCP (no browser session)
+### SchemaSnap in MCP
 
-```python
-# Via MCP — send HTML directly
-mcp.schema_table(html=raw_html)
-mcp.schema_form(html=raw_html)
-mcp.schema_list(html=raw_html)
-mcp.schema_page(html=raw_html)
+**From HTML string (no browser):**
 
-# Or from the current browser session (after navigate/snapshot)
-mcp.schema_session()
-mcp.get_page_html()
-```
+| Tool | Output |
+|------|--------|
+| `schema_table(html)` | columns + types + rows |
+| `schema_form(html)` | fields + validation |
+| `schema_list(html)` | ul/ol/standalone select |
+| `schema_page(html)` | all of the above |
+| `schema_json(html)` | `[{column: value}, ...]` |
+| `schema_csv(html)` | `"col1,col2\n..."` |
+
+**From browser session** (after `navigate` / `snapshot`):
+
+| Tool | Output |
+|------|--------|
+| `schema_session()` | tables + forms + lists |
+| `schema_session_json()` | JSON records |
+| `schema_session_csv()` | CSV string |
+| `get_page_html(max_chars=50000)` | clean HTML (truncated by default) |
+
+All table tools accept `max_rows=50` (default). Set `max_rows=0` for full data.
 
 ---
 
@@ -212,7 +246,7 @@ shadow_web/
 ├── compressor.py      # DOM strip + Action Map + semantic groups
 ├── dom_capture.py     # Shadow DOM / iframe flatten (in-browser, read-only)
 ├── grouping.py        # Semantic groups (forms, nav, modals)
-├── schema_snap.py     # ★ NEW — parse tables, forms, lists → structured JSON
+├── schema_snap.py     # Tables, forms, lists → JSON/CSV export
 ├── heal_local.py      # Local selector heal + ~/.shadow-web/heal_cache.json
 ├── query.py           # shadow_grep (type:, intent:, label~, AND)
 ├── webmcp.py          # WebMCP bridge (Chrome 145+)
@@ -240,6 +274,14 @@ Run locally: `pip install tiktoken && python benchmarks/run.py`
 
 ## MCP for Cursor / Claude
 
+One-command setup:
+
+```bash
+bash scripts/cursor-setup.sh
+```
+
+Or manually:
+
 ```json
 {
   "mcpServers": {
@@ -250,24 +292,42 @@ Run locally: `pip install tiktoken && python benchmarks/run.py`
 }
 ```
 
-**Tools (15+):**
+### All 22 tools
 
-| Tool | What it does |
-|------|-------------|
-| `navigate` | Open URL → Action Map snapshot |
-| `snapshot` | Refresh page (opt-in diff mode) |
-| `click`, `fill` | Interact by data-sid |
-| `compress_html` | Strip + Action Map from raw HTML |
-| `compress_html_to_xml` | Grouped XML from raw HTML |
-| `shadow_query`, `query_page`, `shadow_grep_html` | grep-style element filter |
-| `web_search` | Brave Search (no API keys) |
-| `webmcp_list_tools`, `webmcp_execute_tool` | Chrome WebMCP bridge |
-| **`schema_table`** | ★ Table columns + types + rows (from HTML) |
-| **`schema_form`** | ★ Form fields with validation |
-| **`schema_list`** | ★ List items |
-| **`schema_page`** | ★ All of the above at once |
-| **`schema_session`** | ★ All from current browser session |
-| **`get_page_html`** | ★ Full clean HTML from current session |
+| Category | Tool | What it does |
+|----------|------|--------------|
+| **Browse** | `navigate` | Open URL → snapshot (`detail`: minimal / terse / xml / full) |
+| | `snapshot` | Refresh page; `diff=true` for delta only |
+| | `click`, `fill` | Interact by `data-sid` |
+| **Filter (control plane)** | `shadow_query` | grep-style filter on live session |
+| | `query_page` | Alias for shadow_query (json output) |
+| | `shadow_grep_html` | Filter raw/clean HTML without browser |
+| **Compress (offline)** | `compress_html` | Strip + Action Map + groups |
+| | `compress_html_to_xml` | Grouped XML from HTML |
+| **Data (SchemaSnap)** | `schema_table` | Table columns + types + rows |
+| | `schema_form` | Form fields + validation |
+| | `schema_list` | Lists + standalone selects |
+| | `schema_page` | All structured data at once |
+| | `schema_json` | Table → JSON records |
+| | `schema_csv` | Table → CSV string |
+| | `schema_session` | Structured data from browser session |
+| | `schema_session_json` | JSON records from session |
+| | `schema_session_csv` | CSV from session |
+| | `get_page_html` | Clean HTML (`max_chars` default 50000) |
+| **Search** | `web_search` | Brave Search (no API keys) |
+| **WebMCP** | `webmcp_list_tools` | Chrome 145+ page tools |
+| | `webmcp_execute_tool` | Execute WebMCP tool by name |
+
+### Recommended MCP workflow
+
+```
+navigate(url, detail="minimal")     # ~200 tokens — action_count, page_class
+schema_session_json(max_rows=50)    # data plane — table records
+shadow_query("intent:login")        # control plane — what to click
+click(sid) → snapshot(diff=true)    # delta only after action
+```
+
+See [examples/golden_path/CASE.md](examples/golden_path/CASE.md) for the full playbook.
 
 ---
 
@@ -313,15 +373,29 @@ selector verified in headless Chromium → cached to ~/.shadow-web/heal_cache.js
 
 ## SchemaSnap — token-aware data extraction
 
-SchemaSnap tools default to **max_rows=50** to keep token usage predictable. Set `max_rows=0` for full data when you need it — but remember that a 500-row table can cost 10K+ tokens.
+SchemaSnap is the **data plane** complement to the Action Map **control plane**:
 
-```
-navigate(url, detail="minimal")   → load page, minimal output
-schema_session()                  → tables + forms, max 50 rows/table
-schema_session(max_rows=0)        → full data (potentially large)
-```
+| Layer | Question | Tools |
+|-------|----------|-------|
+| Control | What can I click? | `navigate`, `shadow_query`, `click`, `fill` |
+| Data | What data is on the page? | `schema_session_json`, `schema_session`, `schema_csv` |
 
-**Type inference** detects: `string`, `integer`, `number`, `currency` ($/€/£), `percentage`, `date`, `email`, `url`.
+Default **max_rows=50** per table. Set `max_rows=0` for full export when needed.
+
+**Type inference:** `string`, `integer`, `number`, `currency`, `percentage`, `date`, `email`, `url`.
+
+---
+
+## Known limitations
+
+| Limitation | Workaround |
+|------------|------------|
+| **Anti-bot / Cloudflare** headless | `page_class: Anti-bot` — stop, don't retry; use headed browser or manual step |
+| **`colspan` / `rowspan` tables** | Column alignment may drift; verify row shape |
+| **JS-rendered grids** (AG Grid, React Table) | May not use `<table>` — use `shadow_query` + Action Map instead |
+| **Closed Shadow DOM** | `navigate(..., capture_mode="dual")` or `"a11y"` |
+| **Cross-origin iframes** | Not accessible — `page_class: Iframe-heavy` |
+| **Token bombs** | Never default to `detail="full"`, `get_page_html(max_chars=0)`, or `max_rows=0` unless debugging |
 
 ---
 
