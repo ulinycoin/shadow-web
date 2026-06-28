@@ -429,6 +429,44 @@ def create_mcp_server():
         limit = None if max_rows <= 0 else max_rows
         return parse_page(_session["clean_html"], max_rows=limit)
 
+    @mcp.tool()
+    def schema_json(html: str, table_index: int = 0, max_rows: int = 50) -> list[dict]:
+        """Export HTML table as JSON records: [{Name: \"Alice\", Age: 30}, ...].
+
+        table_index: which <table> on the page (default 0). max_rows: cap rows (0 = all).
+        """
+        from shadow_web.schema_snap import export_table_json
+        limit = None if max_rows <= 0 else max_rows
+        return export_table_json(html, table_index=table_index, max_rows=limit)
+
+    @mcp.tool()
+    def schema_csv(html: str, table_index: int = 0, max_rows: int = 50) -> str:
+        """Export HTML table as CSV: \"Name,Age,Email\\nAlice,30,alice@...\".
+
+        table_index: which <table> on the page (default 0). max_rows: cap rows (0 = all).
+        """
+        from shadow_web.schema_snap import export_table_csv
+        limit = None if max_rows <= 0 else max_rows
+        return export_table_csv(html, table_index=table_index, max_rows=limit)
+
+    @mcp.tool()
+    def schema_session_json(table_index: int = 0, max_rows: int = 50) -> list[dict]:
+        """Export table from current browser session as JSON records. Requires navigate/snapshot first."""
+        if "clean_html" not in _session:
+            raise RuntimeError("No page loaded. Call navigate(url) or snapshot() first.")
+        from shadow_web.schema_snap import export_table_json
+        limit = None if max_rows <= 0 else max_rows
+        return export_table_json(_session["clean_html"], table_index=table_index, max_rows=limit)
+
+    @mcp.tool()
+    def schema_session_csv(table_index: int = 0, max_rows: int = 50) -> str:
+        """Export table from current browser session as CSV. Requires navigate/snapshot first."""
+        if "clean_html" not in _session:
+            raise RuntimeError("No page loaded. Call navigate(url) or snapshot() first.")
+        from shadow_web.schema_snap import export_table_csv
+        limit = None if max_rows <= 0 else max_rows
+        return export_table_csv(_session["clean_html"], table_index=table_index, max_rows=limit)
+
     return mcp
 
 

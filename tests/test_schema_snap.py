@@ -2,7 +2,15 @@
 
 from __future__ import annotations
 
-from shadow_web.schema_snap import parse_tables, parse_forms, parse_lists, parse_page
+from shadow_web.schema_snap import (
+    parse_tables,
+    parse_forms,
+    parse_lists,
+    parse_page,
+    export_table_json,
+    export_table_csv,
+    table_to_csv,
+)
 
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────
@@ -326,3 +334,34 @@ class TestEdgeCases:
         assert len(table["rows"]) == 10
         assert table["rows_truncated"] is True
         assert table["rows_returned"] == 10
+
+
+class TestExport:
+    def test_export_json_records(self):
+        records = export_table_json(SIMPLE_TABLE)
+        assert records == [
+            {"Name": "Alice", "Age": 30, "Email": "alice@test.com"},
+            {"Name": "Bob", "Age": 25, "Email": "bob@test.com"},
+            {"Name": "Charlie", "Age": 35, "Email": "charlie@test.com"},
+        ]
+
+    def test_export_csv(self):
+        csv_out = export_table_csv(SIMPLE_TABLE)
+        assert csv_out.splitlines()[0] == "Name,Age,Email"
+        assert "Alice,30,alice@test.com" in csv_out
+
+    def test_export_csv_escaped_commas(self):
+        html = "<table><tr><th>A</th><th>B</th></tr><tr><td>hello, world</td><td>ok</td></tr></table>"
+        csv_out = export_table_csv(html)
+        assert '"hello, world"' in csv_out
+
+    def test_export_table_index(self):
+        two = SIMPLE_TABLE + TABLE_WITH_NUMBERS
+        records = export_table_json(two, table_index=1)
+        assert records[0]["Product"] == "Widget A"
+        assert records[0]["Price"] == 19.99
+
+    def test_export_no_tables(self):
+        import pytest
+        with pytest.raises(ValueError, match="No tables"):
+            export_table_json("<html><body></body></html>")
