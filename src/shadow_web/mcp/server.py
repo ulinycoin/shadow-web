@@ -261,6 +261,7 @@ def create_mcp_server():
         shadow = AsyncShadowPage(page, heal_api_url=heal_url, capture_mode=mode)
         clean_html, xml_map = await shadow.refresh()
         _session["shadow_page"] = shadow
+        _session["clean_html"] = clean_html
 
         title = await page.title()
         detail_mode = detail if detail in ("minimal", "terse", "xml", "full") else "terse"
@@ -317,6 +318,7 @@ def create_mcp_server():
         """
         shadow = _get_shadow_page()
         clean_html, xml_map = await shadow.refresh(diff=diff)
+        _session["clean_html"] = clean_html
         title = await shadow.page.title()
         detail_mode = detail if detail in ("minimal", "terse", "xml", "full") else "terse"
         return _format_mcp_response(shadow, clean_html, xml_map, detail=detail_mode, title=title, diff=diff)
@@ -367,6 +369,65 @@ def create_mcp_server():
         """Return grouped XML action map for raw HTML (no browser)."""
         _, _, groups = process_html(html)
         return generate_grouped_xml_map(url or "about:blank", title or "Page", groups)
+
+    @mcp.tool()
+    def schema_table(html: str, max_rows: int = 50) -> list[dict]:
+        """Extract structured table data from HTML: columns, types, and rows.
+
+        max_rows: cap rows per table (default 50). Set 0 for no limit.
+        """
+        from shadow_web.schema_snap import parse_tables
+        limit = None if max_rows <= 0 else max_rows
+        return parse_tables(html, max_rows=limit)
+
+    @mcp.tool()
+    def schema_form(html: str) -> list[dict]:
+        """Extract form schema from HTML: action, method, fields with types and validation."""
+        from shadow_web.schema_snap import parse_forms
+        return parse_forms(html)
+
+    @mcp.tool()
+    def schema_list(html: str) -> list[dict]:
+        """Extract lists from HTML: unordered, ordered, or standalone select with items."""
+        from shadow_web.schema_snap import parse_lists
+        return parse_lists(html)
+
+    @mcp.tool()
+    def schema_page(html: str, max_rows: int = 50) -> dict:
+        """Extract ALL structured data (tables, forms, lists) from HTML at once.
+
+        max_rows: cap rows per table (default 50). Set 0 for no limit.
+        """
+        from shadow_web.schema_snap import parse_page
+        limit = None if max_rows <= 0 else max_rows
+        return parse_page(html, max_rows=limit)
+
+    @mcp.tool()
+    def get_page_html(max_chars: int = 50000) -> str:
+        """Return clean HTML from the current browser session.
+
+        max_chars: truncate output (default 50000). Set 0 for full HTML — may be huge.
+        Requires navigate(url) or snapshot() first.
+        """
+        if "clean_html" not in _session:
+            raise RuntimeError("No page loaded. Call navigate(url) or snapshot() first.")
+        html = _session["clean_html"]
+        if max_chars > 0 and len(html) > max_chars:
+            return html[:max_chars] + f"\n<!-- truncated: {len(html)} chars total, returned {max_chars} -->"
+        return html
+
+    @mcp.tool()
+    def schema_session(max_rows: int = 50) -> dict:
+        """Extract structured data from the current browser session (tables, forms, lists).
+
+        max_rows: cap rows per table (default 50). Set 0 for no limit.
+        Requires navigate(url) or snapshot() first.
+        """
+        if "clean_html" not in _session:
+            raise RuntimeError("No page loaded. Call navigate(url) or snapshot() first.")
+        from shadow_web.schema_snap import parse_page
+        limit = None if max_rows <= 0 else max_rows
+        return parse_page(_session["clean_html"], max_rows=limit)
 
     return mcp
 

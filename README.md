@@ -8,8 +8,8 @@
 
 # Shadow Web
 
-**Cut 64–97% of tokens from web pages before your LLM sees them.**  
-Open-source Python SDK that flattens Shadow DOM, builds a typed Action Map with semantic groups, and heals broken selectors — no cloud required.
+**Cut 64–97% of tokens from web pages before your LLM sees them — then extract structured data.**  
+Open-source Python SDK that flattens Shadow DOM, builds a typed Action Map with semantic groups, heals broken selectors, and turns HTML tables/forms/lists into clean JSON — no cloud required.
 
 ```python
 from shadow_web.compressor import process_html
@@ -17,6 +17,13 @@ from shadow_web.compressor import process_html
 clean_html, actions, groups = process_html(raw_html)
 # ✅ actions = [{"id":"1","type":"button","label":"Buy Now","group":"Checkout"}, ...]
 # ✅ 164 → 46 tokens on a typical page
+
+from shadow_web.schema_snap import parse_page
+
+data = parse_page(clean_html)
+# ✅ tables: [{columns, types, rows, total_rows}]
+# ✅ forms:  [{action, method, fields: [{name, type, required, label}]}]
+# ✅ lists:  [{type, items, total}]
 ```
 
 ---
@@ -25,7 +32,7 @@ clean_html, actions, groups = process_html(raw_html)
 
 AI agents need to see web pages. But raw HTML is full of `<script>`, `<style>`, inline CSS, and interactive elements buried in Shadow DOM trees that Playwright can't reach. A typical Wikipedia page costs **99K tokens** raw. Your LLM bill doesn't need that.
 
-Shadow Web is what runs **between** the browser and the LLM: a compression layer that keeps only what matters — interactive elements, their labels, and a clean DOM skeleton.
+Shadow Web is what runs **between** the browser and the LLM: a compression layer that keeps only what matters — interactive elements, their labels, and a clean DOM skeleton. **SchemaSnap** then takes that clean HTML and turns it into structured data agents can actually use: table rows, form fields with validation, list items.
 
 ---
 
@@ -38,6 +45,9 @@ Shadow Web is what runs **between** the browser and the LLM: a compression layer
 | Shadow DOM readable | ❌ | ❌ partial | ✅ flattened |
 | Semantic groups | ❌ | ❌ | ✅ Login / Cart / Nav |
 | Self-healing selectors | ❌ | ❌ | ✅ local + LLM fallback |
+| **Tables → JSON columns+rows** | ❌ | ❌ | ✅ SchemaSnap |
+| **Forms → fields with validation** | ❌ | ❌ | ✅ SchemaSnap |
+| **Lists → typed items** | ❌ | ❌ | ✅ SchemaSnap |
 | Works offline | ✅ | ✅ | ✅ |
 | PyPI package | — | `playwright` | `shadow-web` |
 
@@ -47,10 +57,11 @@ Shadow Web is what runs **between** the browser and the LLM: a compression layer
 
 | You're building … | Why Shadow Web |
 |-------------------|----------------|
-| A browser-based AI agent | Action Map + self-healing = fewer failures |
-| An MCP tool for Cursor/Claude | Built-in MCP server, one-command setup |
+| A browser-based AI agent | Action Map + self-healing + SchemaSnap = fewer failures, structured data |
+| An MCP tool for Cursor/Claude | Built-in MCP server with 15+ tools, one-command setup |
 | A Playwright scraper that breaks on every deploy | `heal_local.py` catches DOM drift without LLM cost |
 | A Shadow DOM-heavy app (Web components, Lit, Angular) | Read-only flatten — no React/Vue breakage |
+| **An agent that needs data from web pages** | SchemaSnap parses tables, forms, and lists into clean JSON |
 
 ---
 
@@ -113,6 +124,59 @@ shadow.click("3")              # navigate
 _, delta_xml = shadow.refresh(diff=True)  # only what changed
 ```
 
+### SchemaSnap — extract tables, forms, and lists
+
+```python
+from shadow_web.schema_snap import parse_page, parse_tables
+
+# Parse everything from a page
+data = parse_page(raw_html)
+# {
+#   "tables": [
+#     {
+#       "columns": ["Product", "Price", "Stock"],
+#       "types": ["string", "currency", "integer"],
+#       "rows": [["Widget A", "$19.99", "150"], ...],
+#       "total_rows": 12,
+#       "column_count": 3
+#     }
+#   ],
+#   "forms": [
+#     {
+#       "action": "/checkout",
+#       "method": "POST",
+#       "fields": [
+#         {"tag": "input", "type": "email", "name": "email",
+#          "required": true, "label": "Email Address"},
+#         {"tag": "select", "name": "country", "options": [
+#           {"value": "US", "label": "United States"}, ...]}
+#       ]
+#     }
+#   ],
+#   "lists": [
+#     {"type": "unordered", "items": ["Apples", "Bananas"], "total": 2}
+#   ]
+# }
+
+# Or extract only tables with a row limit
+tables = parse_tables(html, max_rows=50)
+# When truncated: adds rows_truncated=True, rows_returned=50
+```
+
+### SchemaSnap in MCP (no browser session)
+
+```python
+# Via MCP — send HTML directly
+mcp.schema_table(html=raw_html)
+mcp.schema_form(html=raw_html)
+mcp.schema_list(html=raw_html)
+mcp.schema_page(html=raw_html)
+
+# Or from the current browser session (after navigate/snapshot)
+mcp.schema_session()
+mcp.get_page_html()
+```
+
 ---
 
 ## How it works
@@ -130,6 +194,8 @@ Browser (live DOM)
                           ↓
                     shadow_grep.py → filter before LLM
                           ↓
+                    schema_snap.py → structured data (tables, forms, lists)
+                          ↓
                     heal_local.py → fuzzy selector recovery (no LLM)
                           ↓
                     FastAPI /v1/heal → LLM fallback + verification
@@ -146,6 +212,7 @@ shadow_web/
 ├── compressor.py      # DOM strip + Action Map + semantic groups
 ├── dom_capture.py     # Shadow DOM / iframe flatten (in-browser, read-only)
 ├── grouping.py        # Semantic groups (forms, nav, modals)
+├── schema_snap.py     # ★ NEW — parse tables, forms, lists → structured JSON
 ├── heal_local.py      # Local selector heal + ~/.shadow-web/heal_cache.json
 ├── query.py           # shadow_grep (type:, intent:, label~, AND)
 ├── webmcp.py          # WebMCP bridge (Chrome 145+)
@@ -183,7 +250,24 @@ Run locally: `pip install tiktoken && python benchmarks/run.py`
 }
 ```
 
-Tools: `navigate`, `snapshot`, `click`, `fill`, `compress_html`, `shadow_query`, `webmcp_list_tools`, `webmcp_execute_tool`, `web_search` (Brave Search, no API keys).
+**Tools (15+):**
+
+| Tool | What it does |
+|------|-------------|
+| `navigate` | Open URL → Action Map snapshot |
+| `snapshot` | Refresh page (opt-in diff mode) |
+| `click`, `fill` | Interact by data-sid |
+| `compress_html` | Strip + Action Map from raw HTML |
+| `compress_html_to_xml` | Grouped XML from raw HTML |
+| `shadow_query`, `query_page`, `shadow_grep_html` | grep-style element filter |
+| `web_search` | Brave Search (no API keys) |
+| `webmcp_list_tools`, `webmcp_execute_tool` | Chrome WebMCP bridge |
+| **`schema_table`** | ★ Table columns + types + rows (from HTML) |
+| **`schema_form`** | ★ Form fields with validation |
+| **`schema_list`** | ★ List items |
+| **`schema_page`** | ★ All of the above at once |
+| **`schema_session`** | ★ All from current browser session |
+| **`get_page_html`** | ★ Full clean HTML from current session |
 
 ---
 
@@ -224,6 +308,20 @@ LLM heal (DeepSeek / OpenAI via /v1/heal) → generates candidate selector
     ↓
 selector verified in headless Chromium → cached to ~/.shadow-web/heal_cache.json
 ```
+
+---
+
+## SchemaSnap — token-aware data extraction
+
+SchemaSnap tools default to **max_rows=50** to keep token usage predictable. Set `max_rows=0` for full data when you need it — but remember that a 500-row table can cost 10K+ tokens.
+
+```
+navigate(url, detail="minimal")   → load page, minimal output
+schema_session()                  → tables + forms, max 50 rows/table
+schema_session(max_rows=0)        → full data (potentially large)
+```
+
+**Type inference** detects: `string`, `integer`, `number`, `currency` ($/€/£), `percentage`, `date`, `email`, `url`.
 
 ---
 

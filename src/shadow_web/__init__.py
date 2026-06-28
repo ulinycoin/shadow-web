@@ -27,6 +27,7 @@ from .a11y_capture import (
     capture_a11y_interactive,
     merge_dom_and_a11y,
 )
+from .schema_snap import parse_tables, parse_forms, parse_lists, parse_page
 from .verified_heal import verify_selector_on_page, verify_selector_in_html, averify_selector_on_page
 from .wrapper import ShadowPage
 from typing import Any
@@ -83,6 +84,10 @@ __all__ = [
     "acapture_page",
     "capture_a11y_interactive",
     "merge_dom_and_a11y",
+    "parse_tables",
+    "parse_forms",
+    "parse_lists",
+    "parse_page",
     "verify_selector_on_page",
     "verify_selector_in_html",
     "averify_selector_on_page",

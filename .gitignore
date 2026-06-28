@@ -13,8 +13,14 @@ tests/temp_test.html
 dist/
 build/
 *.egg-info/
-server.log
 .DS_Store
+
+# Development artifacts
+venv/
+.cursor/
+ss_debug.py
+ss_scrape.py
+server.log
 
 # Internal / agent memory (not for public repo)
 CLAUDE.md
