@@ -27,7 +27,16 @@ from .a11y_capture import (
     capture_a11y_interactive,
     merge_dom_and_a11y,
 )
-from .schema_snap import parse_tables, parse_forms, parse_lists, parse_page
+from .schema_snap import (
+    parse_tables,
+    parse_forms,
+    parse_lists,
+    parse_page,
+    table_to_records,
+    table_to_csv,
+    export_table_json,
+    export_table_csv,
+)
 from .verified_heal import verify_selector_on_page, verify_selector_in_html, averify_selector_on_page
 from .wrapper import ShadowPage
 from typing import Any
@@ -88,6 +97,10 @@ __all__ = [
     "parse_forms",
     "parse_lists",
     "parse_page",
+    "table_to_records",
+    "table_to_csv",
+    "export_table_json",
+    "export_table_csv",
     "verify_selector_on_page",
     "verify_selector_in_html",
     "averify_selector_on_page",

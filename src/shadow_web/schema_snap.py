@@ -8,12 +8,16 @@ Core functions:
   - parse_forms(html)                 -> [{action, method, fields: [...]}]
   - parse_lists(html)               -> [{items, total, type}]
   - parse_page(html, max_rows=None)   -> {tables, forms, lists}
+  - export_table_json(html, ...)      -> [{column: value, ...}, ...]
+  - export_table_csv(html, ...)       -> "col1,col2\\nval1,val2\\n..."
 """
 
 from __future__ import annotations
 
+import csv
+import io
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 from lxml import html as lxml_html, etree
 
 
@@ -478,3 +482,90 @@ def parse_page(html: str, max_rows: Optional[int] = None) -> Dict[str, Any]:
         "forms": [_extract_form(f) for f in tree.xpath("//form")],
         "lists": _parse_lists_from_tree(tree),
     }
+
+
+# -- Export (CSV / JSON records) ------------------------------------------------
+
+
+def _coerce_cell(value: str, col_type: str) -> Union[str, int, float, None]:
+    if not value or value in ("\u2014", "-"):
+        return None
+    if col_type == "integer":
+        try:
+            return int(value.replace(",", "").strip())
+        except ValueError:
+            return value
+    if col_type in ("number", "currency", "percentage"):
+        cleaned = (
+            value.replace(",", "")
+            .replace("$", "")
+            .replace("\u20ac", "")
+            .replace("\u00a3", "")
+            .replace("%", "")
+            .strip()
+        )
+        try:
+            num = float(cleaned)
+            return int(num) if num.is_integer() and col_type != "number" else num
+        except ValueError:
+            return value
+    return value
+
+
+def table_to_records(table: Dict[str, Any], coerce_types: bool = True) -> List[Dict[str, Any]]:
+    """Convert a parsed table dict to a list of row objects keyed by column name."""
+    columns = table.get("columns") or []
+    types = table.get("types") or ["string"] * len(columns)
+    records: List[Dict[str, Any]] = []
+    for row in table.get("rows") or []:
+        record: Dict[str, Any] = {}
+        for idx, col in enumerate(columns):
+            raw = row[idx] if idx < len(row) else ""
+            if coerce_types and idx < len(types):
+                record[col] = _coerce_cell(raw, types[idx])
+            else:
+                record[col] = raw
+        records.append(record)
+    return records
+
+
+def table_to_csv(table: Dict[str, Any]) -> str:
+    """Convert a parsed table dict to a CSV string (RFC-style quoting)."""
+    columns = table.get("columns") or []
+    if not columns:
+        return ""
+    buf = io.StringIO()
+    writer = csv.writer(buf, lineterminator="\n")
+    writer.writerow(columns)
+    for row in table.get("rows") or []:
+        writer.writerow([row[i] if i < len(row) else "" for i in range(len(columns))])
+    return buf.getvalue().rstrip("\n")
+
+
+def _pick_table(tables: List[Dict[str, Any]], table_index: int) -> Dict[str, Any]:
+    if not tables:
+        raise ValueError("No tables found in HTML")
+    if table_index < 0 or table_index >= len(tables):
+        raise IndexError(f"table_index {table_index} out of range (found {len(tables)} table(s))")
+    return tables[table_index]
+
+
+def export_table_json(
+    html: str,
+    table_index: int = 0,
+    max_rows: Optional[int] = None,
+    coerce_types: bool = True,
+) -> List[Dict[str, Any]]:
+    """Extract a table as JSON-ready records: [{Name: \"Alice\", Age: 30}, ...]."""
+    tables = parse_tables(html, max_rows=max_rows)
+    return table_to_records(_pick_table(tables, table_index), coerce_types=coerce_types)
+
+
+def export_table_csv(
+    html: str,
+    table_index: int = 0,
+    max_rows: Optional[int] = None,
+) -> str:
+    """Extract a table as CSV: \"Name,Age\\nAlice,30\\n...\"."""
+    tables = parse_tables(html, max_rows=max_rows)
+    return table_to_csv(_pick_table(tables, table_index))
