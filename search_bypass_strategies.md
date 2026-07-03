@@ -1,44 +1,44 @@
-# Стратегии обхода блокировок поисковых систем для AI-агентов
+# Search Engine Bypass Strategies for AI Agents
 
-При автоматизации поиска в Google/Yandex напрямую через headless-браузер вы быстро столкнетесь с жесткой защитой (CAPTCHA, Cloudflare, блокировки IP). Поисковые системы мгновенно выявляют сигнатуры автоматизации (например, свойство `navigator.webdriver`).
+When automating searches on Google/Yandex directly through a headless browser, you will quickly run into aggressive protection (CAPTCHA, Cloudflare, IP blocks). Search engines instantly detect automation signals (e.g., the `navigator.webdriver` property).
 
-Ниже приведены 4 эффективных архитектурных сценария решения этой проблемы при работе с `shadow-web` и Playwright.
+Below are 4 effective architectural approaches to solving this problem when working with `shadow-web` and Playwright.
 
 ---
 
-## Вариант 1. Переход на DuckDuckGo HTML / Lite (Рекомендуемый для парсинга)
+## Option 1. Switch to DuckDuckGo HTML / Lite (Recommended for scraping)
 
-Обычная версия DuckDuckGo требует выполнения JS, но у них есть официальные «легкие» версии без JS и тяжелых систем защиты от ботов. Они отдают чистый HTML, который идеально сжимается с помощью `shadow-web`.
+The standard DuckDuckGo version requires JavaScript, but they have official "light" versions with no JS and no heavy bot protection. They return clean HTML that compresses perfectly with `shadow-web`.
 
-### Ссылки для поиска:
-* **DuckDuckGo HTML**: `https://html.duckduckgo.com/html/?q=ЗАПРОС`
+### Search URLs:
+* **DuckDuckGo HTML**: `https://html.duckduckgo.com/html/?q=QUERY`
 * **DuckDuckGo Lite**: `https://lite.duckduckgo.com/lite/`
 
-### Пример использования в коде:
+### Usage example:
 
 ```python
-# Переход сразу на страницу результатов DuckDuckGo HTML
+# Navigate directly to DuckDuckGo HTML search results
 query = "Ferrari site:ss.com"
 url = f"https://html.duckduckgo.com/html/?q={query}"
 
 await page.goto(url)
 clean_html, xml_map = await shadow.refresh()
 
-# Теперь агент может прочитать сжатый XML-список результатов без CAPTCHA и JS
+# The agent can now read compressed XML results — no CAPTCHA, no JS
 ```
 
 ---
 
-## Вариант 2. Использование Search API (Самый надежный способ для production)
+## Option 2. Use a Search API (Most reliable for production)
 
-Вместо парсинга поисковой выдачи через браузер, агент может использовать специализированные API, которые возвращают структурированный JSON с результатами поиска. Это экономит огромное количество токенов, времени и работает со 100% стабильностью.
+Instead of scraping search results through a browser, the agent can use dedicated APIs that return structured JSON. This saves enormous amounts of tokens, time, and works with 100% reliability.
 
-### Рекомендуемые сервисы:
-1. **Tavily API** — создан специально для LLM-агентов (возвращает чистый текст и отфильтрованные ответы).
-2. **Brave Search API** — бесплатный лимит и очень дешевые тарифы, отличная альтернатива Google.
-3. **SerpAPI / Serper.dev** — проксируют настоящую выдачу Google/Google Shopping/Yandex без блокировок.
+### Recommended services:
+1. **Tavily API** — built specifically for LLM agents (returns clean text and filtered answers).
+2. **Brave Search API** — free tier and very cheap pricing, excellent Google alternative.
+3. **SerpAPI / Serper.dev** — proxy real Google/Google Shopping/Yandex results without blocks.
 
-### Пример интеграции Tavily:
+### Tavily integration example:
 
 ```python
 from tavily import TavilyClient
@@ -52,11 +52,11 @@ for result in response['results']:
 
 ---
 
-## Вариант 3. Настройка базового маскирования (Stealth) в Playwright
+## Option 3. Basic Stealth Configuration in Playwright
 
-Если вам критически важно искать именно через Google/Yandex в браузере, необходимо скрыть признаки автоматизации.
+If you absolutely must search through Google/Yandex in the browser, you need to hide automation signals.
 
-Добавьте следующие параметры конфигурации при инициализации контекста браузера (например, в файле `src/shadow_web/mcp/server.py`):
+Add the following configuration when initializing the browser context (e.g., in `src/shadow_web/mcp/server.py`):
 
 ```python
 async def _ensure_browser():
@@ -66,18 +66,18 @@ async def _ensure_browser():
         pw = await async_playwright().start()
         browser = await pw.chromium.launch(headless=True)
         
-        # Настройка реалистичного контекста
+        # Realistic context configuration
         context = await browser.new_context(
             user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
             viewport={"width": 1280, "height": 720},
             device_scale_factor=1,
             is_mobile=False,
             has_touch=False,
-            locale="ru-RU",
+            locale="en-US",
             timezone_id="Europe/Riga",
         )
         
-        # Скрытие navigator.webdriver (базовая проверка большинства сайтов)
+        # Hide navigator.webdriver (basic check on most sites)
         await context.add_init_script("delete navigator.__proto__.webdriver;")
         
         page = await context.new_page()
@@ -89,25 +89,26 @@ async def _ensure_browser():
 
 ---
 
-## Вариант 4. Использование пакета `playwright-stealth`
+## Option 4. Use `playwright-stealth` Package
 
-Для более продвинутого скрытия от систем детекции (таких как Cloudflare, Akamai, PerimeterX) можно использовать обертку `playwright-stealth`. Она подменяет фингерпринты плагинов, кодеков, видеокарты и параметры WebGL.
+For more advanced evasion of detection systems (Cloudflare, Akamai, PerimeterX), use the `playwright-stealth` wrapper. It spoofs plugin fingerprints, codecs, GPU, and WebGL parameters.
 
-### Установка:
+### Installation:
 ```bash
 pip install playwright-stealth
 ```
 
-### Подключение в коде:
+### Integration:
+
 ```python
 from playwright_stealth import stealth_async
 
 context = await browser.new_context()
 page = await context.new_page()
 
-# Применяем полную маскировку к странице
+# Apply full stealth masking to the page
 await stealth_async(page)
 
-# Теперь можно переходить на сайты с проверкой ботов
+# Now you can navigate to bot-protected sites
 await page.goto("https://google.com")
 ```
