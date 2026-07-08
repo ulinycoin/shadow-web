@@ -37,6 +37,18 @@ from .schema_snap import (
     export_table_json,
     export_table_csv,
 )
+from .form_fill import (
+    build_form_fill_plan,
+    execute_form_fill_plan,
+    execute_form_fill_plan_async,
+    execute_form_fill_plan_multi_step,
+    execute_form_fill_plan_multi_step_async,
+    link_form_to_actions,
+    plan_from_dict,
+    plan_from_session,
+    validate_profile,
+    FormFillPlan,
+)
 from .verified_heal import verify_selector_on_page, verify_selector_in_html, averify_selector_on_page
 from .wrapper import ShadowPage
 from typing import Any
@@ -101,6 +113,16 @@ __all__ = [
     "table_to_csv",
     "export_table_json",
     "export_table_csv",
+    "build_form_fill_plan",
+    "execute_form_fill_plan",
+    "execute_form_fill_plan_async",
+    "execute_form_fill_plan_multi_step",
+    "execute_form_fill_plan_multi_step_async",
+    "link_form_to_actions",
+    "plan_from_dict",
+    "plan_from_session",
+    "validate_profile",
+    "FormFillPlan",
     "verify_selector_on_page",
     "verify_selector_in_html",
     "averify_selector_on_page",

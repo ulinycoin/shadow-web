@@ -58,12 +58,13 @@ Shadow Web is what runs **between** the browser and the LLM: a compression layer
 | You're building … | Why Shadow Web |
 |-------------------|----------------|
 | A browser-based AI agent | Action Map + self-healing + SchemaSnap = fewer failures, structured data |
-| An MCP tool for Cursor/Claude | Built-in MCP server with **22 tools**, one-command setup |
+| An MCP tool for Cursor/Claude | Built-in MCP server with **24 tools**, one-command setup |
 | A Playwright scraper that breaks on every deploy | `heal_local.py` catches DOM drift without LLM cost |
 | A Shadow DOM-heavy app (Web components, Lit, Angular) | Read-only flatten — no React/Vue breakage |
 | **An agent that needs data from web pages** | SchemaSnap parses tables, forms, and lists into clean JSON |
 | **Attack surface / security recon** | `security_scan.py` + CLI — forms, links, page_class rules (not pentest) |
 | **Competitor monitoring & SEO content** | Shallow multi-site scans with token-bounded Action Map |
+| **SaaS onboarding automation** | AgentOps form fill — schema knows fields, LLM only picks values |
 
 ---
 
@@ -133,6 +134,15 @@ result = analyze_surface(
 Example output: [examples/security_scan/localpdf-full-report.md](examples/security_scan/localpdf-full-report.md) (20 pages, 0 critical/high on public marketing layer).
 
 **Does not test:** XSS, SQLi, auth bypass, HTTP security headers (CSP/HSTS), or TLS. Use only on authorized targets.
+
+### AgentOps form fill
+
+See the full **[Form Fill](#agentops-form-fill)** section below. Quick start:
+
+```bash
+python scripts/form_fill_demo.py https://httpbin.org/forms/post \
+  --profile examples/form_fill/profile.json --json plan.json
+```
 
 ### Competitor intelligence scan
 
@@ -296,6 +306,7 @@ shadow_web/
 ├── dom_capture.py     # Shadow DOM / iframe flatten (in-browser, read-only)
 ├── grouping.py        # Semantic groups (forms, nav, modals)
 ├── schema_snap.py     # Tables, forms, lists → JSON/CSV export
+├── form_fill.py       # AgentOps form fill (auto_fill / ask / handoff)
 ├── security_scan.py   # Attack surface rule engine (forms, links, page_class)
 ├── heal_local.py      # Local selector heal + ~/.shadow-web/heal_cache.json
 ├── query.py           # shadow_grep (type:, intent:, label~, AND)
@@ -323,6 +334,7 @@ scripts/
 | [examples/golden_path/](examples/golden_path/) | Full agent loop + token budget |
 | [examples/security_scan/](examples/security_scan/) | Attack surface scan reports (JSON + Markdown) |
 | [examples/localpdf/](examples/localpdf/) | Competitor intel playbook + sample scan |
+| [examples/form_fill/](examples/form_fill/) | AgentOps form fill playbook + profile sample |
 | [examples/browser_use/](examples/browser_use/) | browser-use integration |
 
 ---
@@ -359,13 +371,15 @@ Or manually:
 }
 ```
 
-### All 22 tools
+### All 24 tools
 
 | Category | Tool | What it does |
 |----------|------|--------------|
 | **Browse** | `navigate` | Open URL → snapshot (`detail`: minimal / terse / xml / full) |
 | | `snapshot` | Refresh page; `diff=true` for delta only |
 | | `click`, `fill` | Interact by `data-sid` |
+| **AgentOps** | `form_fill_plan` | Profile JSON → fill plan (auto_fill / ask / handoff) |
+| | `form_fill_execute` | Run plan (+ answers); validation_error feedback |
 | **Filter (control plane)** | `shadow_query` | grep-style filter on live session |
 | | `query_page` | Alias for shadow_query (json output) |
 | | `shadow_grep_html` | Filter raw/clean HTML without browser |
@@ -387,11 +401,18 @@ Or manually:
 
 ### Recommended MCP workflow
 
+**Browse + extract:**
 ```
 navigate(url, detail="minimal")     # ~200 tokens — action_count, page_class
 schema_session_json(max_rows=50)    # data plane — table records
 shadow_query("intent:login")        # control plane — what to click
 click(sid) → snapshot(diff=true)    # delta only after action
+```
+
+**Form fill (AgentOps):**
+```
+form_fill_plan(profile='{"email":"...","name":"..."}', url="https://...")
+form_fill_execute(plan='...', answers='{}')
 ```
 
 See [examples/golden_path/CASE.md](examples/golden_path/CASE.md) for the full playbook.
@@ -453,6 +474,115 @@ Default **max_rows=50** per table. Set `max_rows=0` for full export when needed.
 
 ---
 
+## AgentOps Form Fill
+
+**Give a URL + JSON profile. Shadow Web reads the form schema, fills safe fields, asks on ambiguity, and hands off on blockers — without sending 50k tokens of HTML to your LLM.**
+
+Classic browser agents: entire page → LLM guesses selectors → silent validation failures.  
+Shadow Web AgentOps split:
+
+```
+Data plane:   schema_form  → { name, type, required, minlength, options }
+Control plane: Action Map → fill(sid), click(sid)
+LLM job:      profile → values only (not “where to click”)
+```
+
+### Execution modes
+
+| Mode | When | What happens | Example |
+|------|------|----------------|---------|
+| **`auto_fill`** | Safe, typed profile fields | `fill(sid, value)` immediately | `email`, `name`, `company`, `role`, `phone` |
+| **`ask`** | Ambiguous or missing data | Structured question returned in `plan.questions` | textarea bio, `<select>` country, “How did you hear about us?” |
+| **`handoff`** | Human-only UI | Stop with `status: handoff` — no blind retries | CAPTCHA, OAuth, file upload, custom datepicker, `page_class: Anti-bot` |
+
+**Design principle:** never promise full autonomy. Pilots survive because blockers surface early instead of failing silently.
+
+### Status codes
+
+| `status` | Meaning |
+|----------|---------|
+| `completed` | Auto-fills ran (+ optional submit click) |
+| `questions_pending` | Operator must answer `questions[]` then re-run with `answers` |
+| `handoff` | Human step required (`blockers[]`) |
+| `validation_error` | Client validation failed after fill — see `errors[]` with `sid` + field |
+
+### Validation feedback loop
+
+After every `fill()`:
+
+1. `snapshot(diff=true)` — catch appeared error messages  
+2. HTML5 `checkValidity()` on live DOM  
+3. Preflight checks (e.g. email format before fill)
+
+```json
+{
+  "status": "validation_error",
+  "errors": [{
+    "sid": "2",
+    "field": {"name": "email", "kind": "email"},
+    "message": "Please include an '@' in the email address",
+    "source": "constraint_validation"
+  }]
+}
+```
+
+### Quick start (Python)
+
+```python
+from shadow_web.form_fill import (
+    validate_profile,
+    plan_from_session,
+    apply_question_answers,
+    execute_form_fill_plan_async,
+    execute_form_fill_plan_multi_step_async,
+)
+
+validation = validate_profile(profile)  # warns: unknown keys like "companny"
+plan = plan_from_session(
+    url=shadow.last_url,
+    clean_html=shadow.clean_html,
+    action_map=shadow.action_map,
+    profile=profile,
+    page_class=shadow.page_class,
+)
+
+result = await execute_form_fill_plan_async(shadow, plan, validate=True)
+
+# Multi-step wizard (enterprise onboarding)
+result = await execute_form_fill_plan_multi_step_async(
+    shadow, profile, max_steps=3, answers={"form0_field4": "Senior engineer"}
+)
+```
+
+### CLI demo
+
+```bash
+pip install -e ".[mcp]"
+playwright install chromium
+
+# Plan only
+python scripts/form_fill_demo.py https://httpbin.org/forms/post \
+  --profile examples/form_fill/profile.json --json plan.json
+
+# Execute safe fills
+python scripts/form_fill_demo.py URL --profile examples/form_fill/profile.json --execute
+
+# Multi-step wizard
+python scripts/form_fill_demo.py URL --profile profile.json --execute --multi-step
+```
+
+### MCP workflow
+
+```
+form_fill_plan(profile='{"email":"you@co.com","name":"Ada","company":"Acme"}', url="https://...")
+form_fill_execute(plan='...', answers='{"form0_field4":"..."}')
+# Wizard: form_fill_execute(profile='...', multi_step=true, max_steps=3)
+```
+
+Playbook: [examples/form_fill/CASE.md](examples/form_fill/CASE.md)
+
+---
+
 ## Known limitations
 
 | Limitation | Workaround |
@@ -465,6 +595,7 @@ Default **max_rows=50** per table. Set `max_rows=0` for full export when needed.
 | **Token bombs** | Never default to `detail="full"`, `get_page_html(max_chars=0)`, or `max_rows=0` unless debugging |
 | **Security scan scope** | Surface mapping only — no XSS/SQLi/header/TLS tests; SPAs may need `capture_mode=dual` |
 | **Security scan authorization** | Run only on systems you own or have explicit permission to test |
+| **Form fill custom widgets** | MUI Select, date pickers → `handoff`; use `capture_mode=dual` for Shadow DOM forms |
 
 ---
 

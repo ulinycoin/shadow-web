@@ -467,6 +467,116 @@ def create_mcp_server():
         limit = None if max_rows <= 0 else max_rows
         return export_table_csv(_session["clean_html"], table_index=table_index, max_rows=limit)
 
+    @mcp.tool()
+    async def form_fill_plan(
+        profile: str,
+        url: str = "",
+        auto_submit: bool = True,
+        form_index: int = 0,
+    ) -> dict:
+        """Build AgentOps form fill plan from profile JSON. Optional url navigates first.
+
+        profile: JSON object with email, name, company, role, phone (unknown keys warned).
+        Returns plan with auto_fill / ask / handoff steps and profile_validation.
+        """
+        from shadow_web.browser_use import AsyncShadowPage
+        from shadow_web.form_fill import plan_from_session
+
+        try:
+            profile_dict = json.loads(profile)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"profile must be valid JSON: {exc}") from exc
+
+        if not isinstance(profile_dict, dict):
+            raise ValueError("profile must be a JSON object")
+
+        if url:
+            await _ensure_browser()
+            page = _session["page"]
+            await page.goto(url, wait_until="domcontentloaded")
+            heal_url = os.environ.get("SHADOW_WEB_HEAL_URL")
+            shadow = AsyncShadowPage(page, heal_api_url=heal_url, capture_mode="auto")
+            clean_html, _ = await shadow.refresh()
+            _session["shadow_page"] = shadow
+            _session["clean_html"] = clean_html
+        else:
+            shadow = _get_shadow_page()
+            if not shadow.clean_html:
+                await shadow.refresh()
+            clean_html = shadow.clean_html
+
+        plan = plan_from_session(
+            url=shadow.last_url,
+            clean_html=clean_html,
+            action_map=shadow.action_map,
+            profile=profile_dict,
+            page_class=shadow.page_class,
+            page_class_reason=shadow.page_class_reason,
+            form_index=form_index,
+            auto_submit=auto_submit,
+        )
+        return {
+            "profile_validation": plan.profile_validation,
+            "plan": plan.to_dict(),
+        }
+
+    @mcp.tool()
+    async def form_fill_execute(
+        plan: str = "",
+        answers: str = "{}",
+        profile: str = "",
+        multi_step: bool = False,
+        max_steps: int = 3,
+        validate: bool = True,
+    ) -> dict:
+        """Execute form fill plan. Use answers JSON for ask steps. Returns status + filled/handoffs/questions.
+
+        status: completed | questions_pending | handoff | validation_error
+        multi_step: wizard loop (requires profile JSON). Ignores plan when true.
+        """
+        from shadow_web.form_fill import (
+            apply_question_answers,
+            execute_form_fill_plan_async,
+            execute_form_fill_plan_multi_step_async,
+            plan_from_dict,
+        )
+
+        try:
+            answers_dict = json.loads(answers or "{}")
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"answers must be valid JSON: {exc}") from exc
+
+        shadow = _get_shadow_page()
+
+        if multi_step:
+            if not profile:
+                raise ValueError("profile JSON required when multi_step=true")
+            try:
+                profile_dict = json.loads(profile)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"profile must be valid JSON: {exc}") from exc
+            return await execute_form_fill_plan_multi_step_async(
+                shadow,
+                profile_dict,
+                answers=answers_dict,
+                max_steps=max_steps,
+                validate=validate,
+            )
+
+        if not plan:
+            raise ValueError("plan JSON required when multi_step=false")
+
+        try:
+            plan_dict = json.loads(plan)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"plan must be valid JSON: {exc}") from exc
+
+        plan_obj = plan_from_dict(plan_dict.get("plan", plan_dict))
+        if answers_dict:
+            apply_question_answers(plan_obj, answers_dict)
+
+        return await execute_form_fill_plan_async(shadow, plan_obj, validate=validate)
+
     return mcp
 
 
