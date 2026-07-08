@@ -31,6 +31,10 @@ _SENSITIVE_LABEL = re.compile(
     re.I,
 )
 
+_SESSION_COOKIE = re.compile(
+    r"(?i)(session|sess|auth|token|jwt|sid|login|csrf|xsrf|remember|phpssid|connect\.sid)"
+)
+
 
 @dataclass
 class Finding:
@@ -518,6 +522,176 @@ def analyze_http_headers(
     return findings
 
 
+def _cookie_host_matches(cookie_domain: str, page_host: str) -> bool:
+    cd = cookie_domain.lstrip(".").lower()
+    ph = page_host.lower()
+    if not cd or not ph:
+        return True
+    return ph == cd or ph.endswith("." + cd)
+
+
+def _is_session_like_cookie(name: str) -> bool:
+    lowered = name.lower()
+    if lowered.startswith("__host-") or lowered.startswith("__secure-"):
+        return True
+    return bool(_SESSION_COOKIE.search(name))
+
+
+def normalize_playwright_cookie(cookie: dict[str, Any]) -> dict[str, Any]:
+    """Normalize Playwright cookie dict for analysis."""
+    same_site = cookie.get("sameSite") or cookie.get("samesite") or ""
+    return {
+        "name": str(cookie.get("name", "")),
+        "domain": str(cookie.get("domain", "")),
+        "path": str(cookie.get("path", "/")),
+        "secure": bool(cookie.get("secure", False)),
+        "httpOnly": bool(cookie.get("httpOnly", cookie.get("httponly", False))),
+        "sameSite": str(same_site) if same_site else "",
+        "expires": cookie.get("expires"),
+    }
+
+
+def summarize_cookies(cookies: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Cookie flags for reports (values redacted)."""
+    summary: list[dict[str, Any]] = []
+    for cookie in cookies[:25]:
+        norm = normalize_playwright_cookie(cookie)
+        expires = norm.get("expires")
+        summary.append(
+            {
+                "name": norm["name"],
+                "domain": norm["domain"],
+                "path": norm["path"],
+                "secure": norm["secure"],
+                "httpOnly": norm["httpOnly"],
+                "sameSite": norm["sameSite"] or None,
+                "session": expires in (-1, None),
+            }
+        )
+    if len(cookies) > 25:
+        summary.append({"truncated": len(cookies) - 25})
+    return summary
+
+
+def analyze_cookies(page_url: str, cookies: list[dict[str, Any]]) -> list[Finding]:
+    """Rule engine for cookie Secure / HttpOnly / SameSite flags."""
+    findings: list[Finding] = []
+    if not cookies:
+        return findings
+
+    parsed = urlparse(page_url)
+    is_https = parsed.scheme == "https"
+    page_host = _netloc(page_url)
+
+    for raw in cookies:
+        cookie = normalize_playwright_cookie(raw)
+        name = cookie["name"]
+        if not name:
+            continue
+
+        ctx = {
+            "name": name,
+            "domain": cookie["domain"],
+            "path": cookie["path"],
+            "secure": cookie["secure"],
+            "httpOnly": cookie["httpOnly"],
+            "sameSite": cookie["sameSite"] or None,
+        }
+        session_like = _is_session_like_cookie(name)
+        same_site = cookie["sameSite"].lower() if cookie["sameSite"] else ""
+
+        if is_https and not cookie["secure"]:
+            findings.append(
+                Finding(
+                    severity="high" if session_like else "medium",
+                    rule_id="COOKIE_MISSING_SECURE",
+                    title="Cookie missing Secure flag on HTTPS",
+                    detail=f"Cookie `{name}` sent without Secure on TLS page.",
+                    evidence=ctx,
+                )
+            )
+
+        if session_like and not cookie["httpOnly"]:
+            findings.append(
+                Finding(
+                    severity="high",
+                    rule_id="COOKIE_MISSING_HTTPONLY",
+                    title="Session-like cookie accessible to JavaScript",
+                    detail=f"Cookie `{name}` lacks HttpOnly — XSS can exfiltrate it.",
+                    evidence=ctx,
+                )
+            )
+
+        if same_site == "none" and not cookie["secure"]:
+            findings.append(
+                Finding(
+                    severity="high",
+                    rule_id="COOKIE_SAMESITE_NONE_INSECURE",
+                    title="SameSite=None without Secure",
+                    detail=f"Cookie `{name}` uses SameSite=None but Secure is not set.",
+                    evidence=ctx,
+                )
+            )
+
+        if not same_site:
+            findings.append(
+                Finding(
+                    severity="low",
+                    rule_id="COOKIE_MISSING_SAMESITE",
+                    title="Cookie has no explicit SameSite",
+                    detail=f"Cookie `{name}` relies on browser default (usually Lax).",
+                    evidence=ctx,
+                )
+            )
+
+        lowered = name.lower()
+        if lowered.startswith("__host-"):
+            if cookie["domain"] or cookie["path"] != "/":
+                findings.append(
+                    Finding(
+                        severity="medium",
+                        rule_id="COOKIE_HOST_PREFIX_VIOLATION",
+                        title="__Host- cookie prefix requirements violated",
+                        detail=f"Cookie `{name}` must have Path=/ and no Domain attribute.",
+                        evidence=ctx,
+                    )
+                )
+            if not cookie["secure"]:
+                findings.append(
+                    Finding(
+                        severity="high",
+                        rule_id="COOKIE_HOST_PREFIX_INSECURE",
+                        title="__Host- cookie without Secure",
+                        detail=f"Cookie `{name}` requires Secure flag.",
+                        evidence=ctx,
+                    )
+                )
+
+        if lowered.startswith("__secure-") and not cookie["secure"]:
+            findings.append(
+                Finding(
+                    severity="high",
+                    rule_id="COOKIE_SECURE_PREFIX_INSECURE",
+                    title="__Secure- cookie without Secure flag",
+                    detail=f"Cookie `{name}` violates __Secure- prefix rules.",
+                    evidence=ctx,
+                )
+            )
+
+        if page_host and cookie["domain"] and not _cookie_host_matches(cookie["domain"], page_host):
+            findings.append(
+                Finding(
+                    severity="info",
+                    rule_id="COOKIE_THIRD_PARTY",
+                    title="Third-party cookie on page",
+                    detail=f"Cookie `{name}` domain `{cookie['domain']}` differs from page host.",
+                    evidence=ctx,
+                )
+            )
+
+    return findings
+
+
 def analyze_surface(
     page_url: str,
     *,
@@ -531,6 +705,7 @@ def analyze_surface(
     http_headers: dict[str, str] | None = None,
     http_probe_status: Optional[int] = None,
     http_probe_location: Optional[str] = None,
+    cookies: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Run all security rules on a single scanned page."""
     forms = parse_forms(clean_html) if clean_html else []
@@ -546,6 +721,8 @@ def analyze_surface(
                 http_probe_location=http_probe_location,
             )
         )
+    if cookies is not None:
+        findings.extend(analyze_cookies(page_url, cookies))
     findings.extend(analyze_forms(page_url, forms))
     findings.extend(analyze_links(page_url, actions))
     findings.extend(
@@ -577,6 +754,9 @@ def analyze_surface(
     }
     if http_headers is not None:
         payload["http_headers"] = summarize_security_headers(http_headers)
+    if cookies is not None:
+        payload["cookie_count"] = len(cookies)
+        payload["cookies"] = summarize_cookies(cookies)
     return payload
 
 
@@ -689,6 +869,22 @@ def render_markdown_report(report: dict[str, Any]) -> str:
             for key, value in page["http_headers"].items():
                 if value:
                     lines.append(f"  - `{key}`: {value}")
+        cookie_count = page.get("cookie_count", 0)
+        if cookie_count or page.get("cookies"):
+            lines.append(f"- **Cookies:** {cookie_count}")
+            for cookie in page.get("cookies") or []:
+                if "truncated" in cookie:
+                    lines.append(f"  - … and {cookie['truncated']} more")
+                    continue
+                flags = []
+                if cookie.get("secure"):
+                    flags.append("Secure")
+                if cookie.get("httpOnly"):
+                    flags.append("HttpOnly")
+                if cookie.get("sameSite"):
+                    flags.append(f"SameSite={cookie['sameSite']}")
+                flag_text = ", ".join(flags) if flags else "no security flags"
+                lines.append(f"  - `{cookie.get('name')}` ({cookie.get('domain')}): {flag_text}")
         lines.append("")
 
         findings = page.get("findings") or []
@@ -708,7 +904,7 @@ def render_markdown_report(report: dict[str, Any]) -> str:
             "## Limitations",
             "",
             "- Does not test XSS, SQLi, auth bypass, or active CORS exploitation.",
-            "- HTTP header checks are response-level only (no cookie flag audit beyond Set-Cookie presence).",
+            "- Cookie audit covers flags from browser context (Secure, HttpOnly, SameSite); not pentest.",
             "- Use only on systems you are authorized to scan.",
             "",
         ]

@@ -39,6 +39,7 @@ async def scan_page(
     timeout_ms: int = 45000,
     capture_mode: str = "auto",
     check_headers: bool = True,
+    check_cookies: bool = True,
 ) -> dict:
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
@@ -61,6 +62,10 @@ async def scan_page(
                 if urlparse(url).scheme == "https":
                     http_probe_status, http_probe_location, _ = probe_http_redirect(url)
 
+            page_cookies: list[dict] | None = None
+            if check_cookies:
+                page_cookies = await page.context.cookies(url)
+
             result = analyze_surface(
                 url,
                 title=title,
@@ -73,6 +78,7 @@ async def scan_page(
                 http_headers=http_headers,
                 http_probe_status=http_probe_status,
                 http_probe_location=http_probe_location,
+                cookies=page_cookies,
             )
             if header_error:
                 result["header_fetch_error"] = header_error
@@ -110,6 +116,7 @@ async def crawl_and_scan(
     same_domain: bool,
     timeout_ms: int,
     check_headers: bool,
+    check_cookies: bool,
 ) -> list[dict]:
     if not seed_urls:
         raise ValueError("No URLs provided")
@@ -127,7 +134,12 @@ async def crawl_and_scan(
         visited.add(url)
 
         print(f"Scanning [{depth}] {url}...", flush=True)
-        page_result = await scan_page(url, timeout_ms=timeout_ms, check_headers=check_headers)
+        page_result = await scan_page(
+            url,
+            timeout_ms=timeout_ms,
+            check_headers=check_headers,
+            check_cookies=check_cookies,
+        )
         pages.append(page_result)
 
         if "error" in page_result:
@@ -161,6 +173,7 @@ async def main() -> None:
     )
     parser.add_argument("--timeout", type=int, default=45, help="Page load timeout (seconds)")
     parser.add_argument("--no-headers", action="store_true", help="Skip HTTP security header checks")
+    parser.add_argument("--no-cookies", action="store_true", help="Skip cookie flag checks")
     args = parser.parse_args()
 
     urls = _load_urls(args.url_file, args.urls)
@@ -174,6 +187,7 @@ async def main() -> None:
         same_domain=args.same_domain,
         timeout_ms=args.timeout * 1000,
         check_headers=not args.no_headers,
+        check_cookies=not args.no_cookies,
     )
 
     report = {

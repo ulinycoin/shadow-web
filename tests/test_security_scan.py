@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from shadow_web.schema_snap import parse_forms
 from shadow_web.security_scan import (
+    analyze_cookies,
     analyze_forms,
     analyze_http_headers,
     analyze_links,
@@ -148,3 +149,73 @@ def test_analyze_surface_with_headers():
     )
     assert result["http_headers"]["strict-transport-security"] is not None
     assert "HEADER_MISSING_HSTS" not in {f["rule_id"] for f in result["findings"]}
+
+
+def test_analyze_cookies_insecure_session():
+    cookies = [
+        {
+            "name": "session_id",
+            "domain": "app.example.com",
+            "path": "/",
+            "secure": False,
+            "httpOnly": False,
+            "sameSite": "",
+            "expires": -1,
+        }
+    ]
+    findings = analyze_cookies("https://app.example.com/", cookies)
+    rules = {f.rule_id for f in findings}
+    assert "COOKIE_MISSING_SECURE" in rules
+    assert "COOKIE_MISSING_HTTPONLY" in rules
+    assert "COOKIE_MISSING_SAMESITE" in rules
+
+
+def test_analyze_cookies_samesite_none_requires_secure():
+    cookies = [
+        {
+            "name": "tracking",
+            "domain": "app.example.com",
+            "path": "/",
+            "secure": False,
+            "httpOnly": False,
+            "sameSite": "None",
+        }
+    ]
+    findings = analyze_cookies("https://app.example.com/", cookies)
+    assert any(f.rule_id == "COOKIE_SAMESITE_NONE_INSECURE" for f in findings)
+
+
+def test_analyze_cookies_third_party_info():
+    cookies = [
+        {
+            "name": "_ga",
+            "domain": ".google.com",
+            "path": "/",
+            "secure": True,
+            "httpOnly": False,
+            "sameSite": "Lax",
+        }
+    ]
+    findings = analyze_cookies("https://app.example.com/", cookies)
+    assert any(f.rule_id == "COOKIE_THIRD_PARTY" for f in findings)
+
+
+def test_analyze_surface_with_cookies():
+    result = analyze_surface(
+        "https://app.example.com/",
+        clean_html="",
+        action_map=[],
+        cookies=[
+            {
+                "name": "auth_token",
+                "domain": "app.example.com",
+                "path": "/",
+                "secure": True,
+                "httpOnly": True,
+                "sameSite": "Strict",
+            }
+        ],
+    )
+    assert result["cookie_count"] == 1
+    assert result["cookies"][0]["name"] == "auth_token"
+    assert "COOKIE_MISSING_SECURE" not in {f["rule_id"] for f in result["findings"]}
