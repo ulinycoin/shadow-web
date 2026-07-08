@@ -4,12 +4,22 @@ from __future__ import annotations
 
 import re
 from dataclasses import asdict, dataclass, field
-from typing import Any
+from typing import Any, Optional
 from urllib.parse import urlparse, urljoin
 
 from shadow_web.schema_snap import parse_forms
 
 SEVERITY_ORDER = ("critical", "high", "medium", "low", "info")
+
+SECURITY_HEADER_KEYS = (
+    "strict-transport-security",
+    "content-security-policy",
+    "x-frame-options",
+    "x-content-type-options",
+    "referrer-policy",
+    "permissions-policy",
+    "access-control-allow-origin",
+)
 
 _SENSITIVE_PATH = re.compile(
     r"/(?:admin|api|debug|backup|config|wp-admin|phpmyadmin|\.env|actuator)(?:/|$)",
@@ -300,6 +310,214 @@ def analyze_page_meta(
     return findings
 
 
+def normalize_header_map(headers: dict[str, Any]) -> dict[str, str]:
+    """Lower-case header names for consistent lookups."""
+    return {str(k).lower(): str(v) for k, v in headers.items()}
+
+
+def summarize_security_headers(headers: dict[str, str]) -> dict[str, Optional[str]]:
+    """Security-relevant headers for reports (truncated CSP)."""
+    csp = headers.get("content-security-policy", "")
+    if len(csp) > 240:
+        csp = csp[:240] + "..."
+    return {
+        "strict-transport-security": headers.get("strict-transport-security"),
+        "content-security-policy": csp or None,
+        "x-frame-options": headers.get("x-frame-options"),
+        "x-content-type-options": headers.get("x-content-type-options"),
+        "referrer-policy": headers.get("referrer-policy"),
+        "permissions-policy": headers.get("permissions-policy"),
+        "access-control-allow-origin": headers.get("access-control-allow-origin"),
+    }
+
+
+def fetch_http_headers(url: str, *, timeout: float = 15.0) -> tuple[dict[str, str], str, Optional[str]]:
+    """Fetch response headers via HEAD (GET fallback). Returns (headers, final_url, error)."""
+    import requests
+
+    try:
+        response = requests.head(url, allow_redirects=True, timeout=timeout)
+        if response.status_code >= 400 or not response.headers:
+            response = requests.get(url, allow_redirects=True, timeout=timeout, stream=True)
+            response.close()
+        return normalize_header_map(dict(response.headers)), str(response.url), None
+    except Exception as exc:
+        return {}, url, str(exc)
+
+
+def probe_http_redirect(https_url: str, *, timeout: float = 10.0) -> tuple[Optional[int], Optional[str], Optional[str]]:
+    """Check whether plain HTTP redirects to HTTPS. Returns (status, location, error)."""
+    import requests
+
+    parsed = urlparse(https_url)
+    if parsed.scheme != "https" or not parsed.netloc:
+        return None, None, "not_https_url"
+
+    http_url = f"http://{parsed.netloc}{parsed.path or '/'}"
+    try:
+        response = requests.get(http_url, allow_redirects=False, timeout=timeout)
+        location = response.headers.get("Location") or response.headers.get("location")
+        return response.status_code, location, None
+    except Exception as exc:
+        return None, None, str(exc)
+
+
+def analyze_http_headers(
+    page_url: str,
+    headers: dict[str, str],
+    *,
+    http_probe_status: Optional[int] = None,
+    http_probe_location: Optional[str] = None,
+) -> list[Finding]:
+    """Rule engine for HTTP security headers."""
+    findings: list[Finding] = []
+    parsed = urlparse(page_url)
+    is_https = parsed.scheme == "https"
+    header_summary = summarize_security_headers(headers)
+
+    if is_https and not headers.get("strict-transport-security"):
+        findings.append(
+            Finding(
+                severity="high",
+                rule_id="HEADER_MISSING_HSTS",
+                title="Missing Strict-Transport-Security",
+                detail="HTTPS response has no HSTS header.",
+                evidence={"url": page_url, "headers": header_summary},
+            )
+        )
+    elif is_https and headers.get("strict-transport-security"):
+        hsts = headers["strict-transport-security"].lower()
+        if "max-age=" in hsts:
+            try:
+                max_age = int(hsts.split("max-age=", 1)[1].split(";", 1)[0].strip())
+                if max_age < 31_536_000:
+                    findings.append(
+                        Finding(
+                            severity="low",
+                            rule_id="HEADER_SHORT_HSTS",
+                            title="HSTS max-age under one year",
+                            detail=f"max-age={max_age} (< 31536000 recommended).",
+                            evidence={"max_age": max_age},
+                        )
+                    )
+            except ValueError:
+                pass
+
+    if not headers.get("content-security-policy"):
+        findings.append(
+            Finding(
+                severity="medium",
+                rule_id="HEADER_MISSING_CSP",
+                title="Missing Content-Security-Policy",
+                detail="No CSP header on response.",
+                evidence={"url": page_url, "headers": header_summary},
+            )
+        )
+    else:
+        csp = headers["content-security-policy"].lower()
+        if "'unsafe-inline'" in csp or "'unsafe-eval'" in csp:
+            findings.append(
+                Finding(
+                    severity="low",
+                    rule_id="HEADER_CSP_UNSAFE",
+                    title="CSP allows unsafe-inline or unsafe-eval",
+                    detail="Inline script policy weakens XSS defenses.",
+                    evidence={"csp_excerpt": headers["content-security-policy"][:200]},
+                )
+            )
+        if "frame-ancestors" not in csp and not headers.get("x-frame-options"):
+            findings.append(
+                Finding(
+                    severity="medium",
+                    rule_id="HEADER_MISSING_CLICKJACKING_PROTECTION",
+                    title="No clickjacking protection",
+                    detail="Missing X-Frame-Options and CSP frame-ancestors.",
+                    evidence={"url": page_url},
+                )
+            )
+
+    if headers.get("x-frame-options") and headers["x-frame-options"].upper() not in ("DENY", "SAMEORIGIN"):
+        findings.append(
+            Finding(
+                severity="low",
+                rule_id="HEADER_WEAK_XFO",
+                title="Non-standard X-Frame-Options value",
+                detail=f"Value: {headers['x-frame-options']}",
+                evidence={"x-frame-options": headers["x-frame-options"]},
+            )
+        )
+
+    if not headers.get("x-content-type-options"):
+        findings.append(
+            Finding(
+                severity="low",
+                rule_id="HEADER_MISSING_NOSNIFF",
+                title="Missing X-Content-Type-Options",
+                detail="Consider nosniff to reduce MIME confusion attacks.",
+                evidence={"url": page_url},
+            )
+        )
+    elif headers["x-content-type-options"].lower() != "nosniff":
+        findings.append(
+            Finding(
+                severity="low",
+                rule_id="HEADER_WEAK_NOSNIFF",
+                title="X-Content-Type-Options is not nosniff",
+                detail=f"Value: {headers['x-content-type-options']}",
+                evidence={"x-content-type-options": headers["x-content-type-options"]},
+            )
+        )
+
+    acao = headers.get("access-control-allow-origin")
+    if acao == "*":
+        findings.append(
+            Finding(
+                severity="info",
+                rule_id="HEADER_CORS_WILDCARD",
+                title="Access-Control-Allow-Origin: *",
+                detail="Wildcard CORS on this response — verify API endpoints separately.",
+                evidence={"access-control-allow-origin": acao},
+            )
+        )
+
+    if is_https and http_probe_status is not None:
+        if http_probe_status in (301, 302, 307, 308):
+            loc = (http_probe_location or "").lower()
+            if not loc.startswith("https://"):
+                findings.append(
+                    Finding(
+                        severity="high",
+                        rule_id="HEADER_HTTP_WEAK_REDIRECT",
+                        title="HTTP does not redirect to HTTPS",
+                        detail=f"HTTP probe returned {http_probe_status} → {http_probe_location}",
+                        evidence={"status": http_probe_status, "location": http_probe_location},
+                    )
+                )
+        elif http_probe_status == 200:
+            findings.append(
+                Finding(
+                    severity="high",
+                    rule_id="HEADER_HTTP_AVAILABLE",
+                    title="HTTP serves content without redirect",
+                    detail="Plain HTTP returned 200 — credentials may be sent in cleartext.",
+                    evidence={"status": http_probe_status},
+                )
+            )
+
+    if not is_https:
+        findings.append(
+            Finding(
+                severity="high",
+                rule_id="PAGE_HTTP",
+                title="Page served over HTTP",
+                detail="No TLS on this URL — HSTS and secure cookies cannot apply.",
+                evidence={"url": page_url},
+            )
+        )
+
+    return findings
+
+
 def analyze_surface(
     page_url: str,
     *,
@@ -310,12 +528,24 @@ def analyze_surface(
     action_map: list[dict[str, Any]] | None = None,
     clean_html: str = "",
     capture_stats: dict[str, Any] | None = None,
+    http_headers: dict[str, str] | None = None,
+    http_probe_status: Optional[int] = None,
+    http_probe_location: Optional[str] = None,
 ) -> dict[str, Any]:
     """Run all security rules on a single scanned page."""
     forms = parse_forms(clean_html) if clean_html else []
     actions = action_map or []
 
     findings: list[Finding] = []
+    if http_headers is not None:
+        findings.extend(
+            analyze_http_headers(
+                page_url,
+                http_headers,
+                http_probe_status=http_probe_status,
+                http_probe_location=http_probe_location,
+            )
+        )
     findings.extend(analyze_forms(page_url, forms))
     findings.extend(analyze_links(page_url, actions))
     findings.extend(
@@ -335,7 +565,7 @@ def analyze_surface(
     for f in findings:
         counts[f.severity] = counts.get(f.severity, 0) + 1
 
-    return {
+    payload: dict[str, Any] = {
         "url": page_url,
         "title": title,
         "page_class": page_class,
@@ -345,6 +575,9 @@ def analyze_surface(
         "finding_counts": counts,
         "findings": [f.to_dict() for f in findings],
     }
+    if http_headers is not None:
+        payload["http_headers"] = summarize_security_headers(http_headers)
+    return payload
 
 
 def extract_same_domain_links(page_url: str, action_map: list[dict[str, Any]], *, max_links: int = 30) -> list[str]:
@@ -451,6 +684,11 @@ def render_markdown_report(report: dict[str, Any]) -> str:
         lines.append(f"- URL: `{page.get('url')}`")
         lines.append(f"- page_class: **{page.get('page_class')}** — {page.get('page_class_reason', '')}")
         lines.append(f"- action_count: {page.get('action_count')}, forms: {page.get('form_count')}")
+        if page.get("http_headers"):
+            lines.append("- **HTTP headers:**")
+            for key, value in page["http_headers"].items():
+                if value:
+                    lines.append(f"  - `{key}`: {value}")
         lines.append("")
 
         findings = page.get("findings") or []
@@ -469,7 +707,8 @@ def render_markdown_report(report: dict[str, Any]) -> str:
         [
             "## Limitations",
             "",
-            "- Does not test XSS, SQLi, auth bypass, or HTTP security headers.",
+            "- Does not test XSS, SQLi, auth bypass, or active CORS exploitation.",
+            "- HTTP header checks are response-level only (no cookie flag audit beyond Set-Cookie presence).",
             "- Use only on systems you are authorized to scan.",
             "",
         ]

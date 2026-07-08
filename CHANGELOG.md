@@ -4,6 +4,18 @@ All notable changes to this project are documented in this file.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.1] - 2026-07-08
+
+### Added
+
+- **HTTP security headers** in attack surface scan: `fetch_http_headers`, `analyze_http_headers` (HSTS, CSP, clickjacking, nosniff, CORS, HTTP→HTTPS redirect).
+- CLI flag `--no-headers` to skip header checks.
+- Tests for header rule engine; example `examples/security_scan/localpdf-headers-only.json`.
+
+### Changed
+
+- README: security scan docs now include HTTP header checks.
+
 ## [0.3.0] - 2026-07-08
 
 ### Added
@@ -47,6 +59,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Initial release: DOM compression, Action Map, shadow_grep, self-healing, Playwright wrapper, FastAPI `/v1/compress` and `/v1/heal`.
 
+[0.3.1]: https://github.com/ulinycoin/shadow-web/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/ulinycoin/shadow-web/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/ulinycoin/shadow-web/compare/v0.2.0...v0.2.2
 [0.2.0]: https://github.com/ulinycoin/shadow-web/releases/tag/v0.2.0

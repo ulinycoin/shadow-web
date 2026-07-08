@@ -5,9 +5,11 @@ from __future__ import annotations
 from shadow_web.schema_snap import parse_forms
 from shadow_web.security_scan import (
     analyze_forms,
+    analyze_http_headers,
     analyze_links,
     analyze_surface,
     extract_same_domain_links,
+    normalize_header_map,
     render_markdown_report,
     summarize_report,
 )
@@ -100,3 +102,49 @@ def test_markdown_report_renders():
     md = render_markdown_report(report)
     assert "Attack Surface Security Scan" in md
     assert "LINK_HTTP_RESOURCE" in md
+
+
+LOCALPDF_HEADERS = normalize_header_map({
+    "strict-transport-security": "max-age=63072000",
+    "content-security-policy": "default-src 'self'; frame-ancestors 'none'; script-src 'self' 'unsafe-inline'",
+    "x-frame-options": "DENY",
+    "x-content-type-options": "nosniff",
+    "referrer-policy": "strict-origin-when-cross-origin",
+    "permissions-policy": "camera=(), microphone=(), geolocation=()",
+    "access-control-allow-origin": "*",
+})
+
+
+def test_analyze_http_headers_localpdf_like():
+    findings = analyze_http_headers(
+        "https://localpdf.online/",
+        LOCALPDF_HEADERS,
+        http_probe_status=301,
+        http_probe_location="https://localpdf.online/",
+    )
+    rules = {f.rule_id for f in findings}
+    assert "HEADER_MISSING_HSTS" not in rules
+    assert "HEADER_MISSING_CSP" not in rules
+    assert "HEADER_CORS_WILDCARD" in rules
+    assert "HEADER_CSP_UNSAFE" in rules
+
+
+def test_analyze_http_headers_missing_basics():
+    findings = analyze_http_headers("https://insecure.example.com/", {})
+    rules = {f.rule_id for f in findings}
+    assert "HEADER_MISSING_HSTS" in rules
+    assert "HEADER_MISSING_CSP" in rules
+    assert "HEADER_MISSING_NOSNIFF" in rules
+
+
+def test_analyze_surface_with_headers():
+    result = analyze_surface(
+        "https://localpdf.online/",
+        clean_html="",
+        action_map=[],
+        http_headers=LOCALPDF_HEADERS,
+        http_probe_status=301,
+        http_probe_location="https://localpdf.online/",
+    )
+    assert result["http_headers"]["strict-transport-security"] is not None
+    assert "HEADER_MISSING_HSTS" not in {f["rule_id"] for f in result["findings"]}

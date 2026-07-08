@@ -102,7 +102,7 @@ Playbook: [examples/golden_path/CASE.md](examples/golden_path/CASE.md)
 
 ### Attack surface security scan
 
-Automated **surface mapping** (not penetration testing): forms, links, `page_class`, Markdown/JSON reports.
+Automated **surface mapping** (not penetration testing): forms, links, `page_class`, **HTTP security headers** (HSTS, CSP, XFO, nosniff, CORS), Markdown/JSON reports.
 
 ```bash
 pip install -e ".[mcp]"
@@ -111,7 +111,7 @@ playwright install chromium
 # Single URL
 python scripts/security_surface_scan.py https://example.com
 
-# Shallow same-domain crawl + reports
+# Shallow same-domain crawl + reports (--no-headers to skip HTTP header checks)
 python scripts/security_surface_scan.py https://yoursite.com \
   --crawl-depth 1 --max-pages 20 \
   --json report.json --markdown report.md
@@ -128,12 +128,12 @@ result = analyze_surface(
     action_map=actions,
     page_class="Static",
 )
-# findings: FORM_PASSWORD_GET, LINK_HTTP_RESOURCE, PAGE_SHADOW_DOM, ...
+# findings: FORM_PASSWORD_GET, LINK_HTTP_RESOURCE, HEADER_MISSING_CSP, HEADER_CORS_WILDCARD, ...
 ```
 
-Example output: [examples/security_scan/localpdf-full-report.md](examples/security_scan/localpdf-full-report.md) (20 pages, 0 critical/high on public marketing layer).
+Example output: [examples/security_scan/localpdf-full-report.md](examples/security_scan/localpdf-full-report.md) (20 pages, 0 critical/high on public marketing layer). Header-only sample: [localpdf-headers-only.json](examples/security_scan/localpdf-headers-only.json).
 
-**Does not test:** XSS, SQLi, auth bypass, HTTP security headers (CSP/HSTS), or TLS. Use only on authorized targets.
+**Does not test:** XSS, SQLi, auth bypass, or deep TLS/cipher analysis. Use only on authorized targets.
 
 ### AgentOps form fill
 
@@ -593,7 +593,7 @@ Playbook: [examples/form_fill/CASE.md](examples/form_fill/CASE.md)
 | **Closed Shadow DOM** | `navigate(..., capture_mode="dual")` or `"a11y"` |
 | **Cross-origin iframes** | Not accessible — `page_class: Iframe-heavy` |
 | **Token bombs** | Never default to `detail="full"`, `get_page_html(max_chars=0)`, or `max_rows=0` unless debugging |
-| **Security scan scope** | Surface mapping only — no XSS/SQLi/header/TLS tests; SPAs may need `capture_mode=dual` |
+| **Security scan scope** | Surface mapping — forms, links, HTTP headers; no XSS/SQLi; SPAs may need `capture_mode=dual` |
 | **Security scan authorization** | Run only on systems you own or have explicit permission to test |
 | **Form fill custom widgets** | MUI Select, date pickers → `handoff`; use `capture_mode=dual` for Shadow DOM forms |
 

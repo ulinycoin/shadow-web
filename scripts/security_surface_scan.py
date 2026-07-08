@@ -26,12 +26,20 @@ from shadow_web.browser_use import AsyncShadowPage
 from shadow_web.security_scan import (
     analyze_surface,
     extract_same_domain_links,
+    fetch_http_headers,
+    probe_http_redirect,
     render_markdown_report,
     summarize_report,
 )
 
 
-async def scan_page(url: str, *, timeout_ms: int = 45000, capture_mode: str = "auto") -> dict:
+async def scan_page(
+    url: str,
+    *,
+    timeout_ms: int = 45000,
+    capture_mode: str = "auto",
+    check_headers: bool = True,
+) -> dict:
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -43,6 +51,16 @@ async def scan_page(url: str, *, timeout_ms: int = 45000, capture_mode: str = "a
             clean_html, _ = await shadow.refresh()
 
             stats = getattr(shadow, "capture_stats", {}) or {}
+
+            http_headers: dict | None = None
+            http_probe_status = None
+            http_probe_location = None
+            header_error = None
+            if check_headers:
+                http_headers, _, header_error = fetch_http_headers(url)
+                if urlparse(url).scheme == "https":
+                    http_probe_status, http_probe_location, _ = probe_http_redirect(url)
+
             result = analyze_surface(
                 url,
                 title=title,
@@ -52,7 +70,12 @@ async def scan_page(url: str, *, timeout_ms: int = 45000, capture_mode: str = "a
                 action_map=shadow.action_map,
                 clean_html=clean_html,
                 capture_stats=stats,
+                http_headers=http_headers,
+                http_probe_status=http_probe_status,
+                http_probe_location=http_probe_location,
             )
+            if header_error:
+                result["header_fetch_error"] = header_error
             result["scanned_at"] = datetime.now(timezone.utc).isoformat()
             result["outbound_same_domain_links"] = extract_same_domain_links(url, shadow.action_map)
             return result
@@ -86,6 +109,7 @@ async def crawl_and_scan(
     max_pages: int,
     same_domain: bool,
     timeout_ms: int,
+    check_headers: bool,
 ) -> list[dict]:
     if not seed_urls:
         raise ValueError("No URLs provided")
@@ -103,7 +127,7 @@ async def crawl_and_scan(
         visited.add(url)
 
         print(f"Scanning [{depth}] {url}...", flush=True)
-        page_result = await scan_page(url, timeout_ms=timeout_ms)
+        page_result = await scan_page(url, timeout_ms=timeout_ms, check_headers=check_headers)
         pages.append(page_result)
 
         if "error" in page_result:
@@ -136,6 +160,7 @@ async def main() -> None:
         help="Restrict crawl to seed domain(s)",
     )
     parser.add_argument("--timeout", type=int, default=45, help="Page load timeout (seconds)")
+    parser.add_argument("--no-headers", action="store_true", help="Skip HTTP security header checks")
     args = parser.parse_args()
 
     urls = _load_urls(args.url_file, args.urls)
@@ -148,6 +173,7 @@ async def main() -> None:
         max_pages=max(1, args.max_pages),
         same_domain=args.same_domain,
         timeout_ms=args.timeout * 1000,
+        check_headers=not args.no_headers,
     )
 
     report = {
