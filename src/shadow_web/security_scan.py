@@ -1,0 +1,478 @@
+"""Attack surface rule engine for Shadow Web security scans."""
+
+from __future__ import annotations
+
+import re
+from dataclasses import asdict, dataclass, field
+from typing import Any
+from urllib.parse import urlparse, urljoin
+
+from shadow_web.schema_snap import parse_forms
+
+SEVERITY_ORDER = ("critical", "high", "medium", "low", "info")
+
+_SENSITIVE_PATH = re.compile(
+    r"/(?:admin|api|debug|backup|config|wp-admin|phpmyadmin|\.env|actuator)(?:/|$)",
+    re.I,
+)
+
+_SENSITIVE_LABEL = re.compile(
+    r"\b(admin panel|delete all|reset password|debug mode|export all data)\b",
+    re.I,
+)
+
+
+@dataclass
+class Finding:
+    severity: str
+    rule_id: str
+    title: str
+    detail: str
+    evidence: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+def _netloc(url: str) -> str:
+    try:
+        return urlparse(url).netloc.lower()
+    except Exception:
+        return ""
+
+
+def _is_http_url(url: str) -> bool:
+    return url.lower().startswith("http://")
+
+
+def _normalize_path(url: str) -> str:
+    parsed = urlparse(url)
+    path = parsed.path or "/"
+    if path != "/" and path.endswith("/"):
+        path = path.rstrip("/")
+    return path
+
+
+def _dedupe_findings(findings: list[Finding]) -> list[Finding]:
+    seen: set[tuple[str, str, str]] = set()
+    unique: list[Finding] = []
+    for finding in findings:
+        key = (finding.rule_id, finding.title, finding.detail)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(finding)
+    return unique
+
+
+def analyze_forms(page_url: str, forms: list[dict[str, Any]]) -> list[Finding]:
+    findings: list[Finding] = []
+
+    for idx, form in enumerate(forms, start=1):
+        method = (form.get("method") or "GET").upper()
+        action = form.get("action") or page_url
+        fields = form.get("fields") or []
+        password_fields = [f for f in fields if f.get("type") == "password"]
+        hidden_fields = [f for f in fields if f.get("type") == "hidden"]
+        file_fields = [f for f in fields if f.get("type") == "file"]
+
+        form_ctx = {"form_index": idx, "method": method, "action": action}
+
+        if password_fields and method == "GET":
+            findings.append(
+                Finding(
+                    severity="critical",
+                    rule_id="FORM_PASSWORD_GET",
+                    title="Password field submitted via GET",
+                    detail="Credentials may leak via URL, logs, and Referer headers.",
+                    evidence={**form_ctx, "fields": [f.get("name") or f.get("label") for f in password_fields]},
+                )
+            )
+
+        if action and _is_http_url(action):
+            findings.append(
+                Finding(
+                    severity="high",
+                    rule_id="FORM_INSECURE_ACTION",
+                    title="Form posts to insecure HTTP URL",
+                    detail=f"Form action uses HTTP: {action}",
+                    evidence=form_ctx,
+                )
+            )
+
+        for pf in password_fields:
+            if "minlength" not in pf and "pattern" not in pf:
+                findings.append(
+                    Finding(
+                        severity="medium",
+                        rule_id="FORM_WEAK_PASSWORD",
+                        title="Password field lacks client-side length/pattern constraints",
+                        detail="No minlength or pattern on password input (client hint only).",
+                        evidence={
+                            **form_ctx,
+                            "field": pf.get("name") or pf.get("label") or "password",
+                        },
+                    )
+                )
+
+        if len(hidden_fields) > 3:
+            findings.append(
+                Finding(
+                    severity="low",
+                    rule_id="FORM_MANY_HIDDEN",
+                    title="Form has many hidden fields",
+                    detail=f"{len(hidden_fields)} hidden inputs — verify server-side validation.",
+                    evidence={**form_ctx, "hidden_count": len(hidden_fields)},
+                )
+            )
+
+        if file_fields:
+            findings.append(
+                Finding(
+                    severity="medium",
+                    rule_id="FORM_FILE_UPLOAD",
+                    title="Public file upload control detected",
+                    detail="Review upload limits, MIME validation, and auth requirements.",
+                    evidence={
+                        **form_ctx,
+                        "fields": [f.get("name") or f.get("label") for f in file_fields],
+                    },
+                )
+            )
+
+    return findings
+
+
+def analyze_links(page_url: str, action_map: list[dict[str, Any]]) -> list[Finding]:
+    findings: list[Finding] = []
+    page_host = _netloc(page_url)
+    http_links: list[str] = []
+    external_links: list[str] = []
+    sensitive_links: list[dict[str, str]] = []
+
+    for action in action_map:
+        href = (action.get("href") or "").strip()
+        if not href or href.startswith("#") or href.startswith("mailto:") or href.startswith("tel:"):
+            continue
+        if href.startswith("javascript:"):
+            findings.append(
+                Finding(
+                    severity="low",
+                    rule_id="LINK_JAVASCRIPT",
+                    title="javascript: link in attack surface",
+                    detail=f"Link label: {(action.get('label') or '')[:80]}",
+                    evidence={"href": href[:120], "label": action.get("label", "")},
+                )
+            )
+            continue
+
+        absolute = urljoin(page_url, href)
+        parsed = urlparse(absolute)
+        if parsed.scheme not in ("http", "https"):
+            continue
+
+        if _is_http_url(absolute):
+            http_links.append(absolute)
+
+        link_host = parsed.netloc.lower()
+        if page_host and link_host and link_host != page_host:
+            external_links.append(absolute)
+
+        path = parsed.path or "/"
+        label = action.get("label") or ""
+        if _SENSITIVE_PATH.search(path) or _SENSITIVE_LABEL.search(label):
+            sensitive_links.append({"url": absolute, "label": label[:100]})
+
+    if _is_http_url(page_url):
+        findings.append(
+            Finding(
+                severity="high",
+                rule_id="PAGE_HTTP",
+                title="Page served over HTTP",
+                detail="Login forms and cookies on HTTP are vulnerable to interception.",
+                evidence={"url": page_url},
+            )
+        )
+
+    if http_links:
+        unique_http = sorted(set(http_links))[:10]
+        findings.append(
+            Finding(
+                severity="high",
+                rule_id="LINK_HTTP_RESOURCE",
+                title="Insecure HTTP links on page",
+                detail=f"{len(set(http_links))} unique http:// link(s) detected.",
+                evidence={"sample": unique_http},
+            )
+        )
+
+    if external_links:
+        unique_external = sorted(set(external_links))
+        findings.append(
+            Finding(
+                severity="info",
+                rule_id="LINK_EXTERNAL",
+                title="External outbound links",
+                detail=f"{len(unique_external)} external link(s) — review trust and rel=noopener.",
+                evidence={"count": len(unique_external), "sample": unique_external[:15]},
+            )
+        )
+
+    for item in sensitive_links[:10]:
+        findings.append(
+            Finding(
+                severity="medium",
+                rule_id="LINK_SENSITIVE_PATH",
+                title="Link to potentially sensitive path",
+                detail=f"Surface exposes {item['url']}",
+                evidence=item,
+            )
+        )
+
+    return findings
+
+
+def analyze_page_meta(
+    page_url: str,
+    *,
+    page_class: str,
+    page_class_reason: str,
+    action_count: int,
+    capture_stats: dict[str, Any] | None = None,
+) -> list[Finding]:
+    findings: list[Finding] = []
+    stats = capture_stats or {}
+
+    if page_class == "Anti-bot":
+        findings.append(
+            Finding(
+                severity="info",
+                rule_id="PAGE_ANTIBOT",
+                title="Anti-bot protection detected",
+                detail=page_class_reason or "Automated scan may be incomplete.",
+                evidence={"url": page_url},
+            )
+        )
+    elif page_class == "Auth-gated":
+        findings.append(
+            Finding(
+                severity="info",
+                rule_id="PAGE_AUTH_GATED",
+                title="Authentication-gated page",
+                detail=page_class_reason or "Redirected to login or sign-in.",
+                evidence={"url": page_url},
+            )
+        )
+    elif page_class == "SPA" and action_count == 0:
+        findings.append(
+            Finding(
+                severity="low",
+                rule_id="PAGE_SPA_EMPTY",
+                title="SPA with empty interactive surface",
+                detail="Dynamic content may hide forms/links from this pass.",
+                evidence={"url": page_url, "reason": page_class_reason},
+            )
+        )
+
+    if page_class in ("Shadow DOM", "Closed Shadow"):
+        findings.append(
+            Finding(
+                severity="info",
+                rule_id="PAGE_SHADOW_DOM",
+                title="Shadow DOM present",
+                detail=page_class_reason,
+                evidence={"shadow_hosts": stats.get("shadow_hosts", 0)},
+            )
+        )
+
+    cross_origin = stats.get("cross_origin_iframes", 0)
+    if cross_origin or page_class == "Iframe-heavy":
+        findings.append(
+            Finding(
+                severity="info",
+                rule_id="PAGE_CROSS_ORIGIN_IFRAME",
+                title="Cross-origin iframe content",
+                detail="Embedded third-party UI may contain untrusted attack surface.",
+                evidence={"cross_origin_iframes": cross_origin},
+            )
+        )
+
+    return findings
+
+
+def analyze_surface(
+    page_url: str,
+    *,
+    title: str = "",
+    page_class: str = "Static",
+    page_class_reason: str = "",
+    action_count: int = 0,
+    action_map: list[dict[str, Any]] | None = None,
+    clean_html: str = "",
+    capture_stats: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Run all security rules on a single scanned page."""
+    forms = parse_forms(clean_html) if clean_html else []
+    actions = action_map or []
+
+    findings: list[Finding] = []
+    findings.extend(analyze_forms(page_url, forms))
+    findings.extend(analyze_links(page_url, actions))
+    findings.extend(
+        analyze_page_meta(
+            page_url,
+            page_class=page_class,
+            page_class_reason=page_class_reason,
+            action_count=action_count,
+            capture_stats=capture_stats,
+        )
+    )
+
+    findings.sort(key=lambda f: SEVERITY_ORDER.index(f.severity) if f.severity in SEVERITY_ORDER else 99)
+    findings = _dedupe_findings(findings)
+
+    counts = {level: 0 for level in SEVERITY_ORDER}
+    for f in findings:
+        counts[f.severity] = counts.get(f.severity, 0) + 1
+
+    return {
+        "url": page_url,
+        "title": title,
+        "page_class": page_class,
+        "page_class_reason": page_class_reason,
+        "action_count": action_count,
+        "form_count": len(forms),
+        "finding_counts": counts,
+        "findings": [f.to_dict() for f in findings],
+    }
+
+
+def extract_same_domain_links(page_url: str, action_map: list[dict[str, Any]], *, max_links: int = 30) -> list[str]:
+    """Collect same-domain absolute URLs for shallow crawling."""
+    host = _netloc(page_url)
+    if not host:
+        return []
+
+    found: list[str] = []
+    seen: set[str] = set()
+
+    for action in action_map:
+        href = (action.get("href") or "").strip()
+        if not href or href.startswith("#") or href.startswith("javascript:"):
+            continue
+        absolute = urljoin(page_url, href)
+        parsed = urlparse(absolute)
+        if parsed.scheme not in ("http", "https"):
+            continue
+        if parsed.netloc.lower() != host:
+            continue
+        normalized = f"{parsed.scheme}://{parsed.netloc}{_normalize_path(absolute)}"
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        found.append(normalized)
+        if len(found) >= max_links:
+            break
+
+    return found
+
+
+def summarize_report(pages: list[dict[str, Any]]) -> dict[str, Any]:
+    totals = {level: 0 for level in SEVERITY_ORDER}
+    for page in pages:
+        if "error" in page:
+            continue
+        for level, count in page.get("finding_counts", {}).items():
+            totals[level] = totals.get(level, 0) + count
+
+    ranked = []
+    for page in pages:
+        if "error" in page:
+            continue
+        score = (
+            page.get("finding_counts", {}).get("critical", 0) * 100
+            + page.get("finding_counts", {}).get("high", 0) * 25
+            + page.get("finding_counts", {}).get("medium", 0) * 5
+        )
+        ranked.append({"url": page["url"], "risk_score": score, "finding_counts": page.get("finding_counts", {})})
+
+    ranked.sort(key=lambda x: x["risk_score"], reverse=True)
+
+    return {
+        "pages_scanned": len([p for p in pages if "error" not in p]),
+        "pages_failed": len([p for p in pages if "error" in p]),
+        "finding_totals": totals,
+        "highest_risk_pages": ranked[:5],
+    }
+
+
+def render_markdown_report(report: dict[str, Any]) -> str:
+    summary = report.get("summary", {})
+    lines = [
+        "# Attack Surface Security Scan",
+        "",
+        f"**Generated:** {report.get('generated_at', '')}",
+        f"**Scope:** automated surface mapping (not penetration testing)",
+        "",
+        "## Executive summary",
+        "",
+        f"- Pages scanned: **{summary.get('pages_scanned', 0)}**",
+        f"- Pages failed: **{summary.get('pages_failed', 0)}**",
+        f"- Findings: critical **{summary.get('finding_totals', {}).get('critical', 0)}**, "
+        f"high **{summary.get('finding_totals', {}).get('high', 0)}**, "
+        f"medium **{summary.get('finding_totals', {}).get('medium', 0)}**, "
+        f"low **{summary.get('finding_totals', {}).get('low', 0)}**, "
+        f"info **{summary.get('finding_totals', {}).get('info', 0)}**",
+        "",
+    ]
+
+    highest = summary.get("highest_risk_pages") or []
+    if highest:
+        lines.append("### Highest-risk pages")
+        lines.append("")
+        for item in highest:
+            if item.get("risk_score", 0) <= 0:
+                continue
+            lines.append(f"- `{item['url']}` — score {item['risk_score']}")
+        lines.append("")
+
+    lines.extend(["## Findings by page", ""])
+
+    for page in report.get("pages", []):
+        if "error" in page:
+            lines.append(f"### {page.get('url', '?')} — ERROR")
+            lines.append("")
+            lines.append(f"`{page['error']}`")
+            lines.append("")
+            continue
+
+        lines.append(f"### {page.get('title') or page.get('url')}")
+        lines.append("")
+        lines.append(f"- URL: `{page.get('url')}`")
+        lines.append(f"- page_class: **{page.get('page_class')}** — {page.get('page_class_reason', '')}")
+        lines.append(f"- action_count: {page.get('action_count')}, forms: {page.get('form_count')}")
+        lines.append("")
+
+        findings = page.get("findings") or []
+        if not findings:
+            lines.append("_No rule findings on this page._")
+            lines.append("")
+            continue
+
+        for finding in findings:
+            sev = finding.get("severity", "info").upper()
+            lines.append(f"- **[{sev}]** {finding.get('title')} (`{finding.get('rule_id')}`)")
+            lines.append(f"  {finding.get('detail')}")
+        lines.append("")
+
+    lines.extend(
+        [
+            "## Limitations",
+            "",
+            "- Does not test XSS, SQLi, auth bypass, or HTTP security headers.",
+            "- Use only on systems you are authorized to scan.",
+            "",
+        ]
+    )
+
+    return "\n".join(lines)

@@ -1,0 +1,66 @@
+{
+  "generated_at": "2026-07-08T03:57:03.113693+00:00",
+  "disclaimer": "Automated attack surface mapping only. Not a penetration test.",
+  "seeds": [
+    "https://example.com"
+  ],
+  "crawl_depth": 0,
+  "max_pages": 15,
+  "pages": [
+    {
+      "url": "https://example.com",
+      "title": "Example Domain",
+      "page_class": "Static",
+      "page_class_reason": "Standard HTML page with static layout.",
+      "action_count": 1,
+      "form_count": 0,
+      "finding_counts": {
+        "critical": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "info": 1
+      },
+      "findings": [
+        {
+          "severity": "info",
+          "rule_id": "LINK_EXTERNAL",
+          "title": "External outbound links",
+          "detail": "1 external link(s) — review trust and rel=noopener.",
+          "evidence": {
+            "count": 1,
+            "sample": [
+              "https://iana.org/domains/example"
+            ]
+          }
+        }
+      ],
+      "scanned_at": "2026-07-08T03:57:02.531159+00:00",
+      "outbound_same_domain_links": []
+    }
+  ],
+  "summary": {
+    "pages_scanned": 1,
+    "pages_failed": 0,
+    "finding_totals": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 0,
+      "info": 1
+    },
+    "highest_risk_pages": [
+      {
+        "url": "https://example.com",
+        "risk_score": 0,
+        "finding_counts": {
+          "critical": 0,
+          "high": 0,
+          "medium": 0,
+          "low": 0,
+          "info": 1
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,194 @@
+{
+  "generated_at": "2026-07-08T03:57:27.704719+00:00",
+  "disclaimer": "Automated attack surface mapping only. Not a penetration test.",
+  "seeds": [
+    "https://localpdf.online/",
+    "https://localpdf.online/pricing"
+  ],
+  "crawl_depth": 0,
+  "max_pages": 15,
+  "pages": [
+    {
+      "url": "https://localpdf.online/",
+      "title": "Private PDF Editor — Edit, Merge & OCR in Browser | LocalPDF",
+      "page_class": "Static",
+      "page_class_reason": "Standard HTML page with static layout.",
+      "action_count": 86,
+      "form_count": 0,
+      "finding_counts": {
+        "critical": 0,
+        "high": 0,
+        "medium": 3,
+        "low": 0,
+        "info": 0
+      },
+      "findings": [
+        {
+          "severity": "medium",
+          "rule_id": "LINK_SENSITIVE_PATH",
+          "title": "Link to potentially sensitive path",
+          "detail": "Surface exposes https://localpdf.online/use-cases/internal-operations",
+          "evidence": {
+            "url": "https://localpdf.online/use-cases/internal-operations",
+            "label": "For internal operations"
+          }
+        },
+        {
+          "severity": "medium",
+          "rule_id": "LINK_SENSITIVE_PATH",
+          "title": "Link to potentially sensitive path",
+          "detail": "Surface exposes https://localpdf.online/features/split-pdf",
+          "evidence": {
+            "url": "https://localpdf.online/features/split-pdf",
+            "label": "Delete Pages"
+          }
+        },
+        {
+          "severity": "medium",
+          "rule_id": "LINK_SENSITIVE_PATH",
+          "title": "Link to potentially sensitive path",
+          "detail": "Surface exposes https://localpdf.online/use-cases/internal-operations",
+          "evidence": {
+            "url": "https://localpdf.online/use-cases/internal-operations",
+            "label": "For internal operations"
+          }
+        }
+      ],
+      "scanned_at": "2026-07-08T03:57:19.679443+00:00",
+      "outbound_same_domain_links": [
+        "https://localpdf.online/",
+        "https://localpdf.online/pricing",
+        "https://localpdf.online/app",
+        "https://localpdf.online/features/edit-pdf",
+        "https://localpdf.online/features/merge-pdf",
+        "https://localpdf.online/features/split-pdf",
+        "https://localpdf.online/features/sign-pdf",
+        "https://localpdf.online/features/ocr-pdf",
+        "https://localpdf.online/features/compress-pdf",
+        "https://localpdf.online/features/convert-pdf",
+        "https://localpdf.online/blog",
+        "https://localpdf.online/security",
+        "https://localpdf.online/private-pdf-editor",
+        "https://localpdf.online/compare/localpdf-vs-smallpdf",
+        "https://localpdf.online/pdf-tools-without-upload",
+        "https://localpdf.online/use-cases/lawyers",
+        "https://localpdf.online/use-cases/accountants",
+        "https://localpdf.online/use-cases/hr-sensitive-documents",
+        "https://localpdf.online/use-cases/internal-operations",
+        "https://localpdf.online/faq",
+        "https://localpdf.online/ja",
+        "https://localpdf.online/zh",
+        "https://localpdf.online/features/auto-toc-pdf",
+        "https://localpdf.online/blog/how-to-merge-pdf-files",
+        "https://localpdf.online/blog/edit-text-in-pdf-guide",
+        "https://localpdf.online/blog/ocr-pdf-extract-text",
+        "https://localpdf.online/privacy",
+        "https://localpdf.online/terms",
+        "https://localpdf.online/refund-policy",
+        "https://localpdf.online/about"
+      ]
+    },
+    {
+      "url": "https://localpdf.online/pricing",
+      "title": "LocalPDF Pricing — Free & Pro Plans from $3.99/mo | Private PDF Tool",
+      "page_class": "Static",
+      "page_class_reason": "Standard HTML page with static layout.",
+      "action_count": 56,
+      "form_count": 0,
+      "finding_counts": {
+        "critical": 0,
+        "high": 0,
+        "medium": 2,
+        "low": 0,
+        "info": 0
+      },
+      "findings": [
+        {
+          "severity": "medium",
+          "rule_id": "LINK_SENSITIVE_PATH",
+          "title": "Link to potentially sensitive path",
+          "detail": "Surface exposes https://localpdf.online/use-cases/internal-operations",
+          "evidence": {
+            "url": "https://localpdf.online/use-cases/internal-operations",
+            "label": "For internal operations"
+          }
+        },
+        {
+          "severity": "medium",
+          "rule_id": "LINK_SENSITIVE_PATH",
+          "title": "Link to potentially sensitive path",
+          "detail": "Surface exposes https://localpdf.online/use-cases/internal-operations",
+          "evidence": {
+            "url": "https://localpdf.online/use-cases/internal-operations",
+            "label": "For internal operations"
+          }
+        }
+      ],
+      "scanned_at": "2026-07-08T03:57:27.199473+00:00",
+      "outbound_same_domain_links": [
+        "https://localpdf.online/",
+        "https://localpdf.online/pricing",
+        "https://localpdf.online/app",
+        "https://localpdf.online/features/edit-pdf",
+        "https://localpdf.online/features/merge-pdf",
+        "https://localpdf.online/features/split-pdf",
+        "https://localpdf.online/features/sign-pdf",
+        "https://localpdf.online/features/ocr-pdf",
+        "https://localpdf.online/features/compress-pdf",
+        "https://localpdf.online/features/convert-pdf",
+        "https://localpdf.online/blog",
+        "https://localpdf.online/security",
+        "https://localpdf.online/private-pdf-editor",
+        "https://localpdf.online/compare/localpdf-vs-smallpdf",
+        "https://localpdf.online/pdf-tools-without-upload",
+        "https://localpdf.online/use-cases/lawyers",
+        "https://localpdf.online/use-cases/accountants",
+        "https://localpdf.online/use-cases/hr-sensitive-documents",
+        "https://localpdf.online/use-cases/internal-operations",
+        "https://localpdf.online/faq",
+        "https://localpdf.online/ja",
+        "https://localpdf.online/zh",
+        "https://localpdf.online/terms",
+        "https://localpdf.online/privacy",
+        "https://localpdf.online/refund-policy",
+        "https://localpdf.online/about",
+        "https://localpdf.online/how-local-pdf-processing-works"
+      ]
+    }
+  ],
+  "summary": {
+    "pages_scanned": 2,
+    "pages_failed": 0,
+    "finding_totals": {
+      "critical": 0,
+      "high": 0,
+      "medium": 5,
+      "low": 0,
+      "info": 0
+    },
+    "highest_risk_pages": [
+      {
+        "url": "https://localpdf.online/",
+        "risk_score": 15,
+        "finding_counts": {
+          "critical": 0,
+          "high": 0,
+          "medium": 3,
+          "low": 0,
+          "info": 0
+        }
+      },
+      {
+        "url": "https://localpdf.online/pricing",
+        "risk_score": 10,
+        "finding_counts": {
+          "critical": 0,
+          "high": 0,
+          "medium": 2,
+          "low": 0,
+          "info": 0
+        }
+      }
+    ]
+  }
+}
