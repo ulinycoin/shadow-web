@@ -62,6 +62,8 @@ Shadow Web is what runs **between** the browser and the LLM: a compression layer
 | A Playwright scraper that breaks on every deploy | `heal_local.py` catches DOM drift without LLM cost |
 | A Shadow DOM-heavy app (Web components, Lit, Angular) | Read-only flatten — no React/Vue breakage |
 | **An agent that needs data from web pages** | SchemaSnap parses tables, forms, and lists into clean JSON |
+| **Attack surface / security recon** | `security_scan.py` + CLI — forms, links, page_class rules (not pentest) |
+| **Competitor monitoring & SEO content** | Shallow multi-site scans with token-bounded Action Map |
 
 ---
 
@@ -96,6 +98,51 @@ python examples/golden_path/demo.py
 
 Output: raw HTML vs `navigate(minimal)` + `schema_session_json` + `shadow_query` — side-by-side token table.  
 Playbook: [examples/golden_path/CASE.md](examples/golden_path/CASE.md)
+
+### Attack surface security scan
+
+Automated **surface mapping** (not penetration testing): forms, links, `page_class`, Markdown/JSON reports.
+
+```bash
+pip install -e ".[mcp]"
+playwright install chromium
+
+# Single URL
+python scripts/security_surface_scan.py https://example.com
+
+# Shallow same-domain crawl + reports
+python scripts/security_surface_scan.py https://yoursite.com \
+  --crawl-depth 1 --max-pages 20 \
+  --json report.json --markdown report.md
+```
+
+Rule engine (importable without browser):
+
+```python
+from shadow_web.security_scan import analyze_surface, render_markdown_report
+
+result = analyze_surface(
+    "https://app.example.com/login",
+    clean_html=html,
+    action_map=actions,
+    page_class="Static",
+)
+# findings: FORM_PASSWORD_GET, LINK_HTTP_RESOURCE, PAGE_SHADOW_DOM, ...
+```
+
+Example output: [examples/security_scan/localpdf-full-report.md](examples/security_scan/localpdf-full-report.md) (20 pages, 0 critical/high on public marketing layer).
+
+**Does not test:** XSS, SQLi, auth bypass, HTTP security headers (CSP/HSTS), or TLS. Use only on authorized targets.
+
+### Competitor intelligence scan
+
+Token-bounded weekly audit for programmatic SEO / compare pages:
+
+```bash
+python scripts/localpdf_competitor_scan.py --json reports/scan.json
+```
+
+Playbook: [examples/localpdf/CASE.md](examples/localpdf/CASE.md)
 
 Smoke test (install + unit tests + one live site):
 
@@ -230,6 +277,8 @@ Browser (live DOM)
                           ↓
                     schema_snap.py → structured data (tables, forms, lists)
                           ↓
+                    security_scan.py → attack surface rules (forms, links)
+                          ↓
                     heal_local.py → fuzzy selector recovery (no LLM)
                           ↓
                     FastAPI /v1/heal → LLM fallback + verification
@@ -247,6 +296,7 @@ shadow_web/
 ├── dom_capture.py     # Shadow DOM / iframe flatten (in-browser, read-only)
 ├── grouping.py        # Semantic groups (forms, nav, modals)
 ├── schema_snap.py     # Tables, forms, lists → JSON/CSV export
+├── security_scan.py   # Attack surface rule engine (forms, links, page_class)
 ├── heal_local.py      # Local selector heal + ~/.shadow-web/heal_cache.json
 ├── query.py           # shadow_grep (type:, intent:, label~, AND)
 ├── webmcp.py          # WebMCP bridge (Chrome 145+)
@@ -256,7 +306,24 @@ shadow_web/
 ├── wrapper.py         # ShadowPage (Playwright)
 ├── mcp/server.py      # Cursor / Claude MCP tools
 └── server/main.py     # FastAPI (/v1/compress, /v1/heal)
+
+scripts/
+├── security_surface_scan.py   # CLI: crawl + JSON/Markdown security reports
+├── localpdf_competitor_scan.py # Multi-site competitor snapshot
+├── smoke_install.sh           # Install + pytest + one live navigate
+└── cursor-setup.sh            # MCP one-command setup
 ```
+
+---
+
+## Examples
+
+| Path | What it demonstrates |
+|------|----------------------|
+| [examples/golden_path/](examples/golden_path/) | Full agent loop + token budget |
+| [examples/security_scan/](examples/security_scan/) | Attack surface scan reports (JSON + Markdown) |
+| [examples/localpdf/](examples/localpdf/) | Competitor intel playbook + sample scan |
+| [examples/browser_use/](examples/browser_use/) | browser-use integration |
 
 ---
 
@@ -396,6 +463,8 @@ Default **max_rows=50** per table. Set `max_rows=0` for full export when needed.
 | **Closed Shadow DOM** | `navigate(..., capture_mode="dual")` or `"a11y"` |
 | **Cross-origin iframes** | Not accessible — `page_class: Iframe-heavy` |
 | **Token bombs** | Never default to `detail="full"`, `get_page_html(max_chars=0)`, or `max_rows=0` unless debugging |
+| **Security scan scope** | Surface mapping only — no XSS/SQLi/header/TLS tests; SPAs may need `capture_mode=dual` |
+| **Security scan authorization** | Run only on systems you own or have explicit permission to test |
 
 ---
 
