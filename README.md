@@ -1,6 +1,6 @@
 
 <!-- badges -->
-[![PyPI version](https://badge.fury.io/py/shadow-web.svg)](https://pypi.org/project/shadow-web/)
+[![PyPI version](https://img.shields.io/pypi/v/shadow-web.svg)](https://pypi.org/project/shadow-web/)
 [![CI](https://github.com/ulinycoin/shadow-web/actions/workflows/test.yml/badge.svg)](https://github.com/ulinycoin/shadow-web/actions/workflows/test.yml)
 [![Python](https://img.shields.io/pypi/pyversions/shadow-web.svg)](https://pypi.org/project/shadow-web/)
 [![License](https://img.shields.io/github/license/ulinycoin/shadow-web.svg)](LICENSE)
