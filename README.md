@@ -5,6 +5,7 @@
 [![Python](https://img.shields.io/pypi/pyversions/shadow-web.svg)](https://pypi.org/project/shadow-web/)
 [![License](https://img.shields.io/github/license/ulinycoin/shadow-web.svg)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/ulinycoin/shadow-web?style=flat)](https://github.com/ulinycoin/shadow-web)
+[![MCP Badge](https://lobehub.com/badge/mcp/ulinycoin-shadow-web)](https://lobehub.com/mcp/ulinycoin-shadow-web)
 
 # Shadow Web
 
