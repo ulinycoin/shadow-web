@@ -577,6 +577,32 @@ def create_mcp_server():
 
         return await execute_form_fill_plan_async(shadow, plan_obj, validate=validate)
 
+    @mcp.tool()
+    def content_outline(html: str, max_tokens: int = 600) -> str:
+        """Build a terse outline of content blocks (headings, paragraphs, list items) from clean or raw HTML.
+
+        Returns block IDs (p0, p1, …) with heading paths and estimated token
+        counts. Use content_blocks() to fetch full text of selected blocks.
+        Excludes nav, footer, aside, form, and table zones.
+        """
+        from shadow_web.content_index import build, outline_text
+
+        blocks = build(html)
+        return outline_text(blocks, max_tokens=max_tokens)
+
+    @mcp.tool()
+    def content_blocks(html: str, ids: str, max_tokens: int = 2000) -> dict:
+        """Return full text of specific content blocks by ID (comma-separated).
+
+        Pass the HTML and a comma-separated list of block IDs (e.g. "p1,p3,p5").
+        Returns dict mapping block_id → full text, bounded by max_tokens total.
+        """
+        from shadow_web.content_index import build, fetch
+
+        blocks = build(html)
+        block_ids = [i.strip() for i in ids.split(",") if i.strip()]
+        return fetch(blocks, block_ids, max_tokens=max_tokens)
+
     return mcp
 
 

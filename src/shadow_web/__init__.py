@@ -49,6 +49,11 @@ from .form_fill import (
     validate_profile,
     FormFillPlan,
 )
+from .content_index import (
+    build,
+    outline_text,
+    fetch,
+)
 from .verified_heal import verify_selector_on_page, verify_selector_in_html, averify_selector_on_page
 from .wrapper import ShadowPage
 from typing import Any
@@ -123,6 +128,9 @@ __all__ = [
     "plan_from_session",
     "validate_profile",
     "FormFillPlan",
+    "build",
+    "outline_text",
+    "fetch",
     "verify_selector_on_page",
     "verify_selector_in_html",
     "averify_selector_on_page",
