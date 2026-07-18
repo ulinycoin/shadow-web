@@ -9,7 +9,7 @@
 
 # Shadow Web
 
-**Cut 64–97% of tokens from web pages before your LLM sees them — then extract structured data.**  
+**Cut 64–99% of tokens from web pages before your LLM sees them — then extract structured data.**  
 Open-source Python SDK that flattens Shadow DOM, builds a typed Action Map with semantic groups, heals broken selectors, and turns HTML tables/forms/lists into clean JSON — no cloud required.
 
 ```python
@@ -294,6 +294,8 @@ Browser (live DOM)
     │
     └─→ compressor.py → Action Map (data-sid, type, label, group)
                           ↓
+                    content_index.py → block outline (p0, p1…) + on-demand fetch
+                          ↓
                     shadow_grep.py → filter before LLM
                           ↓
                     schema_snap.py → structured data (tables, forms, lists)
@@ -314,6 +316,7 @@ Browser (live DOM)
 ```
 shadow_web/
 ├── compressor.py      # DOM strip + Action Map + semantic groups
+├── content_index.py   # Content block outline + on-demand text fetch
 ├── dom_capture.py     # Shadow DOM / iframe flatten (in-browser, read-only)
 ├── grouping.py        # Semantic groups (forms, nav, modals)
 ├── schema_snap.py     # Tables, forms, lists → JSON/CSV export
@@ -331,9 +334,13 @@ shadow_web/
 
 scripts/
 ├── security_surface_scan.py   # CLI: crawl + JSON/Markdown security reports
+├── form_fill_demo.py          # AgentOps form fill demo (plan + execute + wizard)
 ├── localpdf_competitor_scan.py # Multi-site competitor snapshot
 ├── smoke_install.sh           # Install + pytest + one live navigate
 └── cursor-setup.sh            # MCP one-command setup
+
+deploy/
+└── oci.sh                     # Oracle Cloud deployment script
 ```
 
 ---
@@ -356,9 +363,11 @@ scripts/
 |------|-------------------|----------------------|---------|-----------|
 | Hacker News | 8,637 | 6,704 | 227 | **−22% (1.3×)** |
 | Wikipedia (Web Scraping) | 99,343 | 16,462 | 501 | **−83% (6.0×)** |
+| Wikipedia + Content Index | 57,778 | 599¹ | — | **−99% (96×)** |
 | GitHub Trending | 167,875 | 37,833 | 1,290 | **−77% (4.4×)** |
 
-Run locally: `pip install tiktoken && python benchmarks/run.py`
+¹ `content_outline(max_tokens=600)` — 141 blocks, agent picks what to fetch.
+Full benchmark: `python benchmarks/run.py`
 
 ---
 
