@@ -35,8 +35,16 @@ _STRUCTURAL_MAX_TOKENS = 120
 _STRUCTURAL_MAX_TEXT_NODES = 24
 _STRUCTURAL_ROOT_TAGS = frozenset({"html", "body"})
 
+# Price signals for retention diagnostics. Covers major retail currencies —
+# symbols and ISO/local codes — without site-specific selectors.
+_CURRENCY_SYMBOLS = r"[€$£¥₽]"
+_CURRENCY_CODES = (
+    r"(?:\b(?:EUR|USD|GBP|RUB|PLN|CZK|SEK|NOK|DKK|UAH|KZT|TRY|руб\.?)\b)"
+)
+_AMOUNT = r"\d{1,3}(?:[\s\u00a0.,]\d{3})*(?:[.,]\d{1,2})?"
 _PRICE_RE = re.compile(
-    r"(?:\d[\d\s\u00a0]{0,10}\s?(?:₽|руб\.?))|(?:₽\s?\d)",
+    rf"(?:{_AMOUNT}\s*(?:{_CURRENCY_SYMBOLS}|{_CURRENCY_CODES}))"
+    rf"|(?:(?:{_CURRENCY_SYMBOLS}|{_CURRENCY_CODES})\s*{_AMOUNT})",
     re.IGNORECASE,
 )
 

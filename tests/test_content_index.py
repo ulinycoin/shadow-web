@@ -467,3 +467,27 @@ class TestQuality:
         assert "coverage=" in outline
         assert "mode=hybrid" in outline
         assert "signals=1/1" in outline
+
+    def test_recognizes_major_retail_currencies(self):
+        html = """
+        <main>
+          <div><span>Coat</span><span>€39.95</span></div>
+          <div><span>Dress</span><span>€ 25.96</span></div>
+          <div><span>Shirt</span><span>19,99 €</span></div>
+          <div><span>Bag</span><span>£45.00</span></div>
+          <div><span>Tee</span><span>$19.99</span></div>
+          <div><span>Phone</span><span>59 990 ₽</span></div>
+          <div><span>Watch</span><span>EUR 120.00</span></div>
+          <div><span>Sneakers</span><span>2 499 руб.</span></div>
+        </main>
+        """
+        stats = quality(html, build(html))
+        assert stats["source_price_signals"] == 8
+        assert stats["indexed_price_signals"] == 8
+        assert stats["signal_retention_pct"] == 100
+
+    def test_does_not_count_bare_numbers_as_prices(self):
+        html = "<main><div><span>Size 42</span><span>Model 2024</span><div>Rating 4.8</div></div></main>"
+        stats = quality(html, build(html))
+        assert stats["source_price_signals"] == 0
+        assert stats["indexed_price_signals"] == 0

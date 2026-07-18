@@ -17,6 +17,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Price-signal diagnostics now recognize major retail currencies (€, $, £, ¥, ₽ and ISO/local codes), not only rubles.
 - Content Index MCP tools now read from the current browser session instead of requiring full HTML in every tool call.
 - Outline budgets now apply to the actual output, large blocks remain discoverable, and long outlines expose a continuation offset.
 - Nested content blocks no longer duplicate text; empty HTML and invalid token budgets return safe empty results.
