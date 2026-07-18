@@ -9,6 +9,8 @@ from shadow_web.security_scan import (
     analyze_http_headers,
     analyze_links,
     analyze_surface,
+    check_mixed_content,
+    check_sri,
     extract_same_domain_links,
     normalize_header_map,
     render_markdown_report,
@@ -219,3 +221,109 @@ def test_analyze_surface_with_cookies():
     assert result["cookie_count"] == 1
     assert result["cookies"][0]["name"] == "auth_token"
     assert "COOKIE_MISSING_SECURE" not in {f["rule_id"] for f in result["findings"]}
+
+
+# ── SRI tests ────────────────────────────────────────────────────────
+
+SRI_HTML_WITH_MISSING = """\
+<html><head>
+<script src="https://cdn.example.com/app.js"></script>
+<script src="https://cdn.example.com/lib.js" integrity="sha384-abc123"></script>
+<link rel="stylesheet" href="https://fonts.example.com/font.css">
+<link rel="stylesheet" href="https://cdn.example.com/theme.css" integrity="sha384-def456">
+</head></html>
+"""
+
+SRI_HTML_ALL_COVERED = """\
+<html><head>
+<script src="https://cdn.example.com/app.js" integrity="sha384-abc123"></script>
+<link rel="stylesheet" href="https://cdn.example.com/theme.css" integrity="sha384-def456">
+</head></html>
+"""
+
+
+def test_sri_missing_integrity():
+    findings = check_sri(SRI_HTML_WITH_MISSING)
+    sri_rules = [f for f in findings if f.rule_id == "SRI_MISSING"]
+    assert len(sri_rules) == 2
+    urls = {f.evidence["url"] for f in sri_rules}
+    assert "https://cdn.example.com/app.js" in urls
+    assert "https://fonts.example.com/font.css" in urls
+
+
+def test_sri_all_covered():
+    findings = check_sri(SRI_HTML_ALL_COVERED)
+    assert not any(f.rule_id == "SRI_MISSING" for f in findings)
+
+
+def test_sri_empty_html():
+    assert check_sri("") == []
+
+
+# ── Mixed content tests ──────────────────────────────────────────────
+
+MIXED_HTML = """\
+<html><body>
+<script src="http://cdn.example.com/app.js"></script>
+<script src="https://safe.example.com/lib.js"></script>
+<iframe src="http://tracker.example.com/frame"></iframe>
+<img src="http://static.example.com/pic.jpg">
+<img src="https://safe.example.com/pic.jpg">
+<link rel="stylesheet" href="http://fonts.example.com/font.css">
+<video src="http://media.example.com/clip.mp4"></video>
+<object data="http://plugin.example.com/widget"></object>
+</body></html>
+"""
+
+
+def test_mixed_content_on_https():
+    findings = check_mixed_content("https://example.com/page", MIXED_HTML)
+    assert len(findings) == 6  # script, iframe, img, link, video, object
+    rules = {f.rule_id for f in findings}
+    assert "MIXED_ACTIVE_SCRIPT" in rules
+    assert "MIXED_ACTIVE_IFRAME" in rules
+    assert "MIXED_ACTIVE_STYLESHEET" in rules
+    assert "MIXED_PASSIVE_IMAGE" in rules
+    assert "MIXED_PASSIVE_VIDEO" in rules
+    assert "MIXED_PASSIVE_OBJECT" in rules
+
+
+def test_mixed_content_on_http_returns_nothing():
+    findings = check_mixed_content("http://example.com/page", MIXED_HTML)
+    assert findings == []
+
+
+def test_mixed_content_none_found():
+    safe_html = """\
+<html><body>
+<script src="https://cdn.example.com/app.js"></script>
+<img src="https://static.example.com/pic.jpg">
+</body></html>
+"""
+    findings = check_mixed_content("https://example.com/page", safe_html)
+    assert findings == []
+
+
+def test_mixed_content_integration():
+    result = analyze_surface(
+        "https://example.com/login",
+        title="Login",
+        clean_html=MIXED_HTML,
+        action_map=[],
+    )
+    mixed_rules = {f["rule_id"] for f in result["findings"]}
+    assert "MIXED_ACTIVE_SCRIPT" in mixed_rules
+    assert "MIXED_PASSIVE_IMAGE" in mixed_rules
+
+
+# ── CORS preflight (unit-level: logic only, no HTTP) ─────────────────
+
+def test_cors_in_surface_skipped_when_no_url():
+    """CORS probe is not called when cors_probe_url is omitted."""
+    result = analyze_surface(
+        "https://example.com/",
+        clean_html="",
+        action_map=[],
+    )
+    assert "CORS_ORIGIN_ECHO" not in {f["rule_id"] for f in result["findings"]}
+    assert "CORS_WILDCARD_WITH_CREDENTIALS" not in {f["rule_id"] for f in result["findings"]}

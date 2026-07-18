@@ -7,6 +7,8 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Optional
 from urllib.parse import urlparse, urljoin
 
+import lxml.html as _html_parser
+
 from shadow_web.schema_snap import parse_forms
 
 SEVERITY_ORDER = ("critical", "high", "medium", "low", "info")
@@ -366,6 +368,160 @@ def probe_http_redirect(https_url: str, *, timeout: float = 10.0) -> tuple[Optio
         return None, None, str(exc)
 
 
+# ── SRI (Subresource Integrity) check ──────────────────────────────────
+
+SRI_TAG_PATTERNS: list[tuple[str, str, str, str]] = [
+    ("script", "src", "high", "Active resource loaded without SRI"),
+    ("link", "href", "high", "Stylesheet loaded without SRI"),
+]
+
+
+def check_sri(html: str) -> list[Finding]:
+    """Check script and link tags for missing integrity attribute."""
+    findings: list[Finding] = []
+    try:
+        root = _html_parser.fromstring(html)
+    except Exception:
+        return findings
+
+    for tag_name, attr_name, sev, title in SRI_TAG_PATTERNS:
+        for el in root.iter(tag_name):
+            if tag_name == "link" and el.get("rel") not in ("stylesheet", "preload", "prefetch"):
+                if not el.get("as") or el.get("as") not in ("style", "font", "image", "script"):
+                    continue
+            url = el.get(attr_name)
+            if not url or url.startswith("data:") or url.startswith("#"):
+                continue
+            if not el.get("integrity"):
+                findings.append(
+                    Finding(
+                        severity=sev,
+                        rule_id="SRI_MISSING",
+                        title=f"<{tag_name}> missing integrity attribute",
+                        detail=f"Subresource Integrity not set on {url[:120]}",
+                        evidence={"tag": tag_name, "url": url[:200]},
+                    )
+                )
+    return _dedupe_findings(findings)
+
+
+# ── Mixed content detection ──────────────────────────────────────────
+
+MIXED_CONTENT_PATTERNS: list[tuple[str, str, str, str, str]] = [
+    ("script", "src", "high", "MIXED_ACTIVE_SCRIPT", "Active mixed content: script over HTTP"),
+    ("iframe", "src", "high", "MIXED_ACTIVE_IFRAME", "Active mixed content: iframe over HTTP"),
+    ("link", "href", "high", "MIXED_ACTIVE_STYLESHEET", "Active mixed content: stylesheet over HTTP"),
+    ("video", "src", "medium", "MIXED_PASSIVE_VIDEO", "Passive mixed content: video over HTTP"),
+    ("audio", "src", "medium", "MIXED_PASSIVE_AUDIO", "Passive mixed content: audio over HTTP"),
+    ("img", "src", "medium", "MIXED_PASSIVE_IMAGE", "Passive mixed content: image over HTTP"),
+    ("object", "data", "medium", "MIXED_PASSIVE_OBJECT", "Passive mixed content: object over HTTP"),
+    ("source", "src", "medium", "MIXED_PASSIVE_SOURCE", "Passive mixed content: source over HTTP"),
+    ("embed", "src", "medium", "MIXED_PASSIVE_EMBED", "Passive mixed content: embed over HTTP"),
+]
+
+
+def check_mixed_content(page_url: str, html: str) -> list[Finding]:
+    """Find HTTP resources loaded on an HTTPS page."""
+    findings: list[Finding] = []
+    parsed = urlparse(page_url)
+    if parsed.scheme != "https":
+        return findings
+
+    try:
+        root = _html_parser.fromstring(html)
+    except Exception:
+        return findings
+
+    for tag_name, attr_name, sev, rule_id, title in MIXED_CONTENT_PATTERNS:
+        for el in root.iter(tag_name):
+            if tag_name == "link" and el.get("rel") not in ("stylesheet", "preload", "prefetch"):
+                continue
+            url = el.get(attr_name)
+            if not url:
+                continue
+            # Only flag explicit http:// resources
+            if not url.lower().startswith("http://"):
+                continue
+            findings.append(
+                Finding(
+                    severity=sev,
+                    rule_id=rule_id,
+                    title=title,
+                    detail=f"{url[:200]} loaded via HTTP on HTTPS page",
+                    evidence={"tag": tag_name, "url": url[:250]},
+                )
+            )
+    return _dedupe_findings(findings)
+
+
+# ── CORS preflight probe ────────────────────────────────────────────
+
+
+def probe_cors(
+    url: str,
+    *,
+    origin: str | None = None,
+    timeout: float = 10.0,
+) -> list[Finding]:
+    """Send OPTIONS to check for permissive CORS.
+
+    Derives Origin from the probed URL's scheme+host by default, so the
+    request looks like a legitimate same-origin OPTIONS in server logs.
+
+    Returns findings if the server echoes the Origin back in ACAO or
+    allows wildcard CORS with credentials.
+    """
+    parsed = urlparse(url)
+    if origin is None:
+        origin = f"{parsed.scheme}://{parsed.netloc}"
+
+    findings: list[Finding] = []
+    import requests as _requests
+
+    try:
+        resp = _requests.options(
+            url,
+            headers={"Origin": origin, "Access-Control-Request-Method": "GET"},
+            timeout=timeout,
+        )
+    except Exception:
+        return findings
+
+    acao = (resp.headers.get("Access-Control-Allow-Origin") or "").strip()
+    acac = (resp.headers.get("Access-Control-Allow-Credentials") or "").strip().lower()
+    allow_methods = (resp.headers.get("Access-Control-Allow-Methods") or "").strip()
+
+    if acao == origin:
+        findings.append(
+            Finding(
+                severity="high" if acac == "true" else "medium",
+                rule_id="CORS_ORIGIN_ECHO",
+                title="CORS reflects arbitrary origin via OPTIONS",
+                detail=f"Server echoes Origin header value back in ACAO (credentials={acac}).",
+                evidence={
+                    "url": url,
+                    "origin_sent": origin,
+                    "acao_received": acao,
+                    "acac_received": acac,
+                    "allow_methods": allow_methods or "not sent",
+                },
+            )
+        )
+
+    if acao == "*" and acac == "true":
+        findings.append(
+            Finding(
+                severity="critical",
+                rule_id="CORS_WILDCARD_WITH_CREDENTIALS",
+                title="Wildcard CORS with credentials allowed",
+                detail="ACAO: * + ACAC: true — credentials can be exfiltrated cross-origin.",
+                evidence={"url": url, "allow_methods": allow_methods or "not sent"},
+            )
+        )
+
+    return findings
+
+
 def analyze_http_headers(
     page_url: str,
     headers: dict[str, str],
@@ -706,6 +862,7 @@ def analyze_surface(
     http_probe_status: Optional[int] = None,
     http_probe_location: Optional[str] = None,
     cookies: list[dict[str, Any]] | None = None,
+    cors_probe_url: str | None = None,
 ) -> dict[str, Any]:
     """Run all security rules on a single scanned page."""
     forms = parse_forms(clean_html) if clean_html else []
@@ -734,6 +891,13 @@ def analyze_surface(
             capture_stats=capture_stats,
         )
     )
+
+    if clean_html:
+        findings.extend(check_sri(clean_html))
+        findings.extend(check_mixed_content(page_url, clean_html))
+
+    if cors_probe_url:
+        findings.extend(probe_cors(cors_probe_url))
 
     findings.sort(key=lambda f: SEVERITY_ORDER.index(f.severity) if f.severity in SEVERITY_ORDER else 99)
     findings = _dedupe_findings(findings)

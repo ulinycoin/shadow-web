@@ -25,3 +25,8 @@ server.log
 # Internal / agent memory (not for public repo)
 CLAUDE.md
 PLAN.md
+
+# Unrelated scripts
+scripts/iub_tender_search.py
+scripts/lv_tender.py
+tests/test_lv_tender.py
