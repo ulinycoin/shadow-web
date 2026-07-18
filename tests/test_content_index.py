@@ -165,6 +165,35 @@ class TestBuild:
         blocks = build("<ul><li>Parent<ul><li>Child</li></ul></li></ul>")
         assert [block["text"] for block in blocks] == ["Parent", "Child"]
 
+    def test_boilerplate_language_links_removed(self):
+        html = (
+            "<h1>Article</h1>"
+            + "".join(f"<li>{lang}</li>" for lang in ["العربية","Deutsch","Español","Français","Italiano","日本語","Русский","中文"])
+            + "<p>First real paragraph with enough text to be meaningful content for readers.</p>"
+        )
+        blocks = build(html)
+        langs = {"العربية", "Deutsch", "Español", "Français", "Italiano", "日本語", "Русский", "中文"}
+        block_texts = {b["text"] for b in blocks}
+        assert not langs & block_texts, "Short pre-content li list should be removed"
+        assert "First real paragraph" in " ".join(b["text"] for b in blocks)
+
+    def test_boilerplate_keeps_short_lists_inside_article(self):
+        """A short list inside the article body should NOT be removed."""
+        html = (
+            "<h1>Article</h1>"
+            + "<p>Introduction with enough text to be solid content for the article body.</p>"
+            + "<h2>Key points</h2>"
+            + "<li>Point one with some descriptive detail</li>"
+            + "<li>Point two with more substance here</li>"
+            + "<li>Point three</li>"
+            + "<li>Point four</li>"
+            + "<li>Point five</li>"
+            + "<li>Point six</li>"
+        )
+        blocks = build(html)
+        li_texts = [b["text"] for b in blocks if b["tag"] == "li"]
+        assert len(li_texts) >= 4  # Short lis after h2 are kept
+
     def test_heading_types(self):
         blocks = build(WIKI_HTML)
         headings = [b for b in blocks if b["type"] == "heading"]

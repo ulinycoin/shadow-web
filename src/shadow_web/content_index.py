@@ -39,6 +39,12 @@ def _is_excluded(el) -> bool:
     return False
 
 
+# Max tokens for a single boilerplate list-item before the first h1.
+# Language links, breadcrumbs, and mobile nav are typically very short.
+_BOILERPLATE_MAX_LI_TOKENS = 10
+_BOILERPLATE_MIN_RUN = 5
+
+
 def _clean_text(text: str) -> str:
     text = re.sub(r"\s+", " ", text or "")
     return text.strip()
@@ -140,6 +146,49 @@ def build(html_text: str) -> list[dict[str, Any]]:
             "level": _HEADING_LEVELS.get(tag, 0),
         })
         block_id += 1
+
+    # ── Boilerplate nav removal ──────────────────────────────────────
+    # Runs of ≥5 consecutive <li> blocks each ≤10 tokens, before the
+    # first real content paragraph (p >15t) or h2, are almost certainly
+    # a language switcher / breadcrumb / mobile nav sidebar.
+    # This catches patterns both before and immediately after an h1.
+    first_content = None
+    for idx, b in enumerate(blocks):
+        if b["tag"] == "h2":
+            first_content = idx
+            break
+        if b["tag"] == "p" and b["tokens"] > 15:
+            first_content = idx
+            break
+    if first_content is not None and first_content > 0:
+        pre = blocks[:first_content]
+        run_start = None
+        for idx, b in enumerate(pre):
+            is_short_li = (
+                b["tag"] == "li"
+                and b["type"] == "list_item"
+                and b["tokens"] <= _BOILERPLATE_MAX_LI_TOKENS
+            )
+            if is_short_li:
+                if run_start is None:
+                    run_start = idx
+            else:
+                if run_start is not None and (idx - run_start) >= _BOILERPLATE_MIN_RUN:
+                    for ri in range(run_start, idx):
+                        blocks[ri]["_boilerplate"] = True
+                run_start = None
+        if (
+            run_start is not None
+            and (len(pre) - run_start) >= _BOILERPLATE_MIN_RUN
+        ):
+            for ri in range(run_start, len(pre)):
+                blocks[ri]["_boilerplate"] = True
+
+    if any(b.get("_boilerplate") for b in blocks):
+        blocks = [b for b in blocks if not b.get("_boilerplate")]
+        # Re-number IDs
+        for i, b in enumerate(blocks):
+            b["id"] = f"p{i}"
 
     return blocks
 
