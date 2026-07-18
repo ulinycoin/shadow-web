@@ -166,16 +166,33 @@ class TestBuild:
         assert [block["text"] for block in blocks] == ["Parent", "Child"]
 
     def test_boilerplate_language_links_removed(self):
+        languages = ["العربية","Deutsch","Español","Français","Italiano","日本語","Русский","中文"]
         html = (
             "<h1>Article</h1>"
-            + "".join(f"<li>{lang}</li>" for lang in ["العربية","Deutsch","Español","Français","Italiano","日本語","Русский","中文"])
+            + "".join(
+                f'<li><a href="/lang/{idx}">{lang}</a></li>'
+                for idx, lang in enumerate(languages)
+            )
             + "<p>First real paragraph with enough text to be meaningful content for readers.</p>"
         )
         blocks = build(html)
-        langs = {"العربية", "Deutsch", "Español", "Français", "Italiano", "日本語", "Русский", "中文"}
         block_texts = {b["text"] for b in blocks}
-        assert not langs & block_texts, "Short pre-content li list should be removed"
+        assert not set(languages) & block_texts
         assert "First real paragraph" in " ".join(b["text"] for b in blocks)
+
+    def test_boilerplate_keeps_unlinked_data_list_after_h1(self):
+        """Ingredients/specifications must not be mistaken for navigation."""
+        items = ["Flour", "Water", "Salt", "Yeast", "Oil"]
+        html = (
+            "<h1>Bread recipe</h1>"
+            + "".join(f"<li>{item}</li>" for item in items)
+            + "<p>This recipe explains how to combine the ingredients and bake "
+              "the bread correctly for a reliable result.</p>"
+        )
+        blocks = build(html)
+        li_texts = [b["text"] for b in blocks if b["tag"] == "li"]
+        assert li_texts == items
+        assert all(not any(key.startswith("_") for key in b) for b in blocks)
 
     def test_boilerplate_keeps_short_lists_inside_article(self):
         """A short list inside the article body should NOT be removed."""

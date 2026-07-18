@@ -144,13 +144,15 @@ def build(html_text: str) -> list[dict[str, Any]]:
             "text": text,
             "tokens": tokens,
             "level": _HEADING_LEVELS.get(tag, 0),
+            "_has_link": tag == "li" and bool(el.xpath(".//a[@href]")),
         })
         block_id += 1
 
     # ── Boilerplate nav removal ──────────────────────────────────────
-    # Runs of ≥5 consecutive <li> blocks each ≤10 tokens, before the
-    # first real content paragraph (p >15t) or h2, are almost certainly
-    # a language switcher / breadcrumb / mobile nav sidebar.
+    # Runs of ≥5 consecutive linked <li> blocks each ≤10 tokens, before
+    # the first real content paragraph (p >15t) or h2, are almost certainly
+    # a language switcher / breadcrumb / mobile nav sidebar. Requiring links
+    # preserves short data lists such as ingredients and product attributes.
     # This catches patterns both before and immediately after an h1.
     first_content = None
     for idx, b in enumerate(blocks):
@@ -168,6 +170,7 @@ def build(html_text: str) -> list[dict[str, Any]]:
                 b["tag"] == "li"
                 and b["type"] == "list_item"
                 and b["tokens"] <= _BOILERPLATE_MAX_LI_TOKENS
+                and b["_has_link"]
             )
             if is_short_li:
                 if run_start is None:
@@ -184,11 +187,11 @@ def build(html_text: str) -> list[dict[str, Any]]:
             for ri in range(run_start, len(pre)):
                 blocks[ri]["_boilerplate"] = True
 
-    if any(b.get("_boilerplate") for b in blocks):
-        blocks = [b for b in blocks if not b.get("_boilerplate")]
-        # Re-number IDs
-        for i, b in enumerate(blocks):
-            b["id"] = f"p{i}"
+    blocks = [b for b in blocks if not b.get("_boilerplate")]
+    for i, b in enumerate(blocks):
+        b["id"] = f"p{i}"
+        b.pop("_has_link", None)
+        b.pop("_boilerplate", None)
 
     return blocks
 
