@@ -13,16 +13,6 @@ from shadow_web.schema_snap import parse_forms
 
 SEVERITY_ORDER = ("critical", "high", "medium", "low", "info")
 
-SECURITY_HEADER_KEYS = (
-    "strict-transport-security",
-    "content-security-policy",
-    "x-frame-options",
-    "x-content-type-options",
-    "referrer-policy",
-    "permissions-policy",
-    "access-control-allow-origin",
-)
-
 _SENSITIVE_PATH = re.compile(
     r"/(?:admin|api|debug|backup|config|wp-admin|phpmyadmin|\.env|actuator)(?:/|$)",
     re.I,

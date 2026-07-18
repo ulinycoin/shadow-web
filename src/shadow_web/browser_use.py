@@ -3,10 +3,7 @@ Async ShadowPage wrapper for asynchronous frameworks like browser-use.
 Provides the same DOM capture, semantic grouping, and self-healing logic but fully async.
 """
 
-# from __future__ import annotations
-
 import logging
-import requests
 import aiohttp
 from typing import Any, Dict, List, Optional, Tuple, Literal
 
@@ -14,7 +11,7 @@ from shadow_web.compressor import process_html, generate_grouped_xml_map
 from shadow_web.dom_capture import _INTERACT_SCRIPT
 from shadow_web.a11y_capture import CaptureMode, acapture_page, ainteract_by_a11y_binding, detect_page_class
 from shadow_web.capture_ready import CaptureReadyResult, aprepare_page_for_capture
-from shadow_web.heal_local import HealCache, score_candidate, rank_candidates, HEAL_THRESHOLD, _COLLECT_CANDIDATES_SCRIPT
+from shadow_web.heal_local import HealCache, rank_candidates, HEAL_THRESHOLD, _COLLECT_CANDIDATES_SCRIPT
 from shadow_web.query import QueryResult, shadow_grep
 from shadow_web.verified_heal import averify_selector_on_page
 from shadow_web.webmcp import (

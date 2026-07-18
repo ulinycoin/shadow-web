@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Dict, Literal, Optional
 
 # Playwright Page / Frame — typed loosely to avoid hard dependency in unit tests.
 PageLike = Any
@@ -163,31 +163,6 @@ _FLATTEN_SCRIPT = """
 }
 """
 
-_RESOLVE_SCRIPT = """
-({ path }) => {
-  function elementChildren(parent) {
-    return Array.from(parent.children).filter((n) => n.nodeType === 1);
-  }
-
-  let node = document.documentElement;
-  for (const step of path) {
-    if (!node) return null;
-    if (step.t === "body") {
-      node = document.body;
-    } else if (step.t === "child") {
-      node = elementChildren(node)[step.i];
-    } else if (step.t === "shadow") {
-      if (!node.shadowRoot) return null;
-      node = node.shadowRoot;
-    } else if (step.t === "iframe") {
-      if (node.tagName.toLowerCase() !== "iframe") return null;
-      node = node.contentDocument && node.contentDocument.body;
-    }
-  }
-  return node;
-}
-"""
-
 _INTERACT_SCRIPT = """
 ({ path, action, value }) => {
   function elementChildren(parent) {
@@ -251,15 +226,6 @@ def capture_flattened_dom(page: PageLike) -> FlattenResult:
         bindings=raw.get("bindings") or {},
         stats=raw.get("stats") or {},
     )
-
-
-def resolve_binding(page: PageLike, binding: Dict[str, Any]) -> bool:
-    """Return True if the binding path still resolves to a live element."""
-    path = binding.get("path")
-    if not path:
-        return False
-    node = _parse_eval_res(page.evaluate(_RESOLVE_SCRIPT, {"path": path}))
-    return node is not None
 
 
 def interact_by_binding(

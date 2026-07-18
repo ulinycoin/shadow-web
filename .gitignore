@@ -18,8 +18,6 @@ build/
 # Development artifacts
 venv/
 .cursor/
-ss_debug.py
-ss_scrape.py
 server.log
 
 # Internal / agent memory (not for public repo)

@@ -18,7 +18,7 @@ import csv
 import io
 import re
 from typing import Any, Dict, List, Optional, Union
-from lxml import html as lxml_html, etree
+from lxml import html as lxml_html
 
 
 # -- Safe parser (shared across all functions, guards against XXE/network) ------

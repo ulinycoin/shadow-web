@@ -1,16 +1,17 @@
 
 <!-- badges -->
 [![PyPI version](https://img.shields.io/pypi/v/shadow-web.svg)](https://pypi.org/project/shadow-web/)
+[![PyPI downloads](https://img.shields.io/pypi/dm/shadow-web.svg)](https://pypi.org/project/shadow-web/)
 [![CI](https://github.com/ulinycoin/shadow-web/actions/workflows/test.yml/badge.svg)](https://github.com/ulinycoin/shadow-web/actions/workflows/test.yml)
 [![Python](https://img.shields.io/pypi/pyversions/shadow-web.svg)](https://pypi.org/project/shadow-web/)
-[![License](https://img.shields.io/github/license/ulinycoin/shadow-web.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/ulinycoin/shadow-web?style=flat)](https://github.com/ulinycoin/shadow-web)
 [![MCP Badge](https://lobehub.com/badge/mcp/ulinycoin-shadow-web)](https://lobehub.com/mcp/ulinycoin-shadow-web)
 
 # Shadow Web
 
 **Cut 64–99% of tokens from web pages before your LLM sees them — then extract structured data.**  
-Open-source Python SDK that flattens Shadow DOM, builds a typed Action Map with semantic groups, heals broken selectors, and turns HTML tables/forms/lists into clean JSON — no cloud required.
+Open-source Python SDK that flattens Shadow DOM, builds a typed Action Map with semantic groups, indexes rendered text on demand, heals broken selectors, and turns HTML tables/forms/lists into clean JSON — no cloud required.
 
 ```python
 from shadow_web.compressor import process_html
@@ -43,9 +44,12 @@ Shadow Web is what runs **between** the browser and the LLM: a compression layer
 |---------|----------|-------------------|------------|
 | Token cost (Wikipedia) | 99,343 | — | **16,462** (−83%) |
 | Token cost (GitHub Trending) | 167,875 | — | **37,833** (−77%) |
+| Long-form via Content Index | full page | — | **~600t outline** → fetch blocks |
 | Shadow DOM readable | ❌ | ❌ partial | ✅ flattened |
 | Semantic groups | ❌ | ❌ | ✅ Login / Cart / Nav |
 | Self-healing selectors | ❌ | ❌ | ✅ local + LLM fallback |
+| Consent + lazy hydration | ❌ | manual | ✅ readiness + scroll-until-content |
+| Catalog / feed outline ranking | ❌ | ❌ | ✅ cards / feeds before chrome |
 | **Tables → JSON columns+rows** | ❌ | ❌ | ✅ SchemaSnap |
 | **Forms → fields with validation** | ❌ | ❌ | ✅ SchemaSnap |
 | **Lists → typed items** | ❌ | ❌ | ✅ SchemaSnap |
@@ -63,7 +67,8 @@ Shadow Web is what runs **between** the browser and the LLM: a compression layer
 | A Playwright scraper that breaks on every deploy | `heal_local.py` catches DOM drift without LLM cost |
 | A Shadow DOM-heavy app (Web components, Lit, Angular) | Read-only flatten — no React/Vue breakage |
 | **An agent that needs data from web pages** | SchemaSnap parses tables, forms, and lists into clean JSON |
-| **Attack surface / security recon** | `security_scan.py` + CLI — forms, links, page_class rules (not pentest) |
+| **Long articles, catalogs, social feeds** | Rendered Text Index + ranked `content_outline` (`cards` / `feeds`) |
+| **Attack surface / security recon** | `security_scan.py` + CLI — forms, links, headers, cookies, page_class (not pentest) |
 | **Competitor monitoring & SEO content** | Shallow multi-site scans with token-bounded Action Map |
 | **SaaS onboarding automation** | AgentOps form fill — schema knows fields, LLM only picks values |
 
@@ -286,6 +291,8 @@ All table tools accept `max_rows=50` (default). Set `max_rows=0` for full data.
 ```
 Browser (live DOM)
     │
+    ├─ capture_ready — cookie consent dismiss + wait + scroll-until-content
+    │              ↓
     ├─ [default] DOM capture — flatten Shadow DOM + same-origin iframes (read-only)
     │              ↓
     ├─ [optional] a11y CDP supplement — catch closed Shadow DOM elements
@@ -294,13 +301,13 @@ Browser (live DOM)
     │
     └─→ compressor.py → Action Map (data-sid, type, label, group)
                           ↓
-                    content_index.py → block outline (p0, p1…) + on-demand fetch
+                    content_index.py → ranked outline (p0, p1…; cards/feeds) + fetch
                           ↓
-                    shadow_grep.py → filter before LLM
+                    query.py (shadow_grep) → filter Action Map before LLM
                           ↓
                     schema_snap.py → structured data (tables, forms, lists)
                           ↓
-                    security_scan.py → attack surface rules (forms, links)
+                    security_scan.py → attack surface rules (forms, links, headers, cookies)
                           ↓
                     heal_local.py → fuzzy selector recovery (no LLM)
                           ↓
@@ -316,20 +323,22 @@ Browser (live DOM)
 ```
 shadow_web/
 ├── compressor.py      # DOM strip + Action Map + semantic groups
-├── content_index.py   # Content block outline + on-demand text fetch
+├── content_index.py   # Rendered Text Index — outline + on-demand fetch
+├── capture_ready.py   # Consent dismiss + readiness wait + scroll-until-content
 ├── dom_capture.py     # Shadow DOM / iframe flatten (in-browser, read-only)
 ├── grouping.py        # Semantic groups (forms, nav, modals)
 ├── schema_snap.py     # Tables, forms, lists → JSON/CSV export
 ├── form_fill.py       # AgentOps form fill (auto_fill / ask / handoff)
-├── security_scan.py   # Attack surface rule engine (forms, links, page_class)
+├── security_scan.py   # Attack surface rules (forms, links, headers, cookies)
 ├── heal_local.py      # Local selector heal + ~/.shadow-web/heal_cache.json
 ├── query.py           # shadow_grep (type:, intent:, label~, AND)
 ├── webmcp.py          # WebMCP bridge (Chrome 145+)
 ├── diff.py            # Page diff (skeleton + delta XML)
-├── a11y_capture.py    # CDP Accessibility dual capture
+├── a11y_capture.py    # CDP Accessibility dual capture + page_class
 ├── verified_heal.py   # Playwright selector verification
-├── wrapper.py         # ShadowPage (Playwright)
-├── mcp/server.py      # Cursor / Claude MCP tools
+├── wrapper.py         # ShadowPage (sync Playwright)
+├── browser_use.py     # AsyncShadowPage (browser-use / async Playwright)
+├── mcp/server.py      # Cursor / Claude MCP tools (26)
 └── server.py          # FastAPI (/health, /v1/compress, /v1/heal)
 
 scripts/
@@ -415,7 +424,7 @@ Or manually:
 | | `schema_session_json` | JSON records from session |
 | | `schema_session_csv` | CSV from session |
 | | `get_page_html` | Clean HTML (`max_chars` default 50000) |
-| **Content** | `content_outline` | Token-budgeted rendered-text index + coverage diagnostics |
+| **Content** | `content_outline` | Ranked rendered-text index (`cards` / `feeds` + coverage) |
 | | `content_blocks` | Fetch selected text blocks by compact IDs |
 | **Search** | `web_search` | Brave Search (no API keys) |
 | **WebMCP** | `webmcp_list_tools` | Chrome 145+ page tools |
@@ -627,6 +636,7 @@ Playbook: [examples/form_fill/CASE.md](examples/form_fill/CASE.md)
 | Limitation | Workaround |
 |------------|------------|
 | **Anti-bot / Cloudflare** headless | `page_class: Anti-bot` — stop, don't retry; use headed browser or manual step |
+| **Cookie / empty content shell** | `page_class: SparseShell` — readiness + scroll did not hydrate; don't index blindly |
 | **`colspan` / `rowspan` tables** | Column alignment may drift; verify row shape |
 | **JS-rendered grids** (AG Grid, React Table) | May not use `<table>` — use `shadow_query` + Action Map instead |
 | **Closed Shadow DOM** | `navigate(..., capture_mode="dual")` or `"a11y"` |

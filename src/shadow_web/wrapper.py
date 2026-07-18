@@ -2,7 +2,7 @@ import logging
 import requests
 from typing import List, Dict, Any, Tuple, Optional, Union
 from .compressor import process_html, generate_grouped_xml_map
-from .dom_capture import capture_flattened_dom, interact_by_binding
+from .dom_capture import interact_by_binding
 from .a11y_capture import CaptureMode, capture_page, detect_page_class
 from .capture_ready import CaptureReadyResult, prepare_page_for_capture
 from .heal_local import HealCache, local_heal

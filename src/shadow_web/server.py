@@ -39,7 +39,7 @@ load_env()
 app = FastAPI(
     title="Shadow Web API",
     description="Stateless DOM compression and verified self-healing selector APIs for AI agents.",
-    version="0.3.3",
+    version="0.3.5",
 )
 
 _RATE_BUCKETS: Dict[str, List[float]] = defaultdict(list)
@@ -217,7 +217,9 @@ async def heal_selector_endpoint(
     if not settings:
         raise HTTPException(status_code=503, detail="LLM API key is not configured")
 
-    client = OpenAI(api_key=settings["api_key"], base_url=settings["base_url"])
+    client = get_llm_client()
+    if client is None:
+        raise HTTPException(status_code=503, detail="LLM API key is not configured")
     try:
         selector = await asyncio.to_thread(
             _llm_heal_selector,

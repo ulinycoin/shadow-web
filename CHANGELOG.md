@@ -6,6 +6,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.3.5] - 2026-07-18
+
 ### Added
 
 - Scroll-until-content in capture readiness: under-hydrated first paints scroll the viewport to trigger lazy feeds before capture.
@@ -20,12 +22,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Content indexing now assigns every readable text node to one bounded block, using semantic tags only as boundary signals.
 
+### Removed
+
+- Dead helpers: unused `resolve_binding` / `_RESOLVE_SCRIPT`, unused `SECURITY_HEADER_KEYS`, orphan `search_bypass_strategies.md`.
+- Unused imports across capture/heal/query modules; heal endpoint now uses `get_llm_client`.
+
 ### Fixed
 
 - Price-signal diagnostics now recognize major retail currencies (€, $, £, ¥, ₽ and ISO/local codes), not only rubles.
 - Content Index MCP tools now read from the current browser session instead of requiring full HTML in every tool call.
 - Outline budgets now apply to the actual output, large blocks remain discoverable, and long outlines expose a continuation offset.
 - Nested content blocks no longer duplicate text; empty HTML and invalid token budgets return safe empty results.
+
+## [0.3.4] - 2026-07-18
+
+### Added
+
+- Session-native Content Index MCP tools (`content_outline`, `content_blocks`) with token budgets and continuation offsets.
+
+### Fixed
+
+- Content Index session wiring and pre-content list retention for linked language/boilerplate lists.
 
 ## [0.3.3] - 2026-07-18
 
@@ -110,8 +127,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Initial release: DOM compression, Action Map, shadow_grep, self-healing, Playwright wrapper, FastAPI `/v1/compress` and `/v1/heal`.
 
-[0.3.2]: https://github.com/ulinycoin/shadow-web/compare/v0.3.1...v0.3.2
+[0.3.5]: https://github.com/ulinycoin/shadow-web/compare/v0.3.4...v0.3.5
+[0.3.4]: https://github.com/ulinycoin/shadow-web/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/ulinycoin/shadow-web/compare/v0.3.2...v0.3.3
+[0.3.2]: https://github.com/ulinycoin/shadow-web/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/ulinycoin/shadow-web/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/ulinycoin/shadow-web/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/ulinycoin/shadow-web/compare/v0.2.0...v0.2.2
