@@ -8,6 +8,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Universal capture readiness: multilingual cookie-consent dismiss + wait for text/card hydration before first DOM capture.
+- `SparseShell` page class when a page stays a cookie/anti-bot frame with almost no readable content.
 - Rendered Text Index coverage, duplicate-overhead, extraction-mode, and price-signal diagnostics.
 - Structural text clustering for `div`/`span`-heavy pages without site-specific selectors or tag allowlists.
 

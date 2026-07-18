@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional, Tuple, Literal
 from shadow_web.compressor import process_html, generate_grouped_xml_map
 from shadow_web.dom_capture import _INTERACT_SCRIPT
 from shadow_web.a11y_capture import CaptureMode, acapture_page, ainteract_by_a11y_binding, detect_page_class
+from shadow_web.capture_ready import CaptureReadyResult, aprepare_page_for_capture
 from shadow_web.heal_local import HealCache, score_candidate, rank_candidates, HEAL_THRESHOLD, _COLLECT_CANDIDATES_SCRIPT
 from shadow_web.query import QueryResult, shadow_grep
 from shadow_web.verified_heal import averify_selector_on_page
@@ -77,6 +78,8 @@ class AsyncShadowPage:
         
         self.page_class: str = "Static"
         self.page_class_reason: str = ""
+        self._capture_prepared_url: str = ""
+        self.capture_readiness: Optional[CaptureReadyResult] = None
 
     async def refresh(self, diff: bool = False) -> Tuple[str, str]:
         """Captures flattened DOM asynchronously, processes HTML and builds Action Map."""
@@ -102,13 +105,36 @@ class AsyncShadowPage:
             self.page_class_reason = "Page exposes WebMCP tools natively."
         else:
             self.interaction_mode = "action_map"
+            if self._capture_prepared_url != current_url:
+                self.capture_readiness = await aprepare_page_for_capture(self.page)
+                self._capture_prepared_url = current_url
+                if self.capture_readiness.consent_dismissed:
+                    logger.info(
+                        "[Shadow Web Async] Dismissed consent control: %s",
+                        self.capture_readiness.consent_label,
+                    )
+                if not self.capture_readiness.ready:
+                    logger.info(
+                        "[Shadow Web Async] Capture readiness: %s (text=%s cards=%s)",
+                        self.capture_readiness.reason,
+                        self.capture_readiness.text_chars,
+                        self.capture_readiness.card_candidates,
+                    )
+
             flattened = await acapture_page(self.page, mode=self.capture_mode)
             self.bindings = flattened.bindings
-            self.capture_stats = flattened.stats
+            self.capture_stats = dict(flattened.stats or {})
+            if self.capture_readiness is not None:
+                self.capture_stats["readiness"] = self.capture_readiness.as_stats()
             self.clean_html, self.action_map, self.action_groups = process_html(flattened.html)
-            
-            # SPA Auto-retry logic
-            if len(self.action_map) == 0 and len(flattened.html) > 1000 and self.capture_mode == "auto":
+
+            shell = bool(self.capture_readiness and self.capture_readiness.shell)
+            if (
+                not shell
+                and len(self.action_map) == 0
+                and len(flattened.html) > 1000
+                and self.capture_mode == "auto"
+            ):
                 logger.info("[Shadow Web Async] SPA page suspected (0 actions). Waiting for networkidle/loading...")
                 try:
                     await self.page.wait_for_load_state("networkidle", timeout=3000)
@@ -116,11 +142,13 @@ class AsyncShadowPage:
                     pass
                 flattened = await acapture_page(self.page, mode=self.capture_mode)
                 self.bindings = flattened.bindings
-                self.capture_stats = flattened.stats
+                self.capture_stats = dict(flattened.stats or {})
+                if self.capture_readiness is not None:
+                    self.capture_stats["readiness"] = self.capture_readiness.as_stats()
                 self.clean_html, self.action_map, self.action_groups = process_html(flattened.html)
-                
+
             self.full_xml_map = generate_grouped_xml_map(self.last_url, title, self.action_groups)
-            
+
             # Classify page layout and capture details
             self.page_class, self.page_class_reason = detect_page_class(
                 self.last_url,
