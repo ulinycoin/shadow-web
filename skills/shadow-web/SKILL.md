@@ -54,7 +54,8 @@ snapshot(diff=true, detail="terse")
 | Класс | Что делать |
 |-------|------------|
 | **Static** | Стандартный workflow |
-| **SPA** | Уже был auto-retry (networkidle 3s). Если `action_count=0` → `snapshot(detail="terse")` ещё раз или сообщи пользователю |
+| **SPA** | Уже был readiness wait + auto-retry (networkidle 3s). Если `action_count=0` → `snapshot(detail="terse")` ещё раз или сообщи пользователю |
+| **SparseShell** | **Стоп.** Cookie/anti-bot шелл без контента после readiness wait. Не индексируй и не долби `navigate` — сообщи пользователю |
 | **Anti-bot** | **Стоп.** Сообщи: captcha/Cloudflare, headless не прошёл. Не долбить повторными `navigate` |
 | **Shadow DOM** | Ок, flatten включён. При пропусках: `navigate(..., capture_mode="dual")` |
 | **Closed Shadow** | `capture_mode="a11y"` или `dual` |
