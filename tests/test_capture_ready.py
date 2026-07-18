@@ -7,6 +7,8 @@ import pytest
 from shadow_web.a11y_capture import detect_page_class
 from shadow_web.capture_ready import (
     CaptureReadyResult,
+    _content_grew,
+    _should_scroll,
     dismiss_cookie_consent,
     is_probe_ready,
     is_sparse_shell,
@@ -74,6 +76,32 @@ class TestProbeHeuristics:
             {"has_body": True, "text_chars": 4000, "html_chars": 200000}
         )
 
+    def test_content_grew_on_text_or_cards(self):
+        before = {"text_chars": 200, "card_candidates": 0, "price_hits": 0}
+        after = {"text_chars": 900, "card_candidates": 3, "price_hits": 0}
+        assert _content_grew(before, after)
+        assert not _content_grew(after, after)
+
+    def test_should_scroll_when_sparse_but_not_empty_shell(self):
+        probe = {
+            "has_body": True,
+            "text_chars": 400,
+            "html_chars": 50000,
+            "card_candidates": 1,
+            "price_hits": 0,
+        }
+        assert _should_scroll(probe, scrolls=0, stagnant=0)
+
+    def test_should_not_scroll_tiny_shell(self):
+        probe = {
+            "has_body": True,
+            "text_chars": 40,
+            "html_chars": 120000,
+            "card_candidates": 0,
+            "price_hits": 0,
+        }
+        assert not _should_scroll(probe, scrolls=0, stagnant=0)
+
 
 class TestConsentDismiss:
     def test_clicks_accept_all_not_reject(self):
@@ -133,6 +161,7 @@ class TestPreparePage:
         assert result.shell is False
         assert result.reason == "content_ready"
         assert result.card_candidates == 6
+        assert result.scroll_count == 0
 
     def test_prepare_marks_shell_after_timeout(self):
         def evaluate(script):
@@ -156,6 +185,46 @@ class TestPreparePage:
         assert result.shell is True
         assert result.consent_dismissed is True
         assert result.reason == "sparse_shell"
+        assert result.scroll_count == 0
+
+    def test_prepare_scrolls_until_content_grows(self):
+        """Lazy feeds: first paint sparse → scroll → hydrated content ready."""
+        state = {"probes": 0, "scrolls": 0}
+
+        def evaluate(script):
+            if "ACCEPT" in script or "accept all" in script:
+                return {"dismissed": False, "label": None, "method": "none"}
+            if "scrollBy" in script:
+                state["scrolls"] += 1
+                return {"scrolled": True, "at_bottom": False, "scroll_y": 800}
+            state["probes"] += 1
+            if state["scrolls"] == 0:
+                return {
+                    "has_body": True,
+                    "text_chars": 350,
+                    "html_chars": 40000,
+                    "card_candidates": 1,
+                    "price_hits": 0,
+                    "title": "Feed",
+                }
+            return {
+                "has_body": True,
+                "text_chars": 2400,
+                "html_chars": 90000,
+                "card_candidates": 8,
+                "price_hits": 0,
+                "title": "Feed",
+            }
+
+        page = SimpleNamespace(
+            evaluate=evaluate,
+            wait_for_timeout=lambda *_a, **_k: None,
+        )
+        result = prepare_page_for_capture(page, timeout_ms=3000, poll_ms=50)
+        assert result.ready is True
+        assert result.scroll_count >= 1
+        assert state["scrolls"] >= 1
+        assert result.card_candidates == 8
 
 
 class TestDetectPageClassSparseShell:

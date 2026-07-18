@@ -54,8 +54,8 @@ snapshot(diff=true, detail="terse")
 | Класс | Что делать |
 |-------|------------|
 | **Static** | Стандартный workflow |
-| **SPA** | Уже был readiness wait + auto-retry (networkidle 3s). Если `action_count=0` → `snapshot(detail="terse")` ещё раз или сообщи пользователю |
-| **SparseShell** | **Стоп.** Cookie/anti-bot шелл без контента после readiness wait. Не индексируй и не долби `navigate` — сообщи пользователю |
+| **SPA** | Readiness: consent dismiss + wait + scroll-until-content при бедном first paint. Если `action_count=0` → `snapshot(detail="terse")` ещё раз или сообщи пользователю |
+| **SparseShell** | **Стоп.** Cookie/anti-bot шелл без контента после readiness (скролл не спас). Не индексируй и не долби `navigate` — сообщи пользователю |
 | **Anti-bot** | **Стоп.** Сообщи: captcha/Cloudflare, headless не прошёл. Не долбить повторными `navigate` |
 | **Shadow DOM** | Ок, flatten включён. При пропусках: `navigate(..., capture_mode="dual")` |
 | **Closed Shadow** | `capture_mode="a11y"` или `dual` |
@@ -77,6 +77,7 @@ snapshot(diff=true, detail="terse")
 | **Статический HTML** | `compress_html` / `shadow_grep_html` / `schema_page(html)` — без браузера |
 | **Мультишаг** | один baseline `navigate` → действия → только `snapshot(diff=true)` |
 | **Поиск в сети** | `web_search(query)` → `shadow_query` по результатам → `click(sid)` |
+| **Длинный текст / каталог / лента** | `content_outline` → `content_blocks(ids)`; catalog → `cards=`, feed → `feeds=` (без цен) |
 
 ---
 

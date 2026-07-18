@@ -434,16 +434,19 @@ click(sid) → snapshot(diff=true)    # delta only after action
 **Long-form content:**
 ```
 navigate(url, detail="minimal")
-content_outline(max_tokens=600)              # p0, p1… + coverage/mode/signals/cards
+content_outline(max_tokens=600)              # p0, p1… + coverage/mode/signals/cards|feeds
 content_blocks(ids="p3,p7", max_tokens=2000) # selected text only
 ```
 
 The Rendered Text Index covers semantic articles and `div`/`span`-heavy apps
 without site-specific selectors. Every readable text node belongs to one
 bounded block; headings and paragraphs act as boundary signals rather than an
-allowlist. On catalog pages, priced cards are ranked into the first outline
-page. The summary reports `coverage`, extraction `mode`, retained price
-`signals`, and `cards` so a large reduction cannot hide missing content.
+allowlist. Before the first capture, readiness dismisses cookie consent and
+scrolls under-hydrated first paints until content appears. On catalog pages,
+priced cards are ranked into the first outline page; on feed-like pages,
+repeating mid-size items are ranked without requiring prices. The summary
+reports `coverage`, extraction `mode`, retained price `signals`, `cards`, and
+`feeds` so a large reduction cannot hide missing content.
 
 **Form fill (AgentOps):**
 ```

@@ -8,6 +8,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Scroll-until-content in capture readiness: under-hydrated first paints scroll the viewport to trigger lazy feeds before capture.
+- Feed outline ranking: repeating mid-size items (no prices required) surface above engagement chrome; summary exposes `feeds=N`.
 - Catalog outline ranking: priced product cards surface inside the first token budget instead of filter/nav chrome.
 - Universal capture readiness: multilingual cookie-consent dismiss + wait for text/card hydration before first DOM capture.
 - `SparseShell` page class when a page stays a cookie/anti-bot frame with almost no readable content.

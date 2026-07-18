@@ -391,6 +391,30 @@ class TestOutline:
         first = next(line for line in outline.splitlines() if line.startswith("p"))
         assert "Web Scraping" in first
 
+    def test_feed_outline_surfaces_items_without_prices(self):
+        """Repeating mid-size posts beat engagement chrome in the first budget."""
+        chrome = "".join(
+            f"<div><span>Like {i}</span><span>Share {i}</span>"
+            f"<span>Comment {i}</span></div>"
+            for i in range(30)
+        )
+        # ~40-60 tokens each — similar length, no currency signals.
+        posts = "".join(
+            f"<div><a><span>Breaking story number {i} about local politics "
+            f"and community events with enough detail for agents</span></a>"
+            f"<span>Posted by user{i} · 2 hours ago · discussion thread</span></div>"
+            for i in range(10)
+        )
+        html = f"<main><h1>Latest</h1>{chrome}{posts}</main>"
+        blocks = build(html)
+        outline = outline_text(blocks, max_tokens=400)
+        assert "feeds=" in outline
+        assert " | feed | " in outline
+        first_lines = [line for line in outline.splitlines() if line.startswith("p")]
+        assert first_lines
+        assert "Breaking story" in first_lines[0] or "Latest" in first_lines[0]
+        assert "Like 0" not in first_lines[0]
+
     def test_reduction_wikipedia(self):
         """Real benchmark fixture: actual outline text is at least 10x smaller."""
         fixture = (

@@ -412,6 +412,19 @@ def quality(html_text: str, blocks: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 _CATALOG_PRICE_BLOCK_THRESHOLD = 5
+_FEED_ITEM_THRESHOLD = 5
+_FEED_TOKEN_MIN = 12
+_FEED_TOKEN_MAX = 140
+# Bucket by ~20-token bands so near-equal feed cards cluster together.
+_FEED_TOKEN_BUCKET = 20
+_ENGAGEMENT_RE = re.compile(
+    r"\b(?:"
+    r"like|likes|comment|comments|share|shares|retweet|reply|replies|"
+    r"follow|followers|views|votes|subscribe|подпис|лайк|коммент|репост|"
+    r"просмотр"
+    r")\b",
+    re.IGNORECASE,
+)
 
 
 def _has_price(text: str) -> bool:
@@ -429,11 +442,67 @@ def _is_card_block(block: dict[str, Any]) -> bool:
     return 4 <= tokens <= 160
 
 
-def _outline_rank_score(block: dict[str, Any], *, catalog: bool) -> int:
+def _is_feed_item_block(block: dict[str, Any]) -> bool:
+    """Mid-size repeating unit without requiring a price signal.
+
+    Used for social/news feeds where cards are titles + meta, not €/$ tags.
+    Excludes headings and very short engagement chrome.
+    """
+    if block.get("type") == "heading":
+        return False
+    tokens = int(block.get("tokens", 0))
+    if tokens < _FEED_TOKEN_MIN or tokens > _FEED_TOKEN_MAX:
+        return False
+    text = str(block.get("text", ""))
+    # Pure engagement counters are not feed items.
+    if tokens <= 18 and _ENGAGEMENT_RE.search(text) and not _has_price(text):
+        return False
+    return True
+
+
+def _feed_token_bucket(tokens: int) -> int:
+    return int(tokens) // _FEED_TOKEN_BUCKET
+
+
+def _detect_feed_mode(blocks: list[dict[str, Any]]) -> tuple[bool, set[int]]:
+    """Find a dominant mid-size token cluster of repeating items.
+
+    Returns (feed_mode, set of original indices that are in the dominant cluster).
+    Catalog pages (priced cards) take precedence elsewhere — callers should
+    skip this when catalog mode is active.
+    """
+    candidates: list[tuple[int, int]] = []
+    for idx, block in enumerate(blocks):
+        if not _is_feed_item_block(block):
+            continue
+        tokens = int(block.get("tokens", 0))
+        candidates.append((idx, _feed_token_bucket(tokens)))
+    if len(candidates) < _FEED_ITEM_THRESHOLD:
+        return False, set()
+
+    bucket_counts = Counter(bucket for _, bucket in candidates)
+    dominant_bucket, dominant_count = bucket_counts.most_common(1)[0]
+    if dominant_count < _FEED_ITEM_THRESHOLD:
+        return False, set()
+    # Require the cluster to be a meaningful share of mid-size blocks.
+    if dominant_count < max(_FEED_ITEM_THRESHOLD, len(candidates) // 3):
+        return False, set()
+    feed_ids = {idx for idx, bucket in candidates if bucket == dominant_bucket}
+    return True, feed_ids
+
+
+def _outline_rank_score(
+    block: dict[str, Any],
+    *,
+    catalog: bool,
+    feed: bool,
+    is_feed_item: bool,
+) -> int:
     """Higher score → earlier in the token-budgeted outline.
 
     Catalog mode (many priced blocks) promotes product cards and demotes
-    filters/nav chrome. Article mode keeps document order via near-equal
+    filters/nav chrome. Feed mode (repeating mid-size items, no prices)
+    promotes those items. Article mode keeps document order via near-equal
     scores and stable original indices.
     """
     text = str(block.get("text", ""))
@@ -470,6 +539,19 @@ def _outline_rank_score(block: dict[str, Any], *, catalog: bool) -> int:
                 score -= 20
             if tokens > 180:
                 score -= 25
+    elif feed:
+        if is_feed_item:
+            score += 140
+            if 20 <= tokens <= 100:
+                score += 25
+        elif btype == "heading" and level <= 2:
+            score += 30
+        else:
+            score -= 35
+            if tokens <= 8:
+                score -= 25
+            if _ENGAGEMENT_RE.search(text) and tokens <= 24:
+                score -= 30
     else:
         # Articles: prefer natural reading order; light boosts only.
         if btype in {"paragraph", "list_item", "blockquote", "code"}:
@@ -478,14 +560,35 @@ def _outline_rank_score(block: dict[str, Any], *, catalog: bool) -> int:
     return score
 
 
-def _ranked_blocks_for_outline(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _ranked_blocks_for_outline(
+    blocks: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     price_blocks = sum(1 for block in blocks if _has_price(str(block.get("text", ""))))
     catalog = price_blocks >= _CATALOG_PRICE_BLOCK_THRESHOLD
+    feed = False
+    feed_indices: set[int] = set()
+    if not catalog:
+        feed, feed_indices = _detect_feed_mode(blocks)
+
     ranked = sorted(
         enumerate(blocks),
-        key=lambda item: (-_outline_rank_score(item[1], catalog=catalog), item[0]),
+        key=lambda item: (
+            -_outline_rank_score(
+                item[1],
+                catalog=catalog,
+                feed=feed,
+                is_feed_item=item[0] in feed_indices,
+            ),
+            item[0],
+        ),
     )
-    return [block for _, block in ranked]
+    meta = {
+        "catalog": catalog,
+        "feed": feed,
+        "feed_count": len(feed_indices),
+        "feed_indices": feed_indices,
+    }
+    return [block for _, block in ranked], meta
 
 
 def outline_text(
@@ -501,8 +604,10 @@ def outline_text(
       p1 | Architecture | paragraph | 184t | Shadow Web compresses pages before…
 
     On catalog-like pages (many priced blocks), product cards are ranked above
-    chrome so the first budgeted page surfaces buyable items. Block IDs stay
-    stable for content_blocks(); offset walks the ranked outline order.
+    chrome so the first budgeted page surfaces buyable items. On feed-like
+    pages (repeating mid-size items without prices), feed items are ranked
+    above engagement chrome. Block IDs stay stable for content_blocks();
+    offset walks the ranked outline order.
 
     The budget applies to the actual outline text, not to source block sizes.
     Large blocks still receive an outline line so agents can fetch them.
@@ -510,14 +615,25 @@ def outline_text(
     if max_tokens <= 0:
         return ""
 
-    ordered = _ranked_blocks_for_outline(blocks)
+    ordered, rank_meta = _ranked_blocks_for_outline(blocks)
     start = max(0, offset)
     lines: list[str] = []
     source_tokens = sum(int(block.get("tokens", 0)) for block in blocks)
     card_count = sum(1 for block in blocks if _is_card_block(block))
+    feed_indices = rank_meta.get("feed_indices") or set()
+    # Map block id → whether it was in the dominant feed cluster (by identity).
+    feed_block_ids = {
+        blocks[i]["id"] for i in feed_indices if 0 <= i < len(blocks)
+    }
+    feed_count = int(rank_meta.get("feed_count") or 0)
     for block in ordered[start:]:
         heading_path = str(block["heading_path"])[:120]
-        display_type = "card" if _is_card_block(block) else block["type"]
+        if _is_card_block(block):
+            display_type = "card"
+        elif block["id"] in feed_block_ids:
+            display_type = "feed"
+        else:
+            display_type = block["type"]
         if block["type"] == "heading":
             line = (
                 f'{block["id"]} | {block["tag"]} | {heading_path} | '
@@ -541,6 +657,7 @@ def outline_text(
             next_offset,
             quality_data,
             card_count=card_count,
+            feed_count=feed_count,
         )
         candidate = "\n".join([*candidate_lines, summary])
         if _estimate_tokens(candidate) > max_tokens:
@@ -557,6 +674,7 @@ def outline_text(
         next_offset,
         quality_data,
         card_count=card_count,
+        feed_count=feed_count,
     )
     output = "\n".join([*lines, summary])
     if _estimate_tokens(output) <= max_tokens:
@@ -572,12 +690,15 @@ def _summary_line(
     next_offset: int | None,
     quality_data: dict[str, Any] | None,
     card_count: int = 0,
+    feed_count: int = 0,
 ) -> str:
     summary = f"range={start}:{end}/{total} source={source_tokens}t"
     if next_offset is not None:
         summary += f" next={next_offset}"
     if card_count:
         summary += f" cards={card_count}"
+    if feed_count:
+        summary += f" feeds={feed_count}"
     if quality_data:
         summary += (
             f" coverage={quality_data.get('coverage_pct', 0)}%"

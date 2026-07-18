@@ -14,12 +14,14 @@ from typing import Any, Optional, Protocol
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_TIMEOUT_MS = 8000
+_DEFAULT_TIMEOUT_MS = 10000
 _DEFAULT_POLL_MS = 400
 _MIN_READY_TEXT = 800
 _MIN_CARD_TEXT = 400
 _MIN_CARD_CANDIDATES = 4
 _SHELL_TEXT_CHARS = 250
+_MAX_SCROLLS = 6
+_SCROLL_STAGNANT_LIMIT = 2
 
 _DISMISS_CONSENT_JS = r"""
 () => {
@@ -164,6 +166,24 @@ _PROBE_JS = r"""
 }
 """
 
+_SCROLL_JS = r"""
+() => {
+  const before = window.scrollY || 0;
+  const step = Math.max(700, Math.floor(window.innerHeight * 0.9));
+  window.scrollBy(0, step);
+  const after = window.scrollY || 0;
+  const maxY = Math.max(
+    0,
+    (document.documentElement.scrollHeight || 0) - (window.innerHeight || 0)
+  );
+  return {
+    scrolled: after > before + 2,
+    at_bottom: after >= maxY - 4,
+    scroll_y: after,
+  };
+}
+"""
+
 
 class PageLike(Protocol):
     def evaluate(self, expression: str, arg: Any = None) -> Any: ...
@@ -188,6 +208,7 @@ class CaptureReadyResult:
     wait_ms: int
     reason: str
     has_body: bool = True
+    scroll_count: int = 0
 
     def as_stats(self) -> dict[str, Any]:
         return asdict(self)
@@ -202,6 +223,7 @@ def _parse_probe(raw: Any) -> dict[str, Any]:
             "card_candidates": 0,
             "price_hits": 0,
             "title": "",
+            "consent_only": False,
         }
     return {
         "has_body": bool(raw.get("has_body", True)),
@@ -212,6 +234,63 @@ def _parse_probe(raw: Any) -> dict[str, Any]:
         "title": str(raw.get("title") or ""),
         "consent_only": bool(raw.get("consent_only")),
     }
+
+
+def _content_grew(before: dict[str, Any], after: dict[str, Any]) -> bool:
+    """True when scroll/hydration added meaningful visible content."""
+    return (
+        int(after.get("text_chars") or 0) > int(before.get("text_chars") or 0) + 40
+        or int(after.get("card_candidates") or 0) > int(before.get("card_candidates") or 0)
+        or int(after.get("price_hits") or 0) > int(before.get("price_hits") or 0)
+    )
+
+
+def _should_scroll(probe: dict[str, Any], scrolls: int, stagnant: int) -> bool:
+    """Scroll only while the first paint looks under-hydrated.
+
+    Once text crosses the ready threshold, prefer polling for a plateau
+    instead of scrolling past stable article content.
+    """
+    if scrolls >= _MAX_SCROLLS or stagnant >= _SCROLL_STAGNANT_LIMIT:
+        return False
+    if not probe.get("has_body"):
+        return False
+    text = int(probe.get("text_chars") or 0)
+    cards = int(probe.get("card_candidates") or 0)
+    if is_sparse_shell(probe) and text < 100:
+        return False
+    # Dense enough already — let readiness/plateau logic finish.
+    if text >= _MIN_READY_TEXT:
+        return False
+    if cards >= _MIN_CARD_CANDIDATES and text >= _MIN_CARD_TEXT:
+        return False
+    return True
+
+
+def _result_from_probe(
+    *,
+    probe: dict[str, Any],
+    consent: dict[str, Any],
+    started: float,
+    ready: bool,
+    reason: str,
+    scroll_count: int,
+) -> CaptureReadyResult:
+    shell = (not ready) and is_sparse_shell(probe)
+    return CaptureReadyResult(
+        ready=ready,
+        shell=shell,
+        consent_dismissed=bool(consent.get("dismissed")),
+        consent_label=consent.get("label"),
+        text_chars=int(probe.get("text_chars") or 0),
+        html_chars=int(probe.get("html_chars") or 0),
+        card_candidates=int(probe.get("card_candidates") or 0),
+        price_hits=int(probe.get("price_hits") or 0),
+        wait_ms=int((time.time() - started) * 1000),
+        reason="sparse_shell" if shell and not ready else reason,
+        has_body=bool(probe.get("has_body", True)),
+        scroll_count=scroll_count,
+    )
 
 
 def is_probe_ready(probe: dict[str, Any], previous: Optional[dict[str, Any]] = None) -> bool:
@@ -286,13 +365,28 @@ async def adismiss_cookie_consent(page: AsyncPageLike) -> dict[str, Any]:
     }
 
 
+def _parse_scroll(raw: Any) -> dict[str, Any]:
+    if not isinstance(raw, dict):
+        return {"scrolled": False, "at_bottom": False, "scroll_y": 0}
+    return {
+        "scrolled": bool(raw.get("scrolled")),
+        "at_bottom": bool(raw.get("at_bottom")),
+        "scroll_y": int(raw.get("scroll_y") or 0),
+    }
+
+
 def prepare_page_for_capture(
     page: PageLike,
     *,
     timeout_ms: int = _DEFAULT_TIMEOUT_MS,
     poll_ms: int = _DEFAULT_POLL_MS,
 ) -> CaptureReadyResult:
-    """Dismiss consent (if any) and wait until content looks ready or times out."""
+    """Dismiss consent, wait/scroll until content looks ready, or time out.
+
+    If the first paint is still sparse, scrolls the viewport to trigger lazy
+    hydration. Stops on ready content, scroll plateau, or timeout. No
+    site-specific selectors.
+    """
     started = time.time()
     consent = dismiss_cookie_consent(page)
     if consent.get("dismissed"):
@@ -304,6 +398,8 @@ def prepare_page_for_capture(
     previous: Optional[dict[str, Any]] = None
     probe = _parse_probe({})
     deadline = started + max(0, timeout_ms) / 1000.0
+    scroll_count = 0
+    stagnant = 0
 
     while True:
         try:
@@ -313,43 +409,57 @@ def prepare_page_for_capture(
             probe = _parse_probe({"has_body": False})
 
         if is_probe_ready(probe, previous):
-            wait_ms = int((time.time() - started) * 1000)
-            return CaptureReadyResult(
+            return _result_from_probe(
+                probe=probe,
+                consent=consent,
+                started=started,
                 ready=True,
-                shell=False,
-                consent_dismissed=bool(consent.get("dismissed")),
-                consent_label=consent.get("label"),
-                text_chars=probe["text_chars"],
-                html_chars=probe["html_chars"],
-                card_candidates=probe["card_candidates"],
-                price_hits=probe["price_hits"],
-                wait_ms=wait_ms,
                 reason="content_ready",
-                has_body=probe["has_body"],
+                scroll_count=scroll_count,
             )
 
         if time.time() >= deadline:
             break
+
+        if _should_scroll(probe, scroll_count, stagnant):
+            before = probe
+            try:
+                scroll = _parse_scroll(page.evaluate(_SCROLL_JS))
+            except Exception as exc:
+                logger.debug("scroll-until-content failed: %s", exc)
+                scroll = {"scrolled": False, "at_bottom": True}
+            try:
+                page.wait_for_timeout(min(poll_ms, 350))
+            except Exception:
+                pass
+            try:
+                probe = _parse_probe(page.evaluate(_PROBE_JS))
+            except Exception:
+                probe = before
+            if scroll.get("scrolled"):
+                scroll_count += 1
+            if _content_grew(before, probe):
+                stagnant = 0
+            else:
+                stagnant += 1
+            if scroll.get("at_bottom") and not _content_grew(before, probe):
+                stagnant = _SCROLL_STAGNANT_LIMIT
+            previous = before
+            continue
+
         previous = probe
         try:
             page.wait_for_timeout(poll_ms)
         except Exception:
             break
 
-    wait_ms = int((time.time() - started) * 1000)
-    shell = is_sparse_shell(probe)
-    return CaptureReadyResult(
+    return _result_from_probe(
+        probe=probe,
+        consent=consent,
+        started=started,
         ready=False,
-        shell=shell,
-        consent_dismissed=bool(consent.get("dismissed")),
-        consent_label=consent.get("label"),
-        text_chars=probe["text_chars"],
-        html_chars=probe["html_chars"],
-        card_candidates=probe["card_candidates"],
-        price_hits=probe["price_hits"],
-        wait_ms=wait_ms,
-        reason="sparse_shell" if shell else "timeout",
-        has_body=probe["has_body"],
+        reason="timeout",
+        scroll_count=scroll_count,
     )
 
 
@@ -370,6 +480,8 @@ async def aprepare_page_for_capture(
     previous: Optional[dict[str, Any]] = None
     probe = _parse_probe({})
     deadline = started + max(0, timeout_ms) / 1000.0
+    scroll_count = 0
+    stagnant = 0
 
     while True:
         try:
@@ -379,41 +491,55 @@ async def aprepare_page_for_capture(
             probe = _parse_probe({"has_body": False})
 
         if is_probe_ready(probe, previous):
-            wait_ms = int((time.time() - started) * 1000)
-            return CaptureReadyResult(
+            return _result_from_probe(
+                probe=probe,
+                consent=consent,
+                started=started,
                 ready=True,
-                shell=False,
-                consent_dismissed=bool(consent.get("dismissed")),
-                consent_label=consent.get("label"),
-                text_chars=probe["text_chars"],
-                html_chars=probe["html_chars"],
-                card_candidates=probe["card_candidates"],
-                price_hits=probe["price_hits"],
-                wait_ms=wait_ms,
                 reason="content_ready",
-                has_body=probe["has_body"],
+                scroll_count=scroll_count,
             )
 
         if time.time() >= deadline:
             break
+
+        if _should_scroll(probe, scroll_count, stagnant):
+            before = probe
+            try:
+                scroll = _parse_scroll(await page.evaluate(_SCROLL_JS))
+            except Exception as exc:
+                logger.debug("async scroll-until-content failed: %s", exc)
+                scroll = {"scrolled": False, "at_bottom": True}
+            try:
+                await page.wait_for_timeout(min(poll_ms, 350))
+            except Exception:
+                pass
+            try:
+                probe = _parse_probe(await page.evaluate(_PROBE_JS))
+            except Exception:
+                probe = before
+            if scroll.get("scrolled"):
+                scroll_count += 1
+            if _content_grew(before, probe):
+                stagnant = 0
+            else:
+                stagnant += 1
+            if scroll.get("at_bottom") and not _content_grew(before, probe):
+                stagnant = _SCROLL_STAGNANT_LIMIT
+            previous = before
+            continue
+
         previous = probe
         try:
             await page.wait_for_timeout(poll_ms)
         except Exception:
             break
 
-    wait_ms = int((time.time() - started) * 1000)
-    shell = is_sparse_shell(probe)
-    return CaptureReadyResult(
+    return _result_from_probe(
+        probe=probe,
+        consent=consent,
+        started=started,
         ready=False,
-        shell=shell,
-        consent_dismissed=bool(consent.get("dismissed")),
-        consent_label=consent.get("label"),
-        text_chars=probe["text_chars"],
-        html_chars=probe["html_chars"],
-        card_candidates=probe["card_candidates"],
-        price_hits=probe["price_hits"],
-        wait_ms=wait_ms,
-        reason="sparse_shell" if shell else "timeout",
-        has_body=probe["has_body"],
+        reason="timeout",
+        scroll_count=scroll_count,
     )
