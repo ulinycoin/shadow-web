@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- Content Index MCP tools now read from the current browser session instead of requiring full HTML in every tool call.
+- Outline budgets now apply to the actual output, large blocks remain discoverable, and long outlines expose a continuation offset.
+- Nested content blocks no longer duplicate text; empty HTML and invalid token budgets return safe empty results.
+
 ## [0.3.3] - 2026-07-18
 
 ### Fixed

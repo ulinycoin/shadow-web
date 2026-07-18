@@ -59,7 +59,7 @@ Shadow Web is what runs **between** the browser and the LLM: a compression layer
 | You're building … | Why Shadow Web |
 |-------------------|----------------|
 | A browser-based AI agent | Action Map + self-healing + SchemaSnap = fewer failures, structured data |
-| An MCP tool for Cursor/Claude | Built-in MCP server with **24 tools**, one-command setup |
+| An MCP tool for Cursor/Claude | Built-in MCP server with **26 tools**, one-command setup |
 | A Playwright scraper that breaks on every deploy | `heal_local.py` catches DOM drift without LLM cost |
 | A Shadow DOM-heavy app (Web components, Lit, Angular) | Read-only flatten — no React/Vue breakage |
 | **An agent that needs data from web pages** | SchemaSnap parses tables, forms, and lists into clean JSON |
@@ -382,7 +382,7 @@ Or manually:
 }
 ```
 
-### All 24 tools
+### All 26 tools
 
 | Category | Tool | What it does |
 |----------|------|--------------|
@@ -406,6 +406,8 @@ Or manually:
 | | `schema_session_json` | JSON records from session |
 | | `schema_session_csv` | CSV from session |
 | | `get_page_html` | Clean HTML (`max_chars` default 50000) |
+| **Content** | `content_outline` | Token-budgeted block index from current session |
+| | `content_blocks` | Fetch selected text blocks by compact IDs |
 | **Search** | `web_search` | Brave Search (no API keys) |
 | **WebMCP** | `webmcp_list_tools` | Chrome 145+ page tools |
 | | `webmcp_execute_tool` | Execute WebMCP tool by name |
@@ -418,6 +420,13 @@ navigate(url, detail="minimal")     # ~200 tokens — action_count, page_class
 schema_session_json(max_rows=50)    # data plane — table records
 shadow_query("intent:login")        # control plane — what to click
 click(sid) → snapshot(diff=true)    # delta only after action
+```
+
+**Long-form content:**
+```
+navigate(url, detail="minimal")
+content_outline(max_tokens=600)              # p0, p1…; use next offset if present
+content_blocks(ids="p3,p7", max_tokens=2000) # selected text only
 ```
 
 **Form fill (AgentOps):**

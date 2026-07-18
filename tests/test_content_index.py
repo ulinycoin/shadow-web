@@ -1,8 +1,12 @@
 """Tests for content_index — Content Block Index."""
 
+from pathlib import Path
+from types import SimpleNamespace
+
 import pytest
 
 from shadow_web.content_index import build, outline_text, fetch
+from shadow_web.mcp import server as mcp_server
 
 # ── Fixtures ───────────────────────────────────────────────────────────
 
@@ -154,6 +158,13 @@ class TestBuild:
     def test_no_content_tags_returns_empty(self):
         assert build(SPAN_ONLY) == []
 
+    def test_empty_string_returns_empty(self):
+        assert build("") == []
+
+    def test_nested_list_text_is_not_duplicated(self):
+        blocks = build("<ul><li>Parent<ul><li>Child</li></ul></li></ul>")
+        assert [block["text"] for block in blocks] == ["Parent", "Child"]
+
     def test_heading_types(self):
         blocks = build(WIKI_HTML)
         headings = [b for b in blocks if b["type"] == "heading"]
@@ -200,7 +211,7 @@ class TestOutline:
         blocks = build(WIKI_HTML)
         outline = outline_text(blocks)
         assert "t |" in outline
-        assert "total_estimated_tokens=" in outline
+        assert "source=" in outline
 
     def test_max_tokens_limits_paragraphs(self):
         blocks = build(SIMPLE_PAGE)
@@ -214,53 +225,48 @@ class TestOutline:
 
     def test_empty_blocks(self):
         outline = outline_text([])
-        assert "blocks=0" in outline
+        assert "range=0:0/0" in outline
+
+    def test_budget_applies_to_actual_outline(self):
+        html = "<body>" + "".join(
+            f"<h2>Heading {i} with a fairly long descriptive title</h2>"
+            for i in range(100)
+        ) + "</body>"
+        outline = outline_text(build(html), max_tokens=50)
+        assert len(outline) // 4 <= 50
+
+    def test_large_blocks_remain_discoverable(self):
+        html = "<h1>Article</h1><p>" + ("Long content. " * 1000) + "</p>"
+        outline = outline_text(build(html), max_tokens=100)
+        assert "p1 | Article | paragraph" in outline
+
+    def test_offset_continues_a_budgeted_outline(self):
+        html = "<body>" + "".join(
+            f"<p>Paragraph {i} with enough text for a compact outline line.</p>"
+            for i in range(40)
+        ) + "</body>"
+        blocks = build(html)
+        first = outline_text(blocks, max_tokens=100)
+        assert "next=" in first
+        next_offset = int(first.rsplit("next=", 1)[1])
+        second = outline_text(blocks, max_tokens=100, offset=next_offset)
+        assert f"range={next_offset}:" in second
+        assert f"p{next_offset} |" in second
 
     def test_reduction_wikipedia(self):
-        """Wikipedia-sized content: outline must be < 10% of raw text tokens."""
-        # Simulate a Wikipedia article: lots of verbose text, nav/footer excluded
-        para = (
-            "Machine learning is a subset of AI that enables systems to "
-            "learn and improve from experience without being explicitly programmed. "
+        """Real benchmark fixture: actual outline text is at least 10x smaller."""
+        fixture = (
+            Path(__file__).parents[1]
+            / "benchmarks"
+            / "fixtures"
+            / "wikipedia_like.html"
         )
-        sections = [
-            ("h1", "Artificial Intelligence"),
-            ("p", "AI is intelligence demonstrated by machines."),
-            ("p", para * 50),
-            ("h2", "History"),
-            ("p", ("AI research started at Dartmouth in 1956 with McCarthy, Minsky, "
-                   "Newell, and Simon. ") * 60),
-            ("h2", "Approaches"),
-            ("p", ("Symbolic AI uses explicit rules. Connectionist AI uses neural "
-                   "networks. ") * 60),
-            ("h3", "Machine Learning"),
-            ("p", ("Supervised, unsupervised, and reinforcement learning are the "
-                   "three main paradigms. ") * 50),
-            ("h3", "Deep Learning"),
-            ("p", ("CNNs for images, RNNs for sequences, transformers for "
-                   "language. ") * 50),
-            ("h2", "Applications"),
-            ("p", ("Healthcare diagnosis, fraud detection, self-driving cars, "
-                   "recommender systems. ") * 60),
-            ("h2", "Ethics"),
-            ("p", ("Bias, privacy, job displacement, and alignment are key "
-                   "concerns. ") * 50),
-        ]
-        lines = ["<html><body>"]
-        for tag, content in sections:
-            lines.append(f"<{tag}>{content}</{tag}>")
-        lines.append("<nav><p>Skip this</p></nav>")
-        lines.append("<footer><p>Skip this too</p></footer>")
-        lines.append("<aside><p>And this</p></aside>")
-        lines.append("</body></html>")
-        large_html = "\n".join(lines)
-
+        large_html = fixture.read_text(encoding="utf-8")
         raw_tokens = len(large_html) // 4
         blocks = build(large_html)
         outline = outline_text(blocks, max_tokens=600)
-        import re
-        m = re.search(r"total_estimated_tokens=(\d+)", outline)
-        outline_tokens = int(m.group(1)) if m else len(outline) // 4
+        outline_tokens = max(1, len(outline) // 4)
+        assert outline_tokens <= 600
         assert outline_tokens < raw_tokens // 10, (
             f"Outline {outline_tokens}t vs raw {raw_tokens}t — "
             f"ratio {raw_tokens // max(outline_tokens, 1)}x, need >= 10x"
@@ -296,3 +302,35 @@ class TestFetch:
         blocks = build(WIKI_HTML)
         result = fetch(blocks, [])
         assert result == {}
+
+    def test_non_positive_budget_returns_empty(self):
+        blocks = build(WIKI_HTML)
+        assert fetch(blocks, ["p0"], max_tokens=0) == {}
+        assert fetch(blocks, ["p0"], max_tokens=-1) == {}
+
+    def test_requested_order_is_preserved(self):
+        blocks = build(WIKI_HTML)
+        result = fetch(blocks, ["p3", "p0"])
+        assert list(result) == ["p3", "p0"]
+
+
+class TestSessionIndex:
+    def test_requires_browser_session(self, monkeypatch):
+        monkeypatch.setattr(mcp_server, "_session", {})
+        with pytest.raises(RuntimeError, match="navigate"):
+            mcp_server._get_content_index_blocks()
+
+    def test_builds_from_current_session_and_reuses_cache(self, monkeypatch):
+        shadow = SimpleNamespace(clean_html="<h1>One</h1><p>First body</p>")
+        session = {"shadow_page": shadow}
+        monkeypatch.setattr(mcp_server, "_session", session)
+
+        first = mcp_server._get_content_index_blocks()
+        second = mcp_server._get_content_index_blocks()
+        assert first is second
+        assert [block["text"] for block in first] == ["One", "First body"]
+
+        shadow.clean_html = "<h1>Two</h1><p>Second body</p>"
+        refreshed = mcp_server._get_content_index_blocks()
+        assert refreshed is not first
+        assert [block["text"] for block in refreshed] == ["Two", "Second body"]

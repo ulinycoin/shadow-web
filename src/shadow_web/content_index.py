@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from lxml import etree
 from lxml import html as _html_parser
 
 # Tags that carry readable content for agents
@@ -48,6 +49,24 @@ def _estimate_tokens(text: str) -> int:
     return max(1, len(text) // 4)
 
 
+def _block_text(el) -> str:
+    """Read an element without duplicating nested content blocks."""
+    parts: list[str] = []
+
+    def collect(node) -> None:
+        if node.text:
+            parts.append(node.text)
+        for child in node:
+            tag = child.tag if isinstance(child.tag, str) else ""
+            if tag not in _CONTENT_TAGS:
+                collect(child)
+            if child.tail:
+                parts.append(child.tail)
+
+    collect(el)
+    return _clean_text(" ".join(parts))
+
+
 def build(html_text: str) -> list[dict[str, Any]]:
     """Parse clean HTML and return a flat list of content blocks.
 
@@ -60,7 +79,12 @@ def build(html_text: str) -> list[dict[str, Any]]:
       tokens       int   — estimated token count (len/4)
       level        int   — heading level (0 for non-heading)
     """
-    root = _html_parser.fromstring(html_text)
+    if not html_text or not html_text.strip():
+        return []
+    try:
+        root = _html_parser.fromstring(html_text)
+    except (etree.ParserError, ValueError):
+        return []
     blocks: list[dict[str, Any]] = []
     heading_stack: list[tuple[int, str]] = []  # [(level, text), ...]
     block_id = 0
@@ -83,7 +107,7 @@ def build(html_text: str) -> list[dict[str, Any]]:
         if _is_excluded(el):
             continue
 
-        text = _clean_text(el.text_content())
+        text = _block_text(el)
         if not text:
             continue
 
@@ -120,35 +144,62 @@ def build(html_text: str) -> list[dict[str, Any]]:
     return blocks
 
 
-def outline_text(blocks: list[dict[str, Any]], max_tokens: int = 600) -> str:
+def outline_text(
+    blocks: list[dict[str, Any]],
+    max_tokens: int = 600,
+    offset: int = 0,
+) -> str:
     """Build a terse text outline of content blocks, token-limited.
 
     Format per line:
       p0 | Architecture | heading | 12t | Architecture Overview
       p1 | Architecture | paragraph | 184t | Shadow Web compresses pages before…
 
-    Headings are always included. Paragraphs are included token-first until
-    max_tokens is reached (in estimated tokens).
+    The budget applies to the actual outline text, not to source block sizes.
+    Large blocks still receive an outline line so agents can fetch them.
     """
+    if max_tokens <= 0:
+        return ""
+
+    start = max(0, offset)
     lines: list[str] = []
-    running = 0
+    source_tokens = sum(int(block.get("tokens", 0)) for block in blocks)
+    for block in blocks[start:]:
+        heading_path = str(block["heading_path"])[:120]
+        if block["type"] == "heading":
+            line = (
+                f'{block["id"]} | {block["tag"]} | {heading_path} | '
+                f'{block["tokens"]}t'
+            )
+        else:
+            snippet = str(block["text"])[:80].replace("\n", " ")
+            line = (
+                f'{block["id"]} | {heading_path} | {block["type"]} | '
+                f'{block["tokens"]}t | {snippet}'
+            )
 
-    for block in blocks:
-        # Estimate line tokens: id + heading_path + type + number + truncated text
-        text_snippet = block["text"][:80].replace("\n", " ")
-        line_tokens = block["tokens"]
-        # Always include headings; for content, stop when over budget
-        if block["type"] != "heading" and running + line_tokens > max_tokens:
-            continue
-
-        lines.append(
-            f'{block["id"]} | {block["heading_path"]} | {block["type"]} | '
-            f'{line_tokens}t | {text_snippet}'
+        candidate_lines = [*lines, line]
+        end = start + len(candidate_lines)
+        next_offset = end if end < len(blocks) else None
+        summary = (
+            f"range={start}:{end}/{len(blocks)} source={source_tokens}t"
+            + (f" next={next_offset}" if next_offset is not None else "")
         )
-        running += line_tokens
+        candidate = "\n".join([*candidate_lines, summary])
+        if _estimate_tokens(candidate) > max_tokens:
+            break
+        lines.append(line)
 
-    lines.append(f"\nblocks={len(lines)} total_estimated_tokens={running}")
-    return "\n".join(lines)
+    end = start + len(lines)
+    next_offset = end if end < len(blocks) else None
+    summary = (
+        f"range={start}:{end}/{len(blocks)} source={source_tokens}t"
+        + (f" next={next_offset}" if next_offset is not None else "")
+    )
+    output = "\n".join([*lines, summary])
+    if _estimate_tokens(output) <= max_tokens:
+        return output
+    return output[: max_tokens * 4]
 
 
 def fetch(
@@ -161,24 +212,30 @@ def fetch(
     Returns dict mapping block_id → text (truncated at sentence boundary if
     over max_tokens cumulative).
     """
-    id_set = set(ids)
+    if max_tokens <= 0:
+        return {}
+
+    by_id = {block["id"]: block for block in blocks}
     result: dict[str, str] = {}
     running = 0
 
-    for block in blocks:
-        if block["id"] not in id_set:
+    for block_id in dict.fromkeys(ids):
+        block = by_id.get(block_id)
+        if not block:
             continue
         text = block["text"]
         tokens = block["tokens"]
 
         if running + tokens > max_tokens:
-            # Truncate at sentence boundary
             remaining = max_tokens - running
-            truncated = _truncate_at_sentence(text, remaining * 4)
-            result[block["id"]] = truncated + " […truncated]"
+            marker = " […truncated]"
+            max_chars = max(0, remaining * 4 - len(marker))
+            truncated = _truncate_at_sentence(text, max_chars)
+            if truncated:
+                result[block_id] = truncated + marker
             break
 
-        result[block["id"]] = text
+        result[block_id] = text
         running += tokens
 
     return result
@@ -186,6 +243,8 @@ def fetch(
 
 def _truncate_at_sentence(text: str, max_chars: int) -> str:
     """Truncate text at the last sentence boundary under max_chars."""
+    if max_chars <= 0:
+        return ""
     if len(text) <= max_chars:
         return text
     truncated = text[:max_chars]
