@@ -357,10 +357,39 @@ class TestOutline:
         blocks = build(html)
         first = outline_text(blocks, max_tokens=100)
         assert "next=" in first
-        next_offset = int(first.rsplit("next=", 1)[1])
+        next_offset = int(first.rsplit("next=", 1)[1].split()[0])
         second = outline_text(blocks, max_tokens=100, offset=next_offset)
         assert f"range={next_offset}:" in second
-        assert f"p{next_offset} |" in second
+
+    def test_catalog_outline_surfaces_priced_cards_first(self):
+        """Nav/filter chrome must not consume the first outline budget."""
+        chrome = "".join(
+            f"<div><span>Filter option {i} with long descriptive label text</span></div>"
+            for i in range(40)
+        )
+        products = "".join(
+            f"<div><a><span>Product model {i} wireless headphones</span></a>"
+            f"<span>€{20 + i}.99</span></div>"
+            for i in range(12)
+        )
+        html = f"<main><h1>Catalog</h1>{chrome}{products}</main>"
+        blocks = build(html)
+        outline = outline_text(blocks, max_tokens=350)
+        assert "cards=" in outline
+        assert outline.count("€") >= 4
+        assert " | card | " in outline
+        # First content line after ranking should be a product card or heading,
+        # not a long run of filter chrome.
+        first_lines = [line for line in outline.splitlines() if line.startswith("p")]
+        assert first_lines
+        assert "Product model" in first_lines[0] or "Catalog" in first_lines[0]
+        assert "Filter option 0" not in first_lines[0]
+
+    def test_article_outline_keeps_heading_first(self):
+        blocks = build(WIKI_HTML)
+        outline = outline_text(blocks, max_tokens=200)
+        first = next(line for line in outline.splitlines() if line.startswith("p"))
+        assert "Web Scraping" in first
 
     def test_reduction_wikipedia(self):
         """Real benchmark fixture: actual outline text is at least 10x smaller."""

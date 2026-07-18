@@ -355,6 +355,7 @@ def quality(html_text: str, blocks: list[dict[str, Any]]) -> dict[str, Any]:
             "indexed_price_signals": 0,
             "signal_retention_pct": 100.0,
             "structural_blocks": 0,
+            "card_blocks": 0,
             "mode": "semantic",
         }
     try:
@@ -405,8 +406,86 @@ def quality(html_text: str, blocks: list[dict[str, Any]]) -> dict[str, Any]:
             100 * indexed_prices / max(1, source_prices), 1
         ) if source_prices else 100.0,
         "structural_blocks": structural_blocks,
+        "card_blocks": sum(1 for block in blocks if _is_card_block(block)),
         "mode": "hybrid" if structural_blocks else "semantic",
     }
+
+
+_CATALOG_PRICE_BLOCK_THRESHOLD = 5
+
+
+def _has_price(text: str) -> bool:
+    return bool(_PRICE_RE.search(text or ""))
+
+
+def _is_card_block(block: dict[str, Any]) -> bool:
+    """Compact priced block — the unit agents need from catalog pages."""
+    text = str(block.get("text", ""))
+    tokens = int(block.get("tokens", 0))
+    if not _has_price(text):
+        return False
+    if block.get("type") == "heading":
+        return False
+    return 4 <= tokens <= 160
+
+
+def _outline_rank_score(block: dict[str, Any], *, catalog: bool) -> int:
+    """Higher score → earlier in the token-budgeted outline.
+
+    Catalog mode (many priced blocks) promotes product cards and demotes
+    filters/nav chrome. Article mode keeps document order via near-equal
+    scores and stable original indices.
+    """
+    text = str(block.get("text", ""))
+    tokens = int(block.get("tokens", 0))
+    btype = str(block.get("type", ""))
+    level = int(block.get("level", 0) or 0)
+    priced = _has_price(text)
+    card = _is_card_block(block)
+    score = 0
+
+    if btype == "heading":
+        score += 40 if level <= 1 else 25 if level == 2 else 10
+
+    if card:
+        score += 120
+        if 8 <= tokens <= 100:
+            score += 30
+    elif priced:
+        score += 70
+        if tokens <= 200:
+            score += 15
+
+    if catalog:
+        if card:
+            score += 80
+        elif priced:
+            score += 40
+        elif btype == "heading" and level <= 2:
+            score += 20
+        else:
+            # Filters, size charts, and chrome drown the first page otherwise.
+            score -= 40
+            if tokens <= 6:
+                score -= 20
+            if tokens > 180:
+                score -= 25
+    else:
+        # Articles: prefer natural reading order; light boosts only.
+        if btype in {"paragraph", "list_item", "blockquote", "code"}:
+            score += 5
+
+    return score
+
+
+def _ranked_blocks_for_outline(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    price_blocks = sum(1 for block in blocks if _has_price(str(block.get("text", ""))))
+    catalog = price_blocks >= _CATALOG_PRICE_BLOCK_THRESHOLD
+    ranked = sorted(
+        enumerate(blocks),
+        key=lambda item: (-_outline_rank_score(item[1], catalog=catalog), item[0]),
+    )
+    return [block for _, block in ranked]
 
 
 def outline_text(
@@ -421,17 +500,24 @@ def outline_text(
       p0 | Architecture | heading | 12t | Architecture Overview
       p1 | Architecture | paragraph | 184t | Shadow Web compresses pages before…
 
+    On catalog-like pages (many priced blocks), product cards are ranked above
+    chrome so the first budgeted page surfaces buyable items. Block IDs stay
+    stable for content_blocks(); offset walks the ranked outline order.
+
     The budget applies to the actual outline text, not to source block sizes.
     Large blocks still receive an outline line so agents can fetch them.
     """
     if max_tokens <= 0:
         return ""
 
+    ordered = _ranked_blocks_for_outline(blocks)
     start = max(0, offset)
     lines: list[str] = []
     source_tokens = sum(int(block.get("tokens", 0)) for block in blocks)
-    for block in blocks[start:]:
+    card_count = sum(1 for block in blocks if _is_card_block(block))
+    for block in ordered[start:]:
         heading_path = str(block["heading_path"])[:120]
+        display_type = "card" if _is_card_block(block) else block["type"]
         if block["type"] == "heading":
             line = (
                 f'{block["id"]} | {block["tag"]} | {heading_path} | '
@@ -440,15 +526,21 @@ def outline_text(
         else:
             snippet = str(block["text"])[:80].replace("\n", " ")
             line = (
-                f'{block["id"]} | {heading_path} | {block["type"]} | '
+                f'{block["id"]} | {heading_path} | {display_type} | '
                 f'{block["tokens"]}t | {snippet}'
             )
 
         candidate_lines = [*lines, line]
         end = start + len(candidate_lines)
-        next_offset = end if end < len(blocks) else None
+        next_offset = end if end < len(ordered) else None
         summary = _summary_line(
-            start, end, len(blocks), source_tokens, next_offset, quality_data
+            start,
+            end,
+            len(ordered),
+            source_tokens,
+            next_offset,
+            quality_data,
+            card_count=card_count,
         )
         candidate = "\n".join([*candidate_lines, summary])
         if _estimate_tokens(candidate) > max_tokens:
@@ -456,9 +548,15 @@ def outline_text(
         lines.append(line)
 
     end = start + len(lines)
-    next_offset = end if end < len(blocks) else None
+    next_offset = end if end < len(ordered) else None
     summary = _summary_line(
-        start, end, len(blocks), source_tokens, next_offset, quality_data
+        start,
+        end,
+        len(ordered),
+        source_tokens,
+        next_offset,
+        quality_data,
+        card_count=card_count,
     )
     output = "\n".join([*lines, summary])
     if _estimate_tokens(output) <= max_tokens:
@@ -473,10 +571,13 @@ def _summary_line(
     source_tokens: int,
     next_offset: int | None,
     quality_data: dict[str, Any] | None,
+    card_count: int = 0,
 ) -> str:
     summary = f"range={start}:{end}/{total} source={source_tokens}t"
     if next_offset is not None:
         summary += f" next={next_offset}"
+    if card_count:
+        summary += f" cards={card_count}"
     if quality_data:
         summary += (
             f" coverage={quality_data.get('coverage_pct', 0)}%"

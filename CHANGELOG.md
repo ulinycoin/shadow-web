@@ -8,6 +8,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Catalog outline ranking: priced product cards surface inside the first token budget instead of filter/nav chrome.
 - Universal capture readiness: multilingual cookie-consent dismiss + wait for text/card hydration before first DOM capture.
 - `SparseShell` page class when a page stays a cookie/anti-bot frame with almost no readable content.
 - Rendered Text Index coverage, duplicate-overhead, extraction-mode, and price-signal diagnostics.
