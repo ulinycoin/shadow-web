@@ -20,8 +20,16 @@ echo "[2/4] Install dependencies on remote"
 ssh "${SERVICE_USER}@${INSTANCE_IP}" bash -s <<'REMOTE'
 set -euo pipefail
 cd /opt/shadow-web
-python3 -m pip install -e .
+python3 -m pip install -e ".[server]"
 python3 -m playwright install chromium --with-deps || python3 -m playwright install chromium
+if [[ ! -f .env ]] || ! grep -Eq '^SHADOW_WEB_API_KEYS=.+$' .env; then
+  echo "ERROR: /opt/shadow-web/.env must define SHADOW_WEB_API_KEYS" >&2
+  exit 1
+fi
+if ! grep -Eq '^(DEEPSEEK_API_KEY|OPENAI_API_KEY)=.+$' .env; then
+  echo "ERROR: /opt/shadow-web/.env must define a supported LLM API key" >&2
+  exit 1
+fi
 REMOTE
 
 echo "[3/4] Install systemd unit"
@@ -35,7 +43,8 @@ After=network.target
 User=ubuntu
 WorkingDirectory=/opt/shadow-web
 EnvironmentFile=-/opt/shadow-web/.env
-ExecStart=/usr/bin/python3 -m uvicorn server.main:app --host 0.0.0.0 --port 8000
+Environment=SHADOW_WEB_ENV=production
+ExecStart=/usr/bin/python3 -m uvicorn shadow_web.server:app --host 0.0.0.0 --port 8000
 Restart=on-failure
 
 [Install]
@@ -47,4 +56,4 @@ sudo systemctl restart shadow-web
 REMOTE
 
 echo "[4/4] Health check"
-curl -sf "http://${INSTANCE_IP}:8000/docs" >/dev/null && echo "OK: Shadow Web API live"
+curl -sf "http://${INSTANCE_IP}:8000/health" >/dev/null && echo "OK: Shadow Web API live"

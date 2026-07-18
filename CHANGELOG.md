@@ -4,6 +4,22 @@ All notable changes to this project are documented in this file.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.3] - 2026-07-18
+
+### Fixed
+
+- Prevent healed browser actions from executing twice after a stale binding.
+- Keep OpenAI and DeepSeek API keys, endpoints, and default models isolated.
+- Require configured API authentication for production and remote requests.
+- Make the OCI deploy install server dependencies and use a dedicated health endpoint.
+- Make `cursor-setup.sh` create or merge `.cursor/mcp.json`.
+
+### Added
+
+- Payload limits and non-blocking compression/LLM calls in the FastAPI service.
+- Installable `shadow-web-server` entrypoint inside the Python wheel.
+- Regression tests for single healed-action execution, provider routing, auth, and payload limits.
+
 ## [0.3.2] - 2026-07-08
 
 ### Added
@@ -72,6 +88,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Initial release: DOM compression, Action Map, shadow_grep, self-healing, Playwright wrapper, FastAPI `/v1/compress` and `/v1/heal`.
 
 [0.3.2]: https://github.com/ulinycoin/shadow-web/compare/v0.3.1...v0.3.2
+[0.3.3]: https://github.com/ulinycoin/shadow-web/compare/v0.3.2...v0.3.3
 [0.3.1]: https://github.com/ulinycoin/shadow-web/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/ulinycoin/shadow-web/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/ulinycoin/shadow-web/compare/v0.2.0...v0.2.2

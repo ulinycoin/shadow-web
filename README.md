@@ -84,6 +84,16 @@ pip install "shadow-web[server]"        # FastAPI heal API
 pip install "shadow-web[all]"           # everything
 ```
 
+Run the optional API locally:
+
+```bash
+export DEEPSEEK_API_KEY="..."
+export SHADOW_WEB_API_KEYS="local-secret"
+shadow-web-server
+```
+
+Remote and production requests are rejected unless `SHADOW_WEB_API_KEYS` is configured.
+
 ---
 
 ## Demo
@@ -317,7 +327,7 @@ shadow_web/
 ├── verified_heal.py   # Playwright selector verification
 ├── wrapper.py         # ShadowPage (Playwright)
 ├── mcp/server.py      # Cursor / Claude MCP tools
-└── server/main.py     # FastAPI (/v1/compress, /v1/heal)
+└── server.py          # FastAPI (/health, /v1/compress, /v1/heal)
 
 scripts/
 ├── security_surface_scan.py   # CLI: crawl + JSON/Markdown security reports

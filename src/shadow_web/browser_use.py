@@ -473,6 +473,10 @@ class AsyncShadowPage:
                         heal_error,
                     )
                     raise binding_error from heal_error
+                if action == "click":
+                    await self._wait_after_click(timeout_ms)
+                await self.refresh()
+                return
             else:
                 if action == "click":
                     await self._wait_after_click(timeout_ms)

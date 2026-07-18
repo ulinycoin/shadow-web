@@ -422,6 +422,10 @@ class ShadowPage:
                         heal_error,
                     )
                     raise binding_error from heal_error
+                if action == "click":
+                    self._wait_after_click(timeout_ms)
+                self.refresh()
+                return
             else:
                 if action == "click":
                     self._wait_after_click(timeout_ms)
