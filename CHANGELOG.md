@@ -6,6 +6,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Rendered Text Index coverage, duplicate-overhead, extraction-mode, and price-signal diagnostics.
+- Structural text clustering for `div`/`span`-heavy pages without site-specific selectors or tag allowlists.
+
+### Changed
+
+- Content indexing now assigns every readable text node to one bounded block, using semantic tags only as boundary signals.
+
 ### Fixed
 
 - Content Index MCP tools now read from the current browser session instead of requiring full HTML in every tool call.

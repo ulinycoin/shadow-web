@@ -415,7 +415,7 @@ Or manually:
 | | `schema_session_json` | JSON records from session |
 | | `schema_session_csv` | CSV from session |
 | | `get_page_html` | Clean HTML (`max_chars` default 50000) |
-| **Content** | `content_outline` | Token-budgeted block index from current session |
+| **Content** | `content_outline` | Token-budgeted rendered-text index + coverage diagnostics |
 | | `content_blocks` | Fetch selected text blocks by compact IDs |
 | **Search** | `web_search` | Brave Search (no API keys) |
 | **WebMCP** | `webmcp_list_tools` | Chrome 145+ page tools |
@@ -434,9 +434,15 @@ click(sid) → snapshot(diff=true)    # delta only after action
 **Long-form content:**
 ```
 navigate(url, detail="minimal")
-content_outline(max_tokens=600)              # p0, p1…; use next offset if present
+content_outline(max_tokens=600)              # p0, p1… + coverage/mode/signals
 content_blocks(ids="p3,p7", max_tokens=2000) # selected text only
 ```
+
+The Rendered Text Index covers semantic articles and `div`/`span`-heavy apps
+without site-specific selectors. Every readable text node belongs to one
+bounded block; headings and paragraphs act as boundary signals rather than an
+allowlist. The outline summary reports `coverage`, extraction `mode`, and
+retained price `signals` so a large reduction cannot hide missing content.
 
 **Form fill (AgentOps):**
 ```

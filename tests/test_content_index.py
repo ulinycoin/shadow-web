@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from shadow_web.content_index import build, outline_text, fetch
+from shadow_web.content_index import build, fetch, outline_text, quality
 from shadow_web.mcp import server as mcp_server
 
 # ── Fixtures ───────────────────────────────────────────────────────────
@@ -155,8 +155,71 @@ class TestBuild:
     def test_empty_html_returns_empty(self):
         assert build(EMPTY_HTML) == []
 
-    def test_no_content_tags_returns_empty(self):
-        assert build(SPAN_ONLY) == []
+    def test_span_only_content_is_indexed(self):
+        blocks = build(SPAN_ONLY)
+        assert [block["text"] for block in blocks] == ["hello"]
+        assert blocks[0]["type"] == "text_group"
+
+    def test_div_card_content_is_indexed_without_tag_specific_rules(self):
+        html = """
+        <main>
+          <div>
+            <a><span>Phone Alpha 256 GB</span></a>
+            <div><span>4.8 rating</span><span>59 990 ₽</span></div>
+          </div>
+          <div>
+            <a><span>Phone Beta 128 GB</span></a>
+            <div><span>4.6 rating</span><span>39 990 ₽</span></div>
+          </div>
+        </main>
+        """
+        blocks = build(html)
+        indexed = " ".join(block["text"] for block in blocks)
+        assert "Phone Alpha 256 GB" in indexed
+        assert "Phone Beta 128 GB" in indexed
+        assert "59 990 ₽" in indexed
+        assert "39 990 ₽" in indexed
+        assert indexed.count("Phone Alpha 256 GB") == 1
+        assert indexed.count("59 990 ₽") == 1
+        assert all(block["type"] == "text_group" for block in blocks)
+
+    def test_semantic_and_structural_blocks_keep_document_order(self):
+        html = (
+            "<h1>Catalog</h1>"
+            "<div><span>Featured device</span><span>19 990 ₽</span></div>"
+            "<h2>Details</h2><p>Semantic description.</p>"
+        )
+        blocks = build(html)
+        assert [block["text"] for block in blocks] == [
+            "Catalog",
+            "Featured device 19 990 ₽",
+            "Details",
+            "Semantic description.",
+        ]
+        assert blocks[1]["heading_path"] == "Catalog"
+        assert blocks[3]["heading_path"] == "Catalog > Details"
+
+    def test_each_text_node_is_owned_once(self):
+        html = (
+            "<div><div><span>Unique product name</span></div>"
+            "<div><span>12 345 ₽</span></div></div>"
+        )
+        indexed = " ".join(block["text"] for block in build(html))
+        assert indexed.count("Unique product name") == 1
+        assert indexed.count("12 345 ₽") == 1
+
+    def test_large_repeated_grid_stops_at_compact_cards(self):
+        html = "<main>" + "".join(
+            f"<div><span>Product {i} with descriptive model name</span>"
+            f"<span>{i + 10} 990 ₽</span></div>"
+            for i in range(30)
+        ) + "</main>"
+        blocks = build(html)
+        assert len(blocks) > 1
+        assert max(block["tokens"] for block in blocks) <= 120
+        indexed = " ".join(block["text"] for block in blocks)
+        assert all(indexed.count(f"Product {i} with descriptive model name") == 1
+                   for i in range(30))
 
     def test_empty_string_returns_empty(self):
         assert build("") == []
@@ -375,8 +438,32 @@ class TestSessionIndex:
         second = mcp_server._get_content_index_blocks()
         assert first is second
         assert [block["text"] for block in first] == ["One", "First body"]
+        assert mcp_server._get_content_index_quality()["coverage_pct"] >= 95
 
         shadow.clean_html = "<h1>Two</h1><p>Second body</p>"
         refreshed = mcp_server._get_content_index_blocks()
         assert refreshed is not first
         assert [block["text"] for block in refreshed] == ["Two", "Second body"]
+
+
+class TestQuality:
+    def test_reports_full_structural_coverage_and_price_retention(self):
+        html = (
+            "<main><div><span>Phone Alpha</span><span>59 990 ₽</span></div>"
+            "<div><span>Phone Beta</span><span>39 990 ₽</span></div></main>"
+        )
+        stats = quality(html, build(html))
+        assert stats["coverage_pct"] >= 95
+        assert stats["duplicate_overhead_pct"] == 0
+        assert stats["source_price_signals"] == 2
+        assert stats["indexed_price_signals"] == 2
+        assert stats["signal_retention_pct"] == 100
+        assert stats["mode"] == "hybrid"
+
+    def test_outline_can_include_quality_diagnostics(self):
+        blocks = build("<div><span>Product</span><span>12 990 ₽</span></div>")
+        stats = quality("<div><span>Product</span><span>12 990 ₽</span></div>", blocks)
+        outline = outline_text(blocks, quality_data=stats)
+        assert "coverage=" in outline
+        assert "mode=hybrid" in outline
+        assert "signals=1/1" in outline

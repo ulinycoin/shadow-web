@@ -1,13 +1,14 @@
-"""Content Block Index — tree-aware block outline for on-demand text retrieval.
+"""Rendered Text Index — tree-aware block outline for on-demand retrieval.
 
-Builds a flat list of content blocks (h1-h6, p, li, blockquote, pre) with
-heading-path ancestry. Excludes interactive/data zones (table, nav, footer,
-aside, form). Designed to reduce Wikipedia-style pages from ~16K to ~500
-outline tokens.
+Indexes every readable text node exactly once. Semantic elements (headings,
+paragraphs, lists, quotes, code) remain strong boundaries; unsemantic text in
+div/span-heavy applications is clustered into bounded structural blocks.
+Excludes navigation/data zones handled by dedicated tools.
 """
 
 from __future__ import annotations
 
+from collections import Counter
 import re
 from typing import Any
 
@@ -26,6 +27,18 @@ _EXCLUDED_PARENTS = frozenset({
 })
 
 _HEADING_LEVELS = {"h1": 1, "h2": 2, "h3": 3, "h4": 4, "h5": 5, "h6": 6}
+
+# Structural clusters are deliberately bounded. Starting from a text node, the
+# owner climbs the DOM while the candidate subtree remains compact. On card
+# grids this naturally stops at the product/article card rather than the grid.
+_STRUCTURAL_MAX_TOKENS = 120
+_STRUCTURAL_MAX_TEXT_NODES = 24
+_STRUCTURAL_ROOT_TAGS = frozenset({"html", "body"})
+
+_PRICE_RE = re.compile(
+    r"(?:\d[\d\s\u00a0]{0,10}\s?(?:₽|руб\.?))|(?:₽\s?\d)",
+    re.IGNORECASE,
+)
 
 
 def _is_excluded(el) -> bool:
@@ -73,14 +86,137 @@ def _block_text(el) -> str:
     return _clean_text(" ".join(parts))
 
 
+def _tag(el) -> str:
+    return el.tag if isinstance(el.tag, str) else ""
+
+
+def _scope(root):
+    """Return body when present, otherwise the parsed fragment root."""
+    body = root.find("body")
+    return body if body is not None else root
+
+
+def _walk_text_nodes(scope):
+    """Yield readable direct text nodes in document order.
+
+    The context element is the element that owns the direct text or child tail.
+    Text under semantic blocks is omitted because `_block_text` owns it.
+    """
+    sequence = 0
+    element_order: dict[Any, int] = {}
+    chunks: list[tuple[int, Any, str]] = []
+
+    def visit(el, semantic_depth: int = 0, excluded_depth: int = 0) -> None:
+        nonlocal sequence
+        element_order[el] = sequence
+        sequence += 1
+
+        tag = _tag(el)
+        excluded = excluded_depth + int(tag in _EXCLUDED_PARENTS)
+        semantic = semantic_depth + int(tag in _CONTENT_TAGS)
+
+        if not excluded and not semantic and el.text:
+            text = _clean_text(el.text)
+            if text:
+                chunks.append((sequence, el, text))
+                sequence += 1
+
+        for child in el:
+            visit(child, semantic, excluded)
+            # A child's tail belongs to the current element, not the child.
+            if not excluded and not semantic and child.tail:
+                text = _clean_text(child.tail)
+                if text:
+                    chunks.append((sequence, el, text))
+                    sequence += 1
+
+    visit(scope)
+    return chunks, element_order
+
+
+def _structural_records(scope) -> tuple[list[dict[str, Any]], dict[Any, int]]:
+    """Cluster text not owned by semantic tags into bounded DOM regions."""
+    chunks, element_order = _walk_text_nodes(scope)
+    if not chunks:
+        return [], element_order
+
+    aggregate: dict[Any, dict[str, int]] = {}
+    semantic_descendants: dict[Any, int] = {}
+
+    for el in scope.iter():
+        if _tag(el) in _CONTENT_TAGS and not _is_excluded(el):
+            parent = el.getparent()
+            while parent is not None:
+                semantic_descendants[parent] = semantic_descendants.get(parent, 0) + 1
+                if parent is scope:
+                    break
+                parent = parent.getparent()
+
+    # Aggregate uncovered text size for every ancestor. This lets ownership
+    # climb to a compact card/section without relying on tag names or classes.
+    for _, context, text in chunks:
+        node = context
+        while node is not None:
+            stats = aggregate.setdefault(node, {"chars": 0, "nodes": 0})
+            stats["chars"] += len(text)
+            stats["nodes"] += 1
+            if node is scope:
+                break
+            node = node.getparent()
+
+    grouped: dict[Any, dict[str, Any]] = {}
+    for sequence, context, text in chunks:
+        owner = context
+        parent = owner.getparent()
+        while parent is not None:
+            tag = _tag(parent)
+            stats = aggregate.get(parent, {})
+            if tag in _STRUCTURAL_ROOT_TAGS or tag in _EXCLUDED_PARENTS:
+                break
+            if tag in _CONTENT_TAGS or semantic_descendants.get(parent, 0):
+                break
+            if stats.get("nodes", 0) > _STRUCTURAL_MAX_TEXT_NODES:
+                break
+            if stats.get("chars", 0) // 4 > _STRUCTURAL_MAX_TOKENS:
+                break
+            owner = parent
+            if owner is scope:
+                break
+            parent = owner.getparent()
+
+        record = grouped.setdefault(
+            owner,
+            {
+                "order": sequence,
+                "tag": _tag(owner) or "text",
+                "type": "text_group",
+                "level": 0,
+                "parts": [],
+            },
+        )
+        record["order"] = min(record["order"], sequence)
+        record["parts"].append(text)
+
+    records: list[dict[str, Any]] = []
+    for owner, record in grouped.items():
+        text = _clean_text(" ".join(record.pop("parts")))
+        if not text:
+            continue
+        record["order"] = min(record["order"], element_order.get(owner, record["order"]))
+        record["text"] = text
+        record["tokens"] = _estimate_tokens(text)
+        records.append(record)
+    return records, element_order
+
+
 def build(html_text: str) -> list[dict[str, Any]]:
-    """Parse clean HTML and return a flat list of content blocks.
+    """Parse clean HTML and return semantic plus structural text blocks.
 
     Each block:
       id           str   — "p0", "p1", …
       tag          str   — element tag name
       heading_path str   — "Architecture" or "Architecture > Pipeline"
-      type         str   — "heading" | "paragraph" | "list_item" | "blockquote" | "code"
+      type         str   — semantic type or "text_group"
       text         str   — full text content
       tokens       int   — estimated token count (len/4)
       level        int   — heading level (0 for non-heading)
@@ -91,13 +227,8 @@ def build(html_text: str) -> list[dict[str, Any]]:
         root = _html_parser.fromstring(html_text)
     except (etree.ParserError, ValueError):
         return []
-    blocks: list[dict[str, Any]] = []
-    heading_stack: list[tuple[int, str]] = []  # [(level, text), ...]
-    block_id = 0
-
-    # Walk body only if <body> exists, otherwise whole doc
-    body = root.find("body")
-    elements = body.iter() if body is not None else root.iter()
+    scope = _scope(root)
+    records, element_order = _structural_records(scope)
 
     _TYPE_MAP = {
         "p": "paragraph",
@@ -106,8 +237,8 @@ def build(html_text: str) -> list[dict[str, Any]]:
         "pre": "code",
     }
 
-    for el in elements:
-        tag = el.tag if isinstance(el.tag, str) else ""
+    for el in scope.iter():
+        tag = _tag(el)
         if tag not in _CONTENT_TAGS:
             continue
         if _is_excluded(el):
@@ -117,36 +248,44 @@ def build(html_text: str) -> list[dict[str, Any]]:
         if not text:
             continue
 
-        # Update heading stack
+        # Heading paths are assigned after structural and semantic records are
+        # merged into document order.
         if tag in _HEADING_LEVELS:
             level = _HEADING_LEVELS[tag]
-            # Pop any headings at same or deeper level
-            while heading_stack and heading_stack[-1][0] >= level:
-                heading_stack.pop()
-            heading_stack.append((level, text))
             block_type = "heading"
         else:
+            level = 0
             block_type = _TYPE_MAP.get(tag, "paragraph")
-
-        # Build heading path
-        if heading_stack:
-            heading_path = " > ".join(h[1] for h in heading_stack)
-        else:
-            heading_path = "root"
 
         tokens = _estimate_tokens(text)
 
-        blocks.append({
-            "id": f"p{block_id}",
+        records.append({
+            "order": element_order.get(el, 0),
             "tag": tag,
-            "heading_path": heading_path,
             "type": block_type,
             "text": text,
             "tokens": tokens,
-            "level": _HEADING_LEVELS.get(tag, 0),
+            "level": level,
             "_has_link": tag == "li" and bool(el.xpath(".//a[@href]")),
         })
-        block_id += 1
+
+    records.sort(key=lambda item: item["order"])
+    blocks: list[dict[str, Any]] = []
+    heading_stack: list[tuple[int, str]] = []
+    for record in records:
+        record.pop("order", None)
+        if record["type"] == "heading":
+            level = int(record["level"])
+            while heading_stack and heading_stack[-1][0] >= level:
+                heading_stack.pop()
+            heading_stack.append((level, str(record["text"])))
+        record["heading_path"] = (
+            " > ".join(text for _, text in heading_stack)
+            if heading_stack
+            else "root"
+        )
+        record.setdefault("_has_link", False)
+        blocks.append(record)
 
     # ── Boilerplate nav removal ──────────────────────────────────────
     # Runs of ≥5 consecutive linked <li> blocks each ≤10 tokens, before
@@ -196,10 +335,77 @@ def build(html_text: str) -> list[dict[str, Any]]:
     return blocks
 
 
+def quality(html_text: str, blocks: list[dict[str, Any]]) -> dict[str, Any]:
+    """Measure text coverage, duplication, and price-signal retention."""
+    if not html_text or not html_text.strip():
+        return {
+            "source_tokens": 0,
+            "indexed_tokens": 0,
+            "coverage_pct": 100.0,
+            "duplicate_overhead_pct": 0.0,
+            "source_price_signals": 0,
+            "indexed_price_signals": 0,
+            "signal_retention_pct": 100.0,
+            "structural_blocks": 0,
+            "mode": "semantic",
+        }
+    try:
+        root = _html_parser.fromstring(html_text)
+    except (etree.ParserError, ValueError):
+        root = None
+
+    source_parts: list[str] = []
+    if root is not None:
+        scope = _scope(root)
+        for el in scope.iter():
+            if _tag(el) in _EXCLUDED_PARENTS or _is_excluded(el):
+                continue
+            if el.text:
+                text = _clean_text(el.text)
+                if text:
+                    source_parts.append(text)
+            for child in el:
+                if child.tail:
+                    text = _clean_text(child.tail)
+                    if text:
+                        source_parts.append(text)
+
+    source_text = " ".join(source_parts)
+    indexed_text = " ".join(str(block.get("text", "")) for block in blocks)
+    source_chars = sum(len(part) for part in source_parts)
+    indexed_chars = sum(len(str(block.get("text", ""))) for block in blocks)
+    source_prices = len(_PRICE_RE.findall(source_text))
+    indexed_prices = len(_PRICE_RE.findall(indexed_text))
+    structural_blocks = sum(block.get("type") == "text_group" for block in blocks)
+    source_terms = Counter(re.findall(r"\S+", source_text.casefold()))
+    indexed_terms = Counter(re.findall(r"\S+", indexed_text.casefold()))
+    duplicate_terms = sum((indexed_terms - source_terms).values())
+    indexed_term_count = sum(indexed_terms.values())
+
+    return {
+        "source_tokens": _estimate_tokens(source_text) if source_text else 0,
+        "indexed_tokens": sum(int(block.get("tokens", 0)) for block in blocks),
+        "coverage_pct": round(
+            min(100.0, 100 * indexed_chars / max(1, source_chars)), 1
+        ),
+        "duplicate_overhead_pct": round(
+            100 * duplicate_terms / max(1, indexed_term_count), 1
+        ),
+        "source_price_signals": source_prices,
+        "indexed_price_signals": indexed_prices,
+        "signal_retention_pct": round(
+            100 * indexed_prices / max(1, source_prices), 1
+        ) if source_prices else 100.0,
+        "structural_blocks": structural_blocks,
+        "mode": "hybrid" if structural_blocks else "semantic",
+    }
+
+
 def outline_text(
     blocks: list[dict[str, Any]],
     max_tokens: int = 600,
     offset: int = 0,
+    quality_data: dict[str, Any] | None = None,
 ) -> str:
     """Build a terse text outline of content blocks, token-limited.
 
@@ -233,9 +439,8 @@ def outline_text(
         candidate_lines = [*lines, line]
         end = start + len(candidate_lines)
         next_offset = end if end < len(blocks) else None
-        summary = (
-            f"range={start}:{end}/{len(blocks)} source={source_tokens}t"
-            + (f" next={next_offset}" if next_offset is not None else "")
+        summary = _summary_line(
+            start, end, len(blocks), source_tokens, next_offset, quality_data
         )
         candidate = "\n".join([*candidate_lines, summary])
         if _estimate_tokens(candidate) > max_tokens:
@@ -244,14 +449,34 @@ def outline_text(
 
     end = start + len(lines)
     next_offset = end if end < len(blocks) else None
-    summary = (
-        f"range={start}:{end}/{len(blocks)} source={source_tokens}t"
-        + (f" next={next_offset}" if next_offset is not None else "")
+    summary = _summary_line(
+        start, end, len(blocks), source_tokens, next_offset, quality_data
     )
     output = "\n".join([*lines, summary])
     if _estimate_tokens(output) <= max_tokens:
         return output
     return output[: max_tokens * 4]
+
+
+def _summary_line(
+    start: int,
+    end: int,
+    total: int,
+    source_tokens: int,
+    next_offset: int | None,
+    quality_data: dict[str, Any] | None,
+) -> str:
+    summary = f"range={start}:{end}/{total} source={source_tokens}t"
+    if next_offset is not None:
+        summary += f" next={next_offset}"
+    if quality_data:
+        summary += (
+            f" coverage={quality_data.get('coverage_pct', 0)}%"
+            f" mode={quality_data.get('mode', 'semantic')}"
+            f" signals={quality_data.get('indexed_price_signals', 0)}"
+            f"/{quality_data.get('source_price_signals', 0)}"
+        )
+    return summary
 
 
 def fetch(

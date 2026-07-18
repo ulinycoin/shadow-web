@@ -49,7 +49,7 @@ def _get_shadow_page():
 
 def _get_content_index_blocks() -> list[dict[str, Any]]:
     """Build or reuse the Content Block Index for the current page."""
-    from shadow_web.content_index import build
+    from shadow_web.content_index import build, quality
 
     shadow = _get_shadow_page()
     clean_html = shadow.clean_html
@@ -60,7 +60,17 @@ def _get_content_index_blocks() -> list[dict[str, Any]]:
     if _session.get("content_index_html") != clean_html:
         _session["content_index_html"] = clean_html
         _session["content_index_blocks"] = build(clean_html)
+        _session["content_index_quality"] = quality(
+            clean_html,
+            _session["content_index_blocks"],
+        )
     return _session["content_index_blocks"]
+
+
+def _get_content_index_quality() -> dict[str, Any]:
+    """Return cached coverage and signal-retention diagnostics."""
+    _get_content_index_blocks()
+    return _session["content_index_quality"]
 
 
 def _extract_search_results(
@@ -600,7 +610,9 @@ def create_mcp_server():
         Returns block IDs (p0, p1, …) with heading paths and estimated token
         counts. Use content_blocks() to fetch full text of selected blocks.
         If the summary includes next=N, call again with offset=N.
-        Requires navigate() first. Excludes nav, footer, aside, form, and table.
+        The summary reports text coverage, extraction mode, and retained price
+        signals. Requires navigate() first. Excludes nav, footer, aside, form,
+        and table.
         """
         from shadow_web.content_index import outline_text
 
@@ -608,6 +620,7 @@ def create_mcp_server():
             _get_content_index_blocks(),
             max_tokens=max_tokens,
             offset=offset,
+            quality_data=_get_content_index_quality(),
         )
 
     @mcp.tool()
