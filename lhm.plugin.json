@@ -1,0 +1,33 @@
+{
+  "identifier": "ulinycoin-shadow-web",
+  "name": "Shadow Web",
+  "version": "0.3.5",
+  "author": "ulinycoin",
+  "authorUrl": "https://github.com/ulinycoin",
+  "description": "Agent-facing web interaction toolkit. Compress HTML to action maps, drive browsers via Playwright, extract structured data (tables, forms, lists), search the web, and fill forms — all from MCP.",
+  "homepage": "https://github.com/ulinycoin/shadow-web",
+  "icon": "🕸️",
+  "category": "developer-tools",
+  "tags": ["web-scraping", "browser-automation", "mcp", "html-parsing", "playwright"],
+  "tools": [
+    { "name": "navigate", "description": "Open URL in Playwright and build XML action map snapshot", "inputSchema": { "type": "object", "properties": { "url": { "type": "string" }, "capture_mode": { "type": "string" }, "detail": { "type": "string" } }, "required": ["url"] } },
+    { "name": "snapshot", "description": "Refresh current page snapshot with optional diff", "inputSchema": { "type": "object", "properties": { "diff": { "type": "boolean" }, "detail": { "type": "string" } } } },
+    { "name": "click", "description": "Click element by data-sid on the current page", "inputSchema": { "type": "object", "properties": { "sid": { "type": "string" } }, "required": ["sid"] } },
+    { "name": "fill", "description": "Fill input by data-sid", "inputSchema": { "type": "object", "properties": { "sid": { "type": "string" }, "value": { "type": "string" } }, "required": ["sid", "value"] } },
+    { "name": "web_search", "description": "Search the web via Brave Search (Yahoo fallback)", "inputSchema": { "type": "object", "properties": { "query": { "type": "string" } }, "required": ["query"] } },
+    { "name": "query_page", "description": "Filter current page actions by type, intent, group, or label", "inputSchema": { "type": "object", "properties": { "query": { "type": "string" } }, "required": ["query"] } },
+    { "name": "compress_html", "description": "Compress raw HTML into clean markup, action map, and semantic groups", "inputSchema": { "type": "object", "properties": { "html": { "type": "string" } }, "required": ["html"] } },
+    { "name": "compress_html_to_xml", "description": "Return grouped XML action map for raw HTML", "inputSchema": { "type": "object", "properties": { "html": { "type": "string" }, "url": { "type": "string" }, "title": { "type": "string" } }, "required": ["html"] } },
+    { "name": "schema_table", "description": "Extract structured table data from HTML", "inputSchema": { "type": "object", "properties": { "html": { "type": "string" }, "max_rows": { "type": "integer" } }, "required": ["html"] } },
+    { "name": "schema_form", "description": "Extract form schema from HTML", "inputSchema": { "type": "object", "properties": { "html": { "type": "string" } }, "required": ["html"] } },
+    { "name": "schema_list", "description": "Extract lists from HTML", "inputSchema": { "type": "object", "properties": { "html": { "type": "string" } }, "required": ["html"] } },
+    { "name": "schema_page", "description": "Extract all structured data from HTML at once", "inputSchema": { "type": "object", "properties": { "html": { "type": "string" }, "max_rows": { "type": "integer" } }, "required": ["html"] } },
+    { "name": "schema_session", "description": "Extract structured data from current browser session", "inputSchema": { "type": "object", "properties": { "max_rows": { "type": "integer" } } } },
+    { "name": "content_outline", "description": "Build a content outline from current page (text blocks, headings, token counts)", "inputSchema": { "type": "object", "properties": { "max_tokens": { "type": "integer" }, "offset": { "type": "integer" } } } },
+    { "name": "content_blocks", "description": "Fetch content blocks by IDs from content outline", "inputSchema": { "type": "object", "properties": { "ids": { "type": "string" }, "max_tokens": { "type": "integer" } }, "required": ["ids"] } },
+    { "name": "form_fill_plan", "description": "Build form fill plan from profile JSON", "inputSchema": { "type": "object", "properties": { "profile": { "type": "string" }, "url": { "type": "string" }, "auto_submit": { "type": "boolean" } }, "required": ["profile"] } },
+    { "name": "form_fill_execute", "description": "Execute form fill plan with answers", "inputSchema": { "type": "object", "properties": { "plan": { "type": "string" }, "answers": { "type": "string" }, "profile": { "type": "string" }, "multi_step": { "type": "boolean" } } } },
+    { "name": "webmcp_list_tools", "description": "Detect WebMCP tools on the current page", "inputSchema": { "type": "object", "properties": {} } },
+    { "name": "webmcp_execute_tool", "description": "Execute a WebMCP tool by name", "inputSchema": { "type": "object", "properties": { "name": { "type": "string" }, "arguments": { "type": "string" } }, "required": ["name"] } }
+  ]
+}
