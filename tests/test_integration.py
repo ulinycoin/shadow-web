@@ -141,5 +141,57 @@ class TestSelfHealingIntegration(unittest.TestCase):
         if os.path.exists(temp_html_path):
             os.remove(temp_html_path)
 
+    def test_playwright_heal_via_get_by_role(self):
+        """Playwright native locator heal: data-sid gone, getByRole resolves.
+
+        Validates _attempt_playwright_heal() pipeline step
+        (inserted between CSS failure and LLM API heal).
+        """
+        import tempfile
+
+        html = """<html><body>
+            <button role="button" aria-label="Submit Order">Submit Order</button>
+        </body></html>"""
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".html", delete=False) as f:
+            f.write(html)
+            tmp_path = f.name
+
+        try:
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=True)
+                page = browser.new_page()
+                page.goto(f"file://{tmp_path}")
+
+                sp = ShadowPage(page)  # no heal_api_url — tests local-only heal
+
+                # Manually seed action_map as if we parsed the page before the update
+                sp.action_map = [{
+                    "id": "1",
+                    "type": "button",
+                    "label": "Submit Order",
+                }]
+                sp.last_url = f"file://{tmp_path}"
+
+                # Try Playwright heal — should find via getByRole + name
+                result = sp._attempt_playwright_heal("1")
+                self.assertIsNotNone(result, "Playwright heal should find the button")
+                self.assertIn("button", result)
+
+                # Also verify the selector actually clicks
+                page.evaluate("""() => {
+                    document.querySelector('button').addEventListener('click', () => {
+                        document.body.innerHTML = '<h1>CLICKED VIA HEAL</h1>';
+                    });
+                }""")
+
+                sp.click("1")
+                self.assertIn("CLICKED VIA HEAL", page.content())
+
+                browser.close()
+        finally:
+            os.unlink(tmp_path)
+
+
 if __name__ == "__main__":
     unittest.main()

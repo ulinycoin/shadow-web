@@ -300,6 +300,98 @@ class ShadowPage:
             logger.warning("[Shadow Web] Failed to extract heal context: %s", exc)
             return self.clean_html[:3000]
 
+    def _attempt_playwright_heal(self, sid: str) -> Optional[str]:
+        """Try Playwright-native locators (getByRole, getByLabel, etc.) before CSS fuzzy healing.
+
+        This catches pages where data-sid vanished but the element still has
+        semantic ARIA/label/text — the same scenario the user-post complained about.
+        Caches the recovered selector so subsequent clicks skip the scan.
+        """
+        action = self.get_action_by_sid(sid)
+        if not action:
+            return None
+
+        label = action.get("label", "")
+        action_type = action.get("type", "")
+        base_tag = action_type.split("[")[0].lower()
+
+        # Map action-map types -> Playwright roles
+        role_map = {
+            "button": "button",
+            "a": "link",
+            "input": None,
+            "select": "combobox",
+            "textarea": "textbox",
+            "option": "option",
+        }
+        role = role_map.get(base_tag)
+
+        # Build ordered strategy list: most semantic first
+        strategies: List[Tuple[str, Any]] = []
+
+        if role and label:
+            strategies.append((
+                "get_by_role",
+                lambda r=role, l=label: self.page.get_by_role(r, name=l),
+            ))
+
+        if label:
+            strategies.append(("get_by_label", lambda l=label: self.page.get_by_label(l)))
+            strategies.append(("get_by_placeholder", lambda l=label: self.page.get_by_placeholder(l)))
+            strategies.append(("get_by_text_exact", lambda l=label: self.page.get_by_text(l, exact=True)))
+            strategies.append(("get_by_text_partial", lambda l=label: self.page.get_by_text(l)))
+
+        for strategy_name, locator_fn in strategies:
+            try:
+                locator = locator_fn()
+                count = locator.count()
+                if count == 0 or count > 3:
+                    continue
+                target = locator.first
+                if not target.is_visible():
+                    continue
+
+                # Element found — extract a stable CSS selector for caching
+                selector = target.evaluate("""(el) => {
+                    if (el.getAttribute('data-testid'))
+                        return `[data-testid="${CSS.escape(el.getAttribute('data-testid'))}"]`;
+                    if (el.id)
+                        return `#${CSS.escape(el.id)}`;
+                    if (el.getAttribute('name'))
+                        return `${el.tagName.toLowerCase()}[name="${CSS.escape(el.getAttribute('name'))}"]`;
+                    // last resort: tag + truncated text via Playwright extension
+                    const text = (el.textContent || '').trim().slice(0, 60);
+                    if (text)
+                        return `${el.tagName.toLowerCase()}:has-text("${text.replace(/"/g, '\\\\"')}")`;
+                    return el.tagName.toLowerCase();
+                }""")
+
+                if not selector or not selector.strip():
+                    continue
+
+                # Verify the extracted selector actually resolves
+                from .verified_heal import verify_selector_on_page
+                if not verify_selector_on_page(self.page, selector, label, action_type):
+                    continue
+
+                # Cache it
+                self.healed_selectors[sid] = selector
+                self.heal_cache.set(self.last_url, label, action_type, selector)
+                logger.info(
+                    "[Shadow Web] Playwright heal (%s) for ID %s: '%s'",
+                    strategy_name, sid, selector,
+                )
+                return selector
+
+            except Exception as exc:
+                logger.debug(
+                    "[Shadow Web] Playwright heal strategy %s failed for ID %s: %s",
+                    strategy_name, sid, exc,
+                )
+                continue
+
+        return None
+
     def _attempt_local_heal(self, sid: str) -> Optional[str]:
         action = self.get_action_by_sid(sid)
         if not action:
@@ -393,9 +485,15 @@ class ShadowPage:
         raise RuntimeError(f"API returned status {response.status_code}: {response.text}")
 
     def _attempt_heal(self, sid: str, original_selector: str, error_msg: str) -> str:
+        # 1. Playwright-native locators (getByRole, getByLabel, …)
+        pw_selector = self._attempt_playwright_heal(sid)
+        if pw_selector:
+            return pw_selector
+        # 2. Local CSS fuzzy healing (JS-based candidate scan)
         local_selector = self._attempt_local_heal(sid)
         if local_selector:
             return local_selector
+        # 3. LLM API healing
         return self._attempt_api_heal(sid, original_selector, error_msg)
 
     def _execute_selector_action(
