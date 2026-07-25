@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Literal, Optional, Set
+
+logger = logging.getLogger(__name__)
 
 from lxml import html as lxml_html
 
@@ -356,23 +359,34 @@ async def _get_cdp_session_and_id_async(page: PageLike) -> Tuple[Any, Optional[s
 
 
 async def acapture_a11y_interactive(page: PageLike) -> A11yCaptureResult:
-    """Async: capture interactive nodes from Chrome Accessibility tree."""
-    cdp, session_id = await _get_cdp_session_and_id_async(page)
-    if session_id:
-        await cdp.send("Accessibility.enable", session_id=session_id)
-        payload = await cdp.send("Accessibility.getFullAXTree", session_id=session_id)
-    else:
-        await cdp.send("Accessibility.enable")
-        payload = await cdp.send("Accessibility.getFullAXTree")
-        
-    nodes = parse_ax_nodes(payload.get("nodes") or [])
-    supplement_html, bindings = build_a11y_supplement(nodes, bind_prefix="sw-a11y")
-    return A11yCaptureResult(
-        nodes=nodes,
-        supplement_html=supplement_html,
-        bindings=bindings,
-        stats={"a11y_interactive": len(nodes), "a11y_bindings": len(bindings)},
-    )
+    """Async: capture interactive nodes from Chrome Accessibility tree.
+
+    Falls back to empty result for Firefox/Camoufox (no CDP support).
+    """
+    try:
+        cdp, session_id = await _get_cdp_session_and_id_async(page)
+    except Exception:
+        logger.warning("CDP not available (Firefox/Camoufox). Skipping a11y capture.")
+        return A11yCaptureResult(nodes=[], supplement_html="", bindings={}, stats={})
+    try:
+        if session_id:
+            await cdp.send("Accessibility.enable", session_id=session_id)
+            payload = await cdp.send("Accessibility.getFullAXTree", session_id=session_id)
+        else:
+            await cdp.send("Accessibility.enable")
+            payload = await cdp.send("Accessibility.getFullAXTree")
+
+        nodes = parse_ax_nodes(payload.get("nodes") or [])
+        supplement_html, bindings = build_a11y_supplement(nodes, bind_prefix="sw-a11y")
+        return A11yCaptureResult(
+            nodes=nodes,
+            supplement_html=supplement_html,
+            bindings=bindings,
+            stats={"a11y_interactive": len(nodes), "a11y_bindings": len(bindings)},
+        )
+    except Exception as exc:
+        logger.warning("a11y capture failed (%s). Falling back to DOM-only.", exc)
+        return A11yCaptureResult(nodes=[], supplement_html="", bindings={}, stats={})
 
 
 async def acapture_page(
@@ -407,13 +421,20 @@ def capture_page(
     mode: CaptureMode = "dom",
 ) -> FlattenResult:
     """Unified capture entry: DOM flatten with optional a11y supplement."""
-    from .dom_capture import capture_flattened_dom
+    from .dom_capture import _FLATTEN_SCRIPT
 
     if mode == "a11y":
         a11y = capture_a11y_interactive(page)
         return merge_dom_and_a11y(FlattenResult(html="<body></body>"), a11y, mode="a11y")
 
-    dom = capture_flattened_dom(page)
+    raw = _parse_eval_res(page.evaluate(_FLATTEN_SCRIPT))
+    if not isinstance(raw, dict):
+        raw = {}
+    dom = FlattenResult(
+        html=raw.get("html") or "<body></body>",
+        bindings=raw.get("bindings") or {},
+        stats=raw.get("stats") or {},
+    )
     if mode == "dom":
         dom.stats["capture_source"] = "dom"
         return dom
