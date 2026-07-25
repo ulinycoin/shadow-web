@@ -498,6 +498,9 @@ See [examples/browser_use/](examples/browser_use/) for a complete working implem
 ```
 click("3") → binding path → element not found?
     ↓
+Playwright-native locators (getByRole, getByLabel, getByPlaceholder, getByText) →
+  extract stable CSS, cache — cross-browser, no LLM cost
+    ↓
 local heal (fuzzy label + stable attr match, 85% threshold) → no LLM, no cost
     ↓
 LLM heal (DeepSeek / OpenAI via /v1/heal) → generates candidate selector
@@ -635,11 +638,11 @@ Playbook: [examples/form_fill/CASE.md](examples/form_fill/CASE.md)
 
 | Limitation | Workaround |
 |------------|------------|
-| **Anti-bot / Cloudflare** headless | `page_class: Anti-bot` — stop, don't retry; use headed browser or manual step |
+| **Anti-bot / Cloudflare** headless | `page_class: Anti-bot` — MCP server uses Camoufox (Firefox fingerprint) to bypass common anti-bot; if still blocked, use headed browser or manual step |
 | **Cookie / empty content shell** | `page_class: SparseShell` — readiness + scroll did not hydrate; don't index blindly |
 | **`colspan` / `rowspan` tables** | Column alignment may drift; verify row shape |
 | **JS-rendered grids** (AG Grid, React Table) | May not use `<table>` — use `shadow_query` + Action Map instead |
-| **Closed Shadow DOM** | `navigate(..., capture_mode="dual")` or `"a11y"` |
+| **Closed Shadow DOM** | `navigate(..., capture_mode="dual")` or `"a11y"` (Chromium only; Firefox/Camoufox uses DOM-only fallback) |
 | **Cross-origin iframes** | Not accessible — `page_class: Iframe-heavy` |
 | **Token bombs** | Never default to `detail="full"`, `get_page_html(max_chars=0)`, or `max_rows=0` unless debugging |
 | **Security scan scope** | Surface mapping — forms, links, HTTP headers, cookie flags; no XSS/SQLi; SPAs may need `capture_mode=dual` |
