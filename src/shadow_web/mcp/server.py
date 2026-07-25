@@ -100,20 +100,43 @@ def _extract_search_results(
 
 
 async def _ensure_browser():
-    from camoufox import AsyncCamoufox
+    import logging
+    logger = logging.getLogger("shadow-web.mcp")
+
+    # Recreate if page was closed (e.g. browser crash)
+    if "page" in _session:
+        try:
+            if _session["page"].is_closed():
+                logger.warning("Page closed, recreating browser session")
+                _session.clear()
+        except Exception:
+            logger.warning("Page check failed, recreating browser session")
+            _session.clear()
 
     if "playwright" not in _session:
-        browser = await AsyncCamoufox(
-            headless=True,
-        ).start()
-        context = await browser.new_context(
-            locale="en-US",
-        )
+        browser = None
+        browser_type = "chromium"
+
+        # Try Camoufox first; fall back to plain Chromium
+        try:
+            from camoufox import AsyncCamoufox
+            browser = await AsyncCamoufox(headless=True).start()
+            browser_type = "camoufox"
+            logger.info("Browser: camoufox (Firefox)")
+        except Exception as e:
+            logger.warning("Camoufox unavailable (%s), falling back to Chromium", e)
+            from playwright.async_api import async_playwright
+            pw = await async_playwright().start()
+            browser = await pw.chromium.launch(headless=True)
+            browser_type = "chromium"
+
+        context = await browser.new_context(locale="en-US")
         page = await context.new_page()
-        _session["playwright"] = browser  # non-None flag
+        _session["playwright"] = browser
         _session["browser"] = browser
         _session["context"] = context
         _session["page"] = page
+        _session["browser_type"] = browser_type
 
 
 async def _run_shadow_query(shadow, query: str, fmt: Literal["json", "terse", "xml"] = "json") -> dict | str:

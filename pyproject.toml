@@ -35,7 +35,7 @@ server = [
     "uvicorn>=0.28.0",
     "openai>=1.14.0",
 ]
-mcp = ["mcp>=1.2.0"]
+mcp = ["mcp>=1.2.0", "camoufox>=0.1.0"]
 browser-use = ["browser-use>=0.1.0"]
 dev = [
     "build>=1.2.0",
