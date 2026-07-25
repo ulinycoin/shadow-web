@@ -12,11 +12,6 @@ from shadow_web.query import shadow_grep
 # Lazy browser session for navigate/snapshot/click tools.
 _session: Dict[str, Any] = {}
 
-_STEALTH_USER_AGENT = (
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-)
-
 _SEARCH_NAV_JUNK = (
     "settings",
     "sign in",
@@ -105,23 +100,17 @@ def _extract_search_results(
 
 
 async def _ensure_browser():
-    from playwright.async_api import async_playwright
+    from camoufox import AsyncCamoufox
 
     if "playwright" not in _session:
-        pw = await async_playwright().start()
-        browser = await pw.chromium.launch(
+        browser = await AsyncCamoufox(
             headless=True,
-            args=["--disable-blink-features=AutomationControlled"],
-        )
+        ).start()
         context = await browser.new_context(
-            user_agent=_STEALTH_USER_AGENT,
             locale="en-US",
         )
         page = await context.new_page()
-        await page.add_init_script(
-            "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
-        )
-        _session["playwright"] = pw
+        _session["playwright"] = browser  # non-None flag
         _session["browser"] = browser
         _session["context"] = context
         _session["page"] = page
