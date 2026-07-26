@@ -6,6 +6,7 @@ import logging
 from pathlib import Path
 from typing import Any, Literal, Optional
 
+from shadow_web.runtime_env import allow_chromium_fallback, camoufox_unavailable_message
 from shadow_web.wrapper import ShadowPage
 
 logger = logging.getLogger(__name__)
@@ -32,13 +33,20 @@ class BrowserSession:
         heal_api_url: Optional[str] = None,
         api_key: Optional[str] = None,
         browser: str = "camoufox",
+        allow_chromium_fallback_flag: Optional[bool] = None,
     ):
         self.headed = headed
         self.session_name = session_name
         self.heal_api_url = heal_api_url
         self.api_key = api_key
         self.requested_browser = normalize_browser_engine(browser)
+        self.allow_chromium_fallback = (
+            allow_chromium_fallback()
+            if allow_chromium_fallback_flag is None
+            else bool(allow_chromium_fallback_flag)
+        )
         self.browser_type: str = self.requested_browser
+        self.browser_fallback: bool = False
         self._pw: Any = None
         self._browser: Any = None
         self._context: Any = None
@@ -113,14 +121,22 @@ class BrowserSession:
         headless = not self.headed
         if self.requested_browser == "camoufox":
             try:
+                self.browser_fallback = False
                 return self._start_camoufox(headless)
             except Exception as exc:
+                if not self.allow_chromium_fallback:
+                    self.close()
+                    raise RuntimeError(camoufox_unavailable_message(exc)) from exc
                 logger.warning(
-                    "Camoufox unavailable (%s), falling back to Chromium",
+                    "Camoufox unavailable (%s), falling back to Chromium "
+                    "(SHADOW_WEB_ALLOW_CHROMIUM_FALLBACK=1)",
                     exc,
                 )
                 self.close()
-                return self._start_chromium(headless)
+                shadow = self._start_chromium(headless)
+                self.browser_fallback = True
+                return shadow
+        self.browser_fallback = False
         return self._start_chromium(headless)
 
     def close(self) -> None:

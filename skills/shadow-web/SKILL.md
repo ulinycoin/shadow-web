@@ -16,6 +16,17 @@ Shadow Web — локальный MCP для веб-автоматизации. 
 
 ---
 
+## Preflight / стоп-краны (любой кейс)
+
+Перед browse/`exec`/`agent_run` — не начинай обходы, пока это не зелёное:
+
+1. **LLM key в этом процессе.** `exec`/`agent_run` читают `os.environ` (+ `.env` из cwd/project). Hermes/tool runners часто **не** прокидывают секреты в children → всегда `--api-key "$DEEPSEEK_API_KEY"` или ключ в env MCP-сервера. Один fail `missing_api_key` / `No LLM API key` → чини ключ, **не** уходи в thin-обход.
+2. **Browser honesty.** В ответе `navigate`/`snapshot` смотри `browser_type`, `browser_fallback`. Нужен Camoufox, а `browser_fallback=true` или `browser_type=chromium` без запроса → **стоп**, почини Camoufox (`camoufox fetch`, restart MCP). Тихий fallback выключен; опционально `SHADOW_WEB_ALLOW_CHROMIUM_FALLBACK=1`.
+3. **`page_class` = закон.** `Anti-bot` / `SparseShell` → максимум **один** recovery (consent / другой URL той же задачи), потом стоп + отчёт. Не долби тот же tool с теми же args.
+4. **Один фикс на ошибку.** Тот же fail ≥2 → эскалация человеку. Маршрут дальше только по сигналу страницы (`page_class`, `action_count`, `complete`/`next_hint`), не по нише сайта.
+
+---
+
 ## Жёсткие правила (токены)
 
 1. **Никогда** `detail="full"` без явной отладки по просьбе пользователя.
@@ -137,11 +148,11 @@ python3 -m uvicorn server.main:app --host 127.0.0.1 --port 8000
 
 ## Ограничения
 
-- Первый `navigate`: cold start Chromium ~3–8 с.
+- Первый `navigate`: cold start Camoufox/Chromium ~3–8 с. В ответе всегда есть `browser_type`.
 - Одна браузерная сессия — новый `navigate` заменяет контекст.
 - `web_search` — Brave Search (+ Yahoo fallback), без API-ключей; headless с stealth UA.
-- Anti-bot БК (Fonbet и др.) в headless часто дают `action_count=0` + `page_class: Anti-bot`.
+- Anti-bot / SparseShell в headless → стоп (см. preflight), не бесконечный retry.
 
 ## Отладка
 
-Output panel → **MCP Logs**. Локально: `venv/bin/shadow-web-mcp`.
+Output panel → **MCP Logs** (ищи `Browser: camoufox` vs fallback). Локально: `venv/bin/shadow-web-mcp`.

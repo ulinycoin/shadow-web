@@ -8,9 +8,16 @@ from typing import Any, Dict, Literal
 
 from shadow_web.compressor import generate_grouped_xml_map, process_html
 from shadow_web.query import shadow_grep
+from shadow_web.runtime_env import (
+    allow_chromium_fallback,
+    camoufox_unavailable_message,
+    load_dotenv_files,
+    preferred_browser_engine,
+)
 
 # Lazy browser session for navigate/snapshot/click tools.
 _session: Dict[str, Any] = {}
+load_dotenv_files()
 
 _SEARCH_NAV_JUNK = (
     "settings",
@@ -114,21 +121,43 @@ async def _ensure_browser():
             _session.clear()
 
     if "playwright" not in _session:
+        requested = preferred_browser_engine("camoufox")
+        if requested not in ("camoufox", "chromium"):
+            requested = "camoufox"
         browser = None
-        browser_type = "chromium"
+        browser_type = requested
+        browser_fallback = False
 
-        # Try Camoufox first; fall back to plain Chromium
-        try:
-            from camoufox import AsyncCamoufox
-            browser = await AsyncCamoufox(headless=True).start()
-            browser_type = "camoufox"
-            logger.info("Browser: camoufox (Firefox)")
-        except Exception as e:
-            logger.warning("Camoufox unavailable (%s), falling back to Chromium", e)
+        if requested == "camoufox":
+            try:
+                from camoufox import AsyncCamoufox
+
+                browser = await AsyncCamoufox(headless=True).start()
+                browser_type = "camoufox"
+                logger.info("Browser: camoufox (Firefox)")
+            except Exception as e:
+                if not allow_chromium_fallback():
+                    raise RuntimeError(camoufox_unavailable_message(e)) from e
+                logger.warning(
+                    "Camoufox unavailable (%s), falling back to Chromium "
+                    "(SHADOW_WEB_ALLOW_CHROMIUM_FALLBACK=1)",
+                    e,
+                )
+                from playwright.async_api import async_playwright
+
+                pw = await async_playwright().start()
+                browser = await pw.chromium.launch(headless=True)
+                browser_type = "chromium"
+                browser_fallback = True
+                _session["playwright_driver"] = pw
+        else:
             from playwright.async_api import async_playwright
+
             pw = await async_playwright().start()
             browser = await pw.chromium.launch(headless=True)
             browser_type = "chromium"
+            logger.info("Browser: chromium")
+            _session["playwright_driver"] = pw
 
         context = await browser.new_context(locale="en-US")
         page = await context.new_page()
@@ -137,6 +166,8 @@ async def _ensure_browser():
         _session["context"] = context
         _session["page"] = page
         _session["browser_type"] = browser_type
+        _session["requested_browser"] = requested
+        _session["browser_fallback"] = browser_fallback
 
 
 async def _run_shadow_query(shadow, query: str, fmt: Literal["json", "terse", "xml"] = "json") -> dict | str:
@@ -175,6 +206,11 @@ def _format_mcp_response(
         "action_count": len(shadow.action_map),
         "page_class": getattr(shadow, "page_class", "Static"),
         "page_class_reason": getattr(shadow, "page_class_reason", ""),
+        "browser_type": _session.get("browser_type") or "unknown",
+        "requested_browser": _session.get("requested_browser")
+        or _session.get("browser_type")
+        or "unknown",
+        "browser_fallback": bool(_session.get("browser_fallback")),
     }
     
     # Include diff context if diff mode is requested
@@ -667,10 +703,16 @@ def create_mcp_server():
         (navigate, schema_session, content_outline with offset).
 
         Envelope always includes stop_reason, complete, truncated, and optional next_hint.
-        Requires: pip install "shadow-web[agent]" (+ LLM API key env).
+        Requires: pip install "shadow-web[agent]" (+ LLM API key env or .env).
         Owns its own browser; does not share the thin-tool MCP session.
+        Preflight: fails closed if no API key in this process (pass via env/.env;
+        Hermes often strips secrets — set DEEPSEEK_API_KEY in MCP server env).
         """
         import asyncio
+
+        from shadow_web.runtime_env import load_dotenv_files, missing_llm_key_message
+
+        load_dotenv_files()
 
         goal_text = (goal or "").strip()
         if not goal_text:
@@ -679,6 +721,21 @@ def create_mcp_server():
                 "answer": None,
                 "error": "goal is required",
                 "stop_reason": "invalid",
+                "complete": False,
+                "truncated": False,
+            }
+
+        if not (
+            os.environ.get("DEEPSEEK_API_KEY")
+            or os.environ.get("OPENAI_API_KEY")
+            or os.environ.get("OPENROUTER_API_KEY")
+            or os.environ.get("SHADOW_WEB_LLM_API_KEY")
+        ):
+            return {
+                "ok": False,
+                "answer": None,
+                "error": missing_llm_key_message(),
+                "stop_reason": "missing_api_key",
                 "complete": False,
                 "truncated": False,
             }
@@ -712,7 +769,7 @@ def create_mcp_server():
         token_budget = min(token_budget, 50000)
 
         model_id = (model or "").strip() or os.environ.get(
-            "SHADOW_WEB_LLM_MODEL", "deepseek-chat"
+            "SHADOW_WEB_LLM_MODEL", "deepseek-v4-flash"
         )
         engine = (browser or "camoufox").strip().lower() or "camoufox"
         session_name = (session or "").strip() or None

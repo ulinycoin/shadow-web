@@ -279,11 +279,28 @@ def test_camoufox_falls_back_to_chromium(monkeypatch):
             self.shadow = FakeShadow()  # type: ignore[assignment]
             return self.shadow
 
-    sess = FakeSession(browser="camoufox")
+    sess = FakeSession(browser="camoufox", allow_chromium_fallback_flag=True)
     shadow = sess.start()
     assert calls == ["camoufox", "chromium"]
     assert sess.browser_type == "chromium"
+    assert sess.browser_fallback is True
     assert shadow is sess.shadow
+
+
+def test_camoufox_fail_loud_without_fallback():
+    from shadow_web.agent import session as session_mod
+
+    class FakeSession(session_mod.BrowserSession):
+        def _start_camoufox(self, headless: bool):
+            raise RuntimeError("no camoufox binary")
+
+    sess = FakeSession(browser="camoufox", allow_chromium_fallback_flag=False)
+    try:
+        sess.start()
+        assert False, "expected RuntimeError"
+    except RuntimeError as exc:
+        assert "Camoufox unavailable" in str(exc)
+        assert "ALLOW_CHROMIUM_FALLBACK" in str(exc)
 
 
 def test_camoufox_uses_dom_capture_mode(monkeypatch):

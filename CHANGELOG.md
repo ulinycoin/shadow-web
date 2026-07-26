@@ -8,6 +8,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Runtime preflight: load project `.env` for LLM keys; MCP/`exec` responses expose `browser_type` / `browser_fallback`; Camoufox→Chromium fallback is **opt-in** via `SHADOW_WEB_ALLOW_CHROMIUM_FALLBACK=1` (fail-loud by default).
 - Thick MCP tool `agent_run(goal)` — server-side bounded browser task, one JSON envelope (`stop_reason`, `complete`, `truncated`, `next_hint`). Not for bulk scrapes; thin tools stay for pagination.
 - `exec` / `done` completeness contract: `done(finalAnswer, complete=…, next_hint=…)`; budget stops (`max_steps` / `max_tokens` / `no_progress`) set `truncated=true` + recovery hint.
 - `exec` observe budget: dense pages (`action_count > 40`) auto-downgrade to minimal Action Map; new `shadow_query` tool; `--max-tokens` (default 15000).

@@ -29,8 +29,8 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     exec_p.add_argument(
         "--model",
-        default=os.environ.get("SHADOW_WEB_LLM_MODEL", "deepseek-chat"),
-        help="Model id (default: deepseek-chat or SHADOW_WEB_LLM_MODEL)",
+        default=os.environ.get("SHADOW_WEB_LLM_MODEL", "deepseek-v4-flash"),
+        help="Model id (default: deepseek-v4-flash or SHADOW_WEB_LLM_MODEL)",
     )
     exec_p.add_argument(
         "--base-url",
@@ -98,7 +98,7 @@ def _cmd_models(source: Optional[str]) -> int:
     tips = {
         "deepseek": (
             "export DEEPSEEK_API_KEY=...\n"
-            "shadow-web exec \"...\" --model deepseek-chat"
+            "shadow-web exec \"...\" --model deepseek-v4-flash"
         ),
         "openai": (
             "export OPENAI_API_KEY=...\n"
@@ -150,6 +150,9 @@ def _cmd_exec(args: argparse.Namespace) -> int:
 
 
 def main(argv: Optional[Sequence[str]] = None) -> None:
+    from shadow_web.runtime_env import load_dotenv_files
+
+    load_dotenv_files()
     parser = _build_parser()
     args = parser.parse_args(list(argv) if argv is not None else None)
     if args.command == "models":

@@ -42,6 +42,9 @@ def resolve_api_credentials(
     base_url: Optional[str] = None,
 ) -> tuple[str, Optional[str]]:
     """Resolve API key and optional base_url from args / environment."""
+    from shadow_web.runtime_env import load_dotenv_files, missing_llm_key_message
+
+    load_dotenv_files()
     key = api_key or (
         os.environ.get("DEEPSEEK_API_KEY")
         or os.environ.get("OPENAI_API_KEY")
@@ -49,10 +52,7 @@ def resolve_api_credentials(
         or os.environ.get("SHADOW_WEB_LLM_API_KEY")
     )
     if not key:
-        raise RuntimeError(
-            "No LLM API key. Set DEEPSEEK_API_KEY, OPENAI_API_KEY, "
-            "OPENROUTER_API_KEY, or pass --api-key."
-        )
+        raise RuntimeError(missing_llm_key_message())
 
     url = base_url or os.environ.get("SHADOW_WEB_LLM_BASE_URL")
     if url is None and os.environ.get("DEEPSEEK_API_KEY") and not os.environ.get("OPENAI_API_KEY"):

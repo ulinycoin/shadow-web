@@ -352,6 +352,13 @@ def run_agent_task(
         result = loop.run(task)
         if session_obj is not None:
             result.browser = getattr(session_obj, "browser_type", "") or ""
+            if getattr(session_obj, "browser_fallback", False):
+                evidence = dict(result.evidence or {})
+                evidence["browser_fallback"] = True
+                evidence["requested_browser"] = getattr(
+                    session_obj, "requested_browser", ""
+                )
+                result.evidence = evidence
         return result
     finally:
         if owns_browser and session_obj is not None:
