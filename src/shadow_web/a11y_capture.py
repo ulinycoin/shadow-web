@@ -127,18 +127,34 @@ def parse_ax_nodes(raw_nodes: List[Dict[str, Any]]) -> List[A11yNode]:
 
 
 def capture_a11y_interactive(page: PageLike) -> A11yCaptureResult:
-    """Capture interactive nodes from Chrome Accessibility tree."""
-    cdp = page.context.new_cdp_session(page)
-    cdp.send("Accessibility.enable")
-    payload = cdp.send("Accessibility.getFullAXTree")
-    nodes = parse_ax_nodes(payload.get("nodes") or [])
-    supplement_html, bindings = build_a11y_supplement(nodes, bind_prefix="sw-a11y")
-    return A11yCaptureResult(
-        nodes=nodes,
-        supplement_html=supplement_html,
-        bindings=bindings,
-        stats={"a11y_interactive": len(nodes), "a11y_bindings": len(bindings)},
-    )
+    """Capture interactive nodes from Chrome Accessibility tree.
+
+    Falls back to empty result for Firefox/Camoufox (no CDP support).
+    Mirrors ``acapture_a11y_interactive`` so sync ShadowPage/exec works on Camoufox.
+    """
+    try:
+        cdp, session_id = _get_cdp_session_and_id(page)
+    except Exception:
+        logger.warning("CDP not available (Firefox/Camoufox). Skipping a11y capture.")
+        return A11yCaptureResult(nodes=[], supplement_html="", bindings={}, stats={})
+    try:
+        if session_id:
+            cdp.send("Accessibility.enable", session_id=session_id)
+            payload = cdp.send("Accessibility.getFullAXTree", session_id=session_id)
+        else:
+            cdp.send("Accessibility.enable")
+            payload = cdp.send("Accessibility.getFullAXTree")
+        nodes = parse_ax_nodes(payload.get("nodes") or [])
+        supplement_html, bindings = build_a11y_supplement(nodes, bind_prefix="sw-a11y")
+        return A11yCaptureResult(
+            nodes=nodes,
+            supplement_html=supplement_html,
+            bindings=bindings,
+            stats={"a11y_interactive": len(nodes), "a11y_bindings": len(bindings)},
+        )
+    except Exception as exc:
+        logger.warning("a11y capture failed (%s). Falling back to DOM-only.", exc)
+        return A11yCaptureResult(nodes=[], supplement_html="", bindings={}, stats={})
 
 
 def build_a11y_supplement(

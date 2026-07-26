@@ -6,6 +6,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-26
+
+### Added
+
+- Standalone agent loop: `shadow-web exec` CLI + `run_agent_task()` with observe→act→verify, OpenAI-compatible model adapter, `done(finalAnswer)` single-call finish, and named sessions under `~/.shadow-web/sessions/`.
+- `exec` browser engines: `--browser camoufox|chromium` (default Camoufox, automatic Chromium fallback).
+- Optional extra: `pip install "shadow-web[agent]"` (includes `openai` + `camoufox`).
+- Console helper: `shadow-web models` for DeepSeek / OpenAI / OpenRouter env setup.
+
+### Fixed
+
+- Sync a11y capture skips CDP on Firefox/Camoufox (DOM-only), matching the async MCP path — `shadow-web exec` with default Camoufox no longer fails on navigate/refresh.
+
 ## [0.3.5] - 2026-07-18
 
 ### Added
@@ -127,6 +140,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Initial release: DOM compression, Action Map, shadow_grep, self-healing, Playwright wrapper, FastAPI `/v1/compress` and `/v1/heal`.
 
+[0.4.0]: https://github.com/ulinycoin/shadow-web/compare/v0.3.6...v0.4.0
+[0.3.6]: https://github.com/ulinycoin/shadow-web/compare/v0.3.5...v0.3.6
 [0.3.5]: https://github.com/ulinycoin/shadow-web/compare/v0.3.4...v0.3.5
 [0.3.4]: https://github.com/ulinycoin/shadow-web/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/ulinycoin/shadow-web/compare/v0.3.2...v0.3.3

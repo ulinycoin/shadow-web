@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "shadow-web"
-version = "0.3.6"
-description = "Local-first Python SDK for AI agents: Shadow DOM flatten, Action Map, Rendered Text Index, SchemaSnap, AgentOps form fill, self-healing selectors"
+version = "0.4.0"
+description = "Local-first Python SDK for AI agents: DOM compression, Action Map, SchemaSnap, self-healing selectors, MCP, and shadow-web exec agent loop"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
 authors = [{ name = "ulinycoin", email = "ulinycoin7@gmail.com" }]
-keywords = ["ai-agents", "playwright", "shadow-dom", "browser-automation", "mcp", "llm"]
+keywords = ["ai-agents", "playwright", "shadow-dom", "browser-automation", "mcp", "llm", "camoufox"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -35,6 +35,10 @@ server = [
     "uvicorn>=0.28.0",
     "openai>=1.14.0",
 ]
+agent = [
+    "openai>=1.14.0",
+    "camoufox>=0.1.0",
+]
 mcp = ["mcp>=1.2.0", "camoufox>=0.1.0"]
 browser-use = ["browser-use>=0.1.0"]
 dev = [
@@ -48,6 +52,7 @@ all = [
     "uvicorn>=0.28.0",
     "openai>=1.14.0",
     "mcp>=1.2.0",
+    "camoufox>=0.1.0",
     "browser-use>=0.1.0",
     "build>=1.2.0",
     "twine>=5.0.0",
@@ -61,6 +66,7 @@ Issues = "https://github.com/ulinycoin/shadow-web/issues"
 Documentation = "https://github.com/ulinycoin/shadow-web#readme"
 
 [project.scripts]
+shadow-web = "shadow_web.agent.cli:main"
 shadow-web-mcp = "shadow_web.mcp.server:main"
 shadow-web-server = "shadow_web.server:main"
 

@@ -11,7 +11,9 @@
 # Shadow Web
 
 **Cut 64–99% of tokens from web pages before your LLM sees them — then extract structured data.**  
-Open-source Python SDK that flattens Shadow DOM, builds a typed Action Map with semantic groups, indexes rendered text on demand, heals broken selectors, and turns HTML tables/forms/lists into clean JSON — no cloud required.
+Open-source Python SDK + MCP + standalone `shadow-web exec` agent: flattens Shadow DOM, builds a typed Action Map, indexes rendered text on demand, heals broken selectors, and turns tables/forms/lists into clean JSON — Camoufox by default, no cloud required.
+
+> **v0.4.0** — `pip install "shadow-web[agent]"` → `shadow-web exec "…"` (observe→act→verify, SchemaSnap, single-call finish).
 
 ```python
 from shadow_web.compressor import process_html
@@ -63,6 +65,7 @@ Shadow Web is what runs **between** the browser and the LLM: a compression layer
 | You're building … | Why Shadow Web |
 |-------------------|----------------|
 | A browser-based AI agent | Action Map + self-healing + SchemaSnap = fewer failures, structured data |
+| A coding agent that needs one-shot browsing | `shadow-web exec` — one shell call, one JSON answer (transcript stays inside) |
 | An MCP tool for Cursor/Claude | Built-in MCP server with **26 tools**, one-command setup |
 | A Playwright scraper that breaks on every deploy | `heal_local.py` catches DOM drift without LLM cost |
 | A Shadow DOM-heavy app (Web components, Lit, Angular) | Read-only flatten — no React/Vue breakage |
@@ -86,6 +89,7 @@ playwright install chromium
 ```bash
 pip install "shadow-web[mcp]"          # Cursor/Claude MCP server
 pip install "shadow-web[server]"        # FastAPI heal API
+pip install "shadow-web[agent]"         # standalone exec agent loop
 pip install "shadow-web[all]"           # everything
 ```
 
@@ -98,6 +102,46 @@ shadow-web-server
 ```
 
 Remote and production requests are rejected unless `SHADOW_WEB_API_KEYS` is configured.
+
+### Standalone agent (`shadow-web exec`)
+
+Hand a browser task to the built-in observe→act→verify loop. One command in, one JSON object out — browsing transcript stays inside the sub-agent.
+
+Unlike a11y-tree browser wrappers, observations are **HTML Action Maps + SchemaSnap** (works on any HTML, not only Playwright CDP). Default browser is **Camoufox** (Firefox fingerprint); Chromium is opt-in.
+
+```bash
+pip install "shadow-web[agent]"
+camoufox fetch          # once — required for default --browser camoufox
+# playwright install chromium   # only if you use --browser chromium
+export DEEPSEEK_API_KEY="..."   # or OPENAI_API_KEY / OPENROUTER_API_KEY
+
+shadow-web exec "What is the title of https://example.com?" \
+  --model deepseek-chat
+```
+
+```json
+{
+  "ok": true,
+  "answer": "The page title is \"Example Domain\".",
+  "steps": 2,
+  "usage": {"prompt_tokens": 1821, "completion_tokens": 144, "total_tokens": 1965},
+  "url": "https://example.com/",
+  "browser": "camoufox"
+}
+```
+
+| Flag | Default | Notes |
+|------|---------|--------|
+| `--model` | `deepseek-chat` | Any OpenAI-compatible model id |
+| `--base-url` | auto from env | DeepSeek / OpenRouter inferred from API key |
+| `--browser` | `camoufox` | `chromium` for CDP/a11y supplement path |
+| `--max-steps` | `20` | Model turns budget |
+| `--session` | — | Persistent profile `~/.shadow-web/sessions/<name>` |
+| `--headed` | off | Show the browser window |
+| `--transcript` | off | Include step list in JSON |
+
+Programmatic: `from shadow_web import run_agent_task`.  
+Model env help: `shadow-web models`.
 
 ---
 

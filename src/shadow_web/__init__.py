@@ -58,11 +58,13 @@ from .verified_heal import verify_selector_on_page, verify_selector_in_html, ave
 from .wrapper import ShadowPage
 from typing import Any
 
-# Lazy loading of browser_use adapter to avoid eager import errors when browser-use is not installed
+# Lazy loading of browser_use / agent to avoid eager import errors when extras are missing
 _LAZY_EXPORTS = {
     "AsyncShadowPage": ".browser_use",
     "ShadowTools": ".browser_use",
     "HAS_BROWSER_USE": ".browser_use",
+    "AgentResult": ".agent",
+    "run_agent_task": ".agent",
 }
 
 def __getattr__(name: str) -> Any:
@@ -138,4 +140,7 @@ __all__ = [
     "AsyncShadowPage",
     "ShadowTools",
     "HAS_BROWSER_USE",
+    "AgentResult",
+    "run_agent_task",
+
 ]

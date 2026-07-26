@@ -1,10 +1,10 @@
 ---
 name: shadow-web
 description: >-
-  Browser automation for Cursor via Shadow Web MCP: detail levels (minimal/terse/xml/full),
-  page classifier (SPA, Anti-bot, Shadow DOM), shadow_grep filtering, navigate/click/fill
-  by data-sid, diff snapshots, self-healing. Use when browsing the web, scraping,
-  interacting with sites, compressing HTML, or when the user mentions shadow-web,
+  Browser automation for Cursor via Shadow Web MCP and shadow-web exec: detail levels
+  (minimal/terse/xml/full), page classifier, shadow_grep, navigate/click/fill by data-sid,
+  SchemaSnap, diff snapshots, self-healing, Camoufox. Use when browsing the web, scraping,
+  running shadow-web exec, compressing HTML, or when the user mentions shadow-web,
   shadow_grep, Action Map, data-sid, or page_class.
 ---
 
@@ -78,6 +78,8 @@ snapshot(diff=true, detail="terse")
 | **Мультишаг** | один baseline `navigate` → действия → только `snapshot(diff=true)` |
 | **Поиск в сети** | `web_search(query)` → `shadow_query` по результатам → `click(sid)` |
 | **Длинный текст / каталог / лента** | `content_outline` → `content_blocks(ids)`; catalog → `cards=`, feed → `feeds=` (без цен) |
+| **Один JSON-ответ (sub-agent)** | shell: `shadow-web exec "task" --model …` (`pip install "shadow-web[agent]"`); не тащи transcript в чат |
+| **Reddit search / read** | Skill `reddit-search-read`: только `old.reddit.com`, Camoufox, outline→pick ids (не p0–p5) |
 
 ---
 

@@ -72,6 +72,32 @@ class TestA11yCapture(unittest.TestCase):
         labels = labels_from_dom_html(html)
         self.assertEqual(labels, ["Buy"])
 
+    def test_sync_capture_a11y_skips_when_cdp_unavailable(self):
+        """Firefox/Camoufox: new_cdp_session raises — must not blow up sync refresh."""
+        from src.shadow_web.a11y_capture import capture_a11y_interactive, capture_page
+
+        class _Ctx:
+            def new_cdp_session(self, page):
+                raise RuntimeError("BrowserType.launch: CDP is not supported")
+
+        class _Page:
+            context = _Ctx()
+
+            def evaluate(self, script):
+                return {
+                    "html": "<body><a href='/'>Home</a></body>",
+                    "bindings": {},
+                    "stats": {"shadow_hosts": 0, "interactive": 1},
+                }
+
+        page = _Page()
+        a11y = capture_a11y_interactive(page)
+        self.assertEqual(a11y.nodes, [])
+        flattened = capture_page(page, mode="auto")
+        self.assertIn("Home", flattened.html)
+        # Empty a11y → merge keeps DOM-only result (no CDP crash).
+        self.assertEqual(flattened.stats.get("interactive"), 1)
+
 
 if __name__ == "__main__":
     unittest.main()
