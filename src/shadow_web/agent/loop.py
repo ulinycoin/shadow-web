@@ -11,6 +11,9 @@ from .prompt import SYSTEM_PROMPT
 from .session import BrowserSession
 from .tools import TOOL_SCHEMAS, ToolResult, ToolRouter, parse_tool_arguments
 
+# Default cumulative completion+prompt budget for one exec run.
+DEFAULT_MAX_TOKENS = 15000
+
 
 class SupportsChat(Protocol):
     def chat(
@@ -56,6 +59,7 @@ class AgentLoop:
     llm: SupportsChat
     tools: ToolRouter
     max_steps: int = 20
+    max_tokens: int = DEFAULT_MAX_TOKENS
     no_progress_limit: int = 3
     system_prompt: str = SYSTEM_PROMPT
 
@@ -75,6 +79,17 @@ class AgentLoop:
             response = self.llm.chat(messages, TOOL_SCHEMAS)
             for key in usage_totals:
                 usage_totals[key] += int(response.usage.get(key, 0))
+
+            if self.max_tokens > 0 and usage_totals["total_tokens"] >= self.max_tokens:
+                return AgentResult(
+                    ok=False,
+                    answer=None,
+                    steps=steps,
+                    usage=usage_totals,
+                    url=self.tools.shadow.last_url or "",
+                    error=f"Exceeded max_tokens ({self.max_tokens})",
+                    transcript=transcript,
+                )
 
             if not response.tool_calls:
                 # Model tried to answer in plain text — accept as finish.
@@ -136,6 +151,9 @@ class AgentLoop:
                     )
                 )
 
+                if result.nudge:
+                    messages.append(ChatMessage(role="user", content=result.nudge))
+
                 sig = f"{result.name}:{result.content}"
                 if sig == last_sig:
                     stagnant += 1
@@ -169,6 +187,17 @@ class AgentLoop:
                     evidence=finished.data or {},
                 )
 
+            if self.max_tokens > 0 and usage_totals["total_tokens"] >= self.max_tokens:
+                return AgentResult(
+                    ok=False,
+                    answer=None,
+                    steps=steps,
+                    usage=usage_totals,
+                    url=self.tools.shadow.last_url or "",
+                    error=f"Exceeded max_tokens ({self.max_tokens})",
+                    transcript=transcript,
+                )
+
         return AgentResult(
             ok=False,
             answer=None,
@@ -187,6 +216,7 @@ def run_agent_task(
     api_key: Optional[str] = None,
     base_url: Optional[str] = None,
     max_steps: int = 20,
+    max_tokens: int = DEFAULT_MAX_TOKENS,
     headed: bool = False,
     session: Optional[str] = None,
     heal_api_url: Optional[str] = None,
@@ -223,7 +253,12 @@ def run_agent_task(
             api_key=api_key,
             base_url=base_url,
         )
-        loop = AgentLoop(llm=adapter, tools=router, max_steps=max_steps)
+        loop = AgentLoop(
+            llm=adapter,
+            tools=router,
+            max_steps=max_steps,
+            max_tokens=max_tokens,
+        )
         result = loop.run(task)
         if session_obj is not None:
             result.browser = getattr(session_obj, "browser_type", "") or ""

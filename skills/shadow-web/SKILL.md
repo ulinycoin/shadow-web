@@ -79,6 +79,7 @@ snapshot(diff=true, detail="terse")
 | **Поиск в сети** | `web_search(query)` → `shadow_query` по результатам → `click(sid)` |
 | **Длинный текст / каталог / лента** | `content_outline` → `content_blocks(ids)`; catalog → `cards=`, feed → `feeds=` (без цен) |
 | **Один JSON-ответ (sub-agent)** | shell: `shadow-web exec "task" --model …` (`pip install "shadow-web[agent]"`); не тащи transcript в чат |
+| **SPA-каталог в exec** | `schema_page` пустой → `content_outline` → `content_blocks(ids)` → `done` (не кликать по Action Map) |
 | **Reddit search / read** | Skill `reddit-search-read`: только `old.reddit.com`, Camoufox, outline→pick ids (не p0–p5) |
 
 ---

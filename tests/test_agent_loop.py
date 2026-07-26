@@ -34,6 +34,15 @@ class FakeShadow:
     def diff_terse(self) -> str:
         return "# diff: (none)"
 
+    def query(self, q: str, *, fmt: str = "result"):
+        from shadow_web.query import QueryResult
+
+        matches = [a for a in self.action_map if q.lower() in json.dumps(a).lower()]
+        result = QueryResult(query=q, matches=matches, total=len(self.action_map))
+        if fmt == "terse":
+            return result.terse()
+        return result
+
 
 class ScriptedLLM:
     """Returns a predetermined sequence of ModelResponse objects."""
@@ -289,3 +298,188 @@ def test_cli_browser_flag_defaults_camoufox():
     assert args.browser == "camoufox"
     args2 = _build_parser().parse_args(["exec", "do thing", "--browser", "chromium"])
     assert args2.browser == "chromium"
+    args3 = _build_parser().parse_args(["exec", "do thing", "--max-tokens", "8000"])
+    assert args3.max_tokens == 8000
+
+
+def test_dense_observe_auto_minimal():
+    from shadow_web.agent.tools import DENSE_ACTION_THRESHOLD, _observe
+
+    shadow = FakeShadow()
+    shadow.action_map = [
+        {"id": str(i), "type": "link", "label": f"Item {i}", "group": "Cat"}
+        for i in range(DENSE_ACTION_THRESHOLD + 5)
+    ]
+    shadow.action_groups = [{"name": "Cat", "elements": shadow.action_map}]
+    payload = _observe(shadow, diff=False)
+    assert payload["detail"] == "minimal"
+    assert payload["action_count"] == DENSE_ACTION_THRESHOLD + 5
+    assert "hint" in payload
+    assert "Dense page" in payload["hint"]
+    # only top-10 action lines + header (+ maybe overflow line)
+    lines = [ln for ln in payload["observation"].splitlines() if ln.startswith("@")]
+    assert len(lines) == 10
+
+
+def test_schema_page_nudge_when_payload():
+    shadow = FakeShadow()
+    shadow.clean_html = (
+        "<html><body><form action='/s'><input name='q'/></form>"
+        "<ul><li>Brand A</li><li>Brand B</li></ul></body></html>"
+    )
+    router = ToolRouter(shadow)  # type: ignore[arg-type]
+    result = router.dispatch("schema_page", {})
+    assert result.ok is True
+    assert result.nudge is not None
+    assert "done(finalAnswer)" in result.nudge
+
+
+def test_schema_nudge_injected_into_messages():
+    llm = ScriptedLLM(
+        [
+            ModelResponse(
+                content=None,
+                tool_calls=[_tool_call("schema_page", {}, "t1")],
+                usage={"prompt_tokens": 100, "completion_tokens": 10, "total_tokens": 110},
+            ),
+            ModelResponse(
+                content=None,
+                tool_calls=[_tool_call("done", {"finalAnswer": "ok"}, "t2")],
+                usage={"prompt_tokens": 100, "completion_tokens": 10, "total_tokens": 110},
+            ),
+        ]
+    )
+    shadow = FakeShadow()
+    router = ToolRouter(shadow)  # type: ignore[arg-type]
+    seen: List[List[ChatMessage]] = []
+
+    class CaptureLLM:
+        def chat(self, messages, tools):
+            seen.append(list(messages))
+            return llm.chat(messages, tools)
+
+    def _dispatch(name: str, arguments: Dict[str, Any]) -> ToolResult:
+        if name == "schema_page":
+            return ToolResult(
+                name="schema_page",
+                ok=True,
+                content='{"schema":{"forms":[1]}}',
+                nudge="schema_page returned structured data. call done now",
+            )
+        return ToolResult(
+            name="done",
+            ok=True,
+            content="{}",
+            terminal=True,
+            final_answer=arguments.get("finalAnswer"),
+        )
+
+    router.dispatch = _dispatch  # type: ignore[method-assign]
+    result = AgentLoop(llm=CaptureLLM(), tools=router, max_steps=5).run("list brands")
+    assert result.ok is True
+    assert any(
+        m.role == "user" and m.content and "done" in m.content
+        for batch in seen[1:]
+        for m in batch
+    )
+
+
+def test_max_tokens_stops_loop():
+    resp = ModelResponse(
+        content=None,
+        tool_calls=[_tool_call("snapshot", {"detail": "terse"}, "t1")],
+        usage={"prompt_tokens": 4000, "completion_tokens": 1000, "total_tokens": 5000},
+    )
+    llm = ScriptedLLM([resp, resp, resp])
+    shadow = FakeShadow()
+    router = ToolRouter(shadow)  # type: ignore[arg-type]
+    n = {"i": 0}
+
+    def _snap(name: str, arguments: Dict[str, Any]) -> ToolResult:
+        n["i"] += 1
+        return ToolResult(name="snapshot", ok=True, content=json.dumps({"n": n["i"]}))
+
+    router.dispatch = _snap  # type: ignore[method-assign]
+    result = AgentLoop(llm=llm, tools=router, max_steps=10, max_tokens=6000).run("x")
+    assert result.ok is False
+    assert result.error and "max_tokens" in result.error
+    assert result.usage["total_tokens"] >= 5000
+
+
+def test_shadow_query_tool():
+    shadow = FakeShadow()
+    shadow.action_map = [
+        {"id": "1", "type": "link", "label": "Nike Air", "group": "Brands"},
+        {"id": "2", "type": "link", "label": "Other", "group": "Brands"},
+    ]
+    router = ToolRouter(shadow)  # type: ignore[arg-type]
+    result = router.dispatch("shadow_query", {"query": "nike", "limit": 5})
+    assert result.ok is True
+    body = json.loads(result.content)
+    assert body["count"] >= 1
+    assert "Nike" in body["observation"]
+
+
+def test_schema_empty_nudges_content_outline():
+    from shadow_web.agent.tools import SCHEMA_EMPTY_NUDGE
+
+    shadow = FakeShadow()
+    shadow.clean_html = "<html><body><div>SPA shell</div></body></html>"
+    router = ToolRouter(shadow)  # type: ignore[arg-type]
+    result = router.dispatch("schema_page", {})
+    assert result.nudge == SCHEMA_EMPTY_NUDGE
+
+
+def test_schema_page_compacts_mega_lists():
+    from shadow_web.agent.tools import compact_schema_for_agent
+
+    blob = "{" + "&amp;quot;widgets&amp;quot;:" * 20 + "x" * 500
+    huge = {
+        "tables": [],
+        "forms": [{"action": "/s", "method": "GET", "fields": [{"name": "q"}], "field_count": 1}],
+        "lists": [{"type": "unordered", "items": [blob, "Piens 1l"] + [f"nav{i}" for i in range(30)], "total": 40}],
+    }
+    compact = compact_schema_for_agent(huge)
+    assert len(compact["lists"]) <= 5
+    assert len(compact["lists"][0]["items"]) <= 8
+    assert all(len(str(i)) <= 80 for i in compact["lists"][0]["items"])
+
+
+def test_content_outline_and_blocks():
+    from shadow_web.agent.tools import CONTENT_BLOCKS_NUDGE, CONTENT_BLOCKS_REPEAT_NUDGE
+
+    shadow = FakeShadow()
+    shadow.clean_html = """
+    <html><body>
+      <h1>Books</h1>
+      <p>Nike Air Max — 55,45 €</p>
+      <p>Birkenstock Arizona — 99,95 €</p>
+      <div><span>Polo Ralph Lauren</span><span>85 €</span></div>
+    </body></html>
+    """
+    router = ToolRouter(shadow)  # type: ignore[arg-type]
+    outline = router.dispatch("content_outline", {"max_tokens": 400})
+    assert outline.ok is True
+    body = json.loads(outline.content)
+    assert body["block_count"] >= 1
+    assert body["outline"]
+    assert outline.nudge is not None
+
+    # Pick first pN id from outline lines
+    block_id = None
+    for line in body["outline"].splitlines():
+        if "|" in line and line.strip()[0] == "p":
+            block_id = line.split("|", 1)[0].strip()
+            break
+    assert block_id
+    blocks = router.dispatch("content_blocks", {"ids": block_id, "max_tokens": 800})
+    assert blocks.ok is True
+    fetched = json.loads(blocks.content)["blocks"]
+    assert block_id in fetched
+    assert blocks.nudge == CONTENT_BLOCKS_NUDGE
+
+    # Second fetch on same page is blocked (prevents token blowups).
+    again = router.dispatch("content_blocks", {"ids": block_id})
+    assert again.ok is False
+    assert again.nudge == CONTENT_BLOCKS_REPEAT_NUDGE
+    assert json.loads(again.content).get("blocked") is True

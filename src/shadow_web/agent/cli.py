@@ -43,6 +43,12 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Max model turns (default 20)",
     )
     exec_p.add_argument(
+        "--max-tokens",
+        type=int,
+        default=int(os.environ.get("SHADOW_WEB_MAX_TOKENS", "15000")),
+        help="Stop when cumulative LLM tokens reach this budget (default 15000; 0 = unlimited)",
+    )
+    exec_p.add_argument(
         "--headed",
         action="store_true",
         help="Show the browser window",
@@ -124,6 +130,7 @@ def _cmd_exec(args: argparse.Namespace) -> int:
         api_key=args.api_key,
         base_url=args.base_url,
         max_steps=args.max_steps,
+        max_tokens=args.max_tokens,
         headed=args.headed,
         session=args.session,
         heal_api_url=args.heal_url,

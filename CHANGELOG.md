@@ -6,6 +6,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- `exec` observe budget: dense pages (`action_count > 40`) auto-downgrade to minimal Action Map; new `shadow_query` tool; `--max-tokens` (default 15000).
+- Soft finish nudge after a non-empty `schema_page` result (call `done` unless a fact is still missing).
+- `exec` Content Index tools: `content_outline` + `content_blocks` for SPA/catalogs when SchemaSnap is empty; empty-schema nudge routes there.
+- `exec` content budget: outline default 400t / blocks 800t, max 5 block ids, one `content_blocks` per page (repeat blocked + hard done-nudge).
+
 ## [0.4.0] - 2026-07-26
 
 ### Added

@@ -136,9 +136,12 @@ shadow-web exec "What is the title of https://example.com?" \
 | `--base-url` | auto from env | DeepSeek / OpenRouter inferred from API key |
 | `--browser` | `camoufox` | `chromium` for CDP/a11y supplement path |
 | `--max-steps` | `20` | Model turns budget |
+| `--max-tokens` | `15000` | Cumulative LLM token budget (stops runaway catalog loops) |
 | `--session` | — | Persistent profile `~/.shadow-web/sessions/<name>` |
 | `--headed` | off | Show the browser window |
 | `--transcript` | off | Include step list in JSON |
+
+Dense pages (`action_count > 40`) auto-return **minimal** observations + a hint to use `shadow_query` / `schema_page` / `content_outline` then `done` — same terse pipeline as MCP, not site-specific. SPA catalogs with empty SchemaSnap should use **Rendered Text Index** (`content_outline` → `content_blocks`).
 
 Programmatic: `from shadow_web import run_agent_task`.  
 Model env help: `shadow-web models`.
