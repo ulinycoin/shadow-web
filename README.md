@@ -105,7 +105,9 @@ Remote and production requests are rejected unless `SHADOW_WEB_API_KEYS` is conf
 
 ### Standalone agent (`shadow-web exec`)
 
-Hand a browser task to the built-in observe→act→verify loop. One command in, one JSON object out — browsing transcript stays inside the sub-agent.
+Hand a **bounded browser task** to the built-in observe→act→verify loop. One command in, one JSON object out — browsing transcript stays inside the sub-agent. Same thick entrypoint over MCP: `agent_run(goal)`.
+
+This is for answering a question / short flow — **not** a full-site scrape. Large volumes stay on thin tools + pagination (`schema_session`, `content_outline(offset=…)`). The envelope always reports honesty fields: `complete`, `truncated`, `stop_reason`, optional `next_hint`.
 
 Unlike a11y-tree browser wrappers, observations are **HTML Action Maps + SchemaSnap** (works on any HTML, not only Playwright CDP). Default browser is **Camoufox** (Firefox fingerprint); Chromium is opt-in.
 
@@ -126,7 +128,10 @@ shadow-web exec "What is the title of https://example.com?" \
   "steps": 2,
   "usage": {"prompt_tokens": 1821, "completion_tokens": 144, "total_tokens": 1965},
   "url": "https://example.com/",
-  "browser": "camoufox"
+  "browser": "camoufox",
+  "stop_reason": "done",
+  "complete": true,
+  "truncated": false
 }
 ```
 

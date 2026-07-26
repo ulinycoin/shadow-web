@@ -8,6 +8,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Thick MCP tool `agent_run(goal)` — server-side bounded browser task, one JSON envelope (`stop_reason`, `complete`, `truncated`, `next_hint`). Not for bulk scrapes; thin tools stay for pagination.
+- `exec` / `done` completeness contract: `done(finalAnswer, complete=…, next_hint=…)`; budget stops (`max_steps` / `max_tokens` / `no_progress`) set `truncated=true` + recovery hint.
 - `exec` observe budget: dense pages (`action_count > 40`) auto-downgrade to minimal Action Map; new `shadow_query` tool; `--max-tokens` (default 15000).
 - Soft finish nudge after a non-empty `schema_page` result (call `done` unless a fact is still missing).
 - `exec` Content Index tools: `content_outline` + `content_blocks` for SPA/catalogs when SchemaSnap is empty; empty-schema nudge routes there.

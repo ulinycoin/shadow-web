@@ -18,9 +18,15 @@ def _build_parser() -> argparse.ArgumentParser:
 
     exec_p = sub.add_parser(
         "exec",
-        help="Run a browser task with the built-in agent loop (one JSON result)",
+        help=(
+            "Run a bounded browser TASK (one JSON result). "
+            "Not a bulk scraper — see complete/truncated/next_hint in output."
+        ),
     )
-    exec_p.add_argument("task", help="Natural-language browser task")
+    exec_p.add_argument(
+        "task",
+        help="Natural-language browser task (one goal, not a full-site scrape)",
+    )
     exec_p.add_argument(
         "--model",
         default=os.environ.get("SHADOW_WEB_LLM_MODEL", "deepseek-chat"),

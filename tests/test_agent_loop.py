@@ -103,7 +103,7 @@ def test_done_stops_loop():
             content=json.dumps({"finalAnswer": arguments["finalAnswer"]}),
             terminal=True,
             final_answer=arguments["finalAnswer"],
-            data={"url": shadow.last_url},
+            data={"url": shadow.last_url, "complete": True},
         )
 
     router.dispatch = _done_only  # type: ignore[method-assign]
@@ -113,6 +113,13 @@ def test_done_stops_loop():
     assert result.steps == 1
     assert result.usage["total_tokens"] == 15
     assert llm.calls == 1
+    assert result.complete is True
+    assert result.truncated is False
+    assert result.stop_reason == "done"
+    payload = result.to_dict()
+    assert payload["complete"] is True
+    assert payload["truncated"] is False
+    assert payload["stop_reason"] == "done"
 
 
 def test_no_progress_guard():
@@ -135,6 +142,10 @@ def test_no_progress_guard():
     assert result.ok is False
     assert result.error and "No progress" in result.error
     assert result.steps == 3
+    assert result.stop_reason == "no_progress"
+    assert result.complete is False
+    assert result.truncated is True
+    assert result.next_hint
 
 
 def test_max_steps_exhausted():
@@ -171,6 +182,10 @@ def test_max_steps_exhausted():
     assert result.ok is False
     assert result.error and "max_steps" in result.error
     assert result.steps == 3
+    assert result.stop_reason == "max_steps"
+    assert result.truncated is True
+    assert result.complete is False
+    assert "thin" in (result.next_hint or "").lower() or "Bound" in (result.next_hint or "")
 
 
 def test_plain_text_finish():
@@ -182,6 +197,8 @@ def test_plain_text_finish():
     result = AgentLoop(llm=llm, tools=router).run("what?")
     assert result.ok is True
     assert result.answer == "The answer is 42"
+    assert result.stop_reason == "plain_text"
+    assert result.complete is True
 
 
 def test_run_agent_task_with_injected_deps():
@@ -404,6 +421,55 @@ def test_max_tokens_stops_loop():
     assert result.ok is False
     assert result.error and "max_tokens" in result.error
     assert result.usage["total_tokens"] >= 5000
+    assert result.stop_reason == "max_tokens"
+    assert result.truncated is True
+
+
+def test_done_partial_completeness():
+    llm = ScriptedLLM(
+        [
+            ModelResponse(
+                content=None,
+                tool_calls=[
+                    _tool_call(
+                        "done",
+                        {
+                            "finalAnswer": "Top 3: A, B, C",
+                            "complete": False,
+                            "next_hint": "content_outline offset=20",
+                        },
+                        "t1",
+                    )
+                ],
+                usage={},
+            )
+        ]
+    )
+    shadow = FakeShadow()
+    router = ToolRouter(shadow)  # type: ignore[arg-type]
+    result = AgentLoop(llm=llm, tools=router).run("list products")
+    assert result.ok is True
+    assert result.answer == "Top 3: A, B, C"
+    assert result.complete is False
+    assert result.truncated is True
+    assert result.stop_reason == "done"
+    assert result.next_hint == "content_outline offset=20"
+    assert "complete" not in result.evidence
+    assert "next_hint" not in result.evidence
+
+
+def test_tool_router_done_partial_flags():
+    shadow = FakeShadow()
+    router = ToolRouter(shadow)  # type: ignore[arg-type]
+    done = router.dispatch(
+        "done",
+        {"finalAnswer": "slice", "complete": False, "next_hint": "page 2"},
+    )
+    assert done.terminal is True
+    body = json.loads(done.content)
+    assert body["complete"] is False
+    assert body["next_hint"] == "page 2"
+    assert done.data["complete"] is False
 
 
 def test_shadow_query_tool():

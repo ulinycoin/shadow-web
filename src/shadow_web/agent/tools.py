@@ -183,8 +183,9 @@ TOOL_SCHEMAS: List[Dict[str, Any]] = [
         "function": {
             "name": "done",
             "description": (
-                "Finish the task with a final answer. "
-                "Call this as soon as you have enough information (single-call finish for read-only)."
+                "Finish the bounded task with a final answer. "
+                "Call as soon as you have enough for THIS task (not the whole site). "
+                "Set complete=false + next_hint when the answer is a slice of a larger dataset."
             ),
             "parameters": {
                 "type": "object",
@@ -192,6 +193,20 @@ TOOL_SCHEMAS: List[Dict[str, Any]] = [
                     "finalAnswer": {
                         "type": "string",
                         "description": "Concise final answer for the user",
+                    },
+                    "complete": {
+                        "type": "boolean",
+                        "description": (
+                            "true if the task is fully answered; "
+                            "false if this is a useful slice / truncated extract"
+                        ),
+                    },
+                    "next_hint": {
+                        "type": "string",
+                        "description": (
+                            "When complete=false: how to continue "
+                            "(page URL, outline offset, thin-tool pagination)"
+                        ),
                     },
                 },
                 "required": ["finalAnswer"],
@@ -638,10 +653,21 @@ class ToolRouter:
         answer = args.get("finalAnswer")
         if answer is None:
             raise ValueError("finalAnswer is required")
+        complete_raw = args.get("complete", True)
+        if isinstance(complete_raw, str):
+            complete = complete_raw.strip().lower() not in ("false", "0", "no", "")
+        else:
+            complete = bool(complete_raw)
+        next_hint = args.get("next_hint") or args.get("nextHint")
+        if next_hint is not None:
+            next_hint = str(next_hint).strip() or None
         evidence: Dict[str, Any] = {
             "url": self.shadow.last_url,
             "action_count": len(self.shadow.action_map),
+            "complete": complete,
         }
+        if next_hint:
+            evidence["next_hint"] = next_hint
         if self.shadow.clean_html:
             try:
                 evidence["schema"] = compact_schema_for_agent(
@@ -649,10 +675,17 @@ class ToolRouter:
                 )
             except Exception:
                 pass
+        payload = {
+            "finalAnswer": str(answer),
+            "complete": complete,
+            "evidence": {k: v for k, v in evidence.items() if k not in ("complete", "next_hint")},
+        }
+        if next_hint:
+            payload["next_hint"] = next_hint
         return ToolResult(
             name="done",
             ok=True,
-            content=json.dumps({"finalAnswer": str(answer), "evidence": evidence}, ensure_ascii=False),
+            content=json.dumps(payload, ensure_ascii=False),
             data=evidence,
             terminal=True,
             final_answer=str(answer),

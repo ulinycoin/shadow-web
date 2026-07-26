@@ -651,6 +651,85 @@ def create_mcp_server():
             max_tokens=max_tokens,
         )
 
+    @mcp.tool()
+    async def agent_run(
+        goal: str,
+        max_steps: int = 20,
+        max_tokens: int = 15000,
+        model: str = "",
+        browser: str = "camoufox",
+        session: str = "",
+    ) -> dict:
+        """Thick tool: run a bounded browser TASK server-side and return one JSON result.
+
+        Use for: answer a question, find a fact, short interactive flow.
+        Do NOT use for: full-site / large-catalog scrapes — those stay on thin tools
+        (navigate, schema_session, content_outline with offset).
+
+        Envelope always includes stop_reason, complete, truncated, and optional next_hint.
+        Requires: pip install "shadow-web[agent]" (+ LLM API key env).
+        Owns its own browser; does not share the thin-tool MCP session.
+        """
+        import asyncio
+
+        goal_text = (goal or "").strip()
+        if not goal_text:
+            return {
+                "ok": False,
+                "answer": None,
+                "error": "goal is required",
+                "stop_reason": "invalid",
+                "complete": False,
+                "truncated": False,
+            }
+
+        try:
+            from shadow_web.agent.loop import DEFAULT_MAX_TOKENS, run_agent_task
+        except ImportError as exc:
+            return {
+                "ok": False,
+                "answer": None,
+                "error": (
+                    "agent_run requires the agent extra: "
+                    'pip install "shadow-web[agent]" '
+                    f"({exc})"
+                ),
+                "stop_reason": "missing_dependency",
+                "complete": False,
+                "truncated": False,
+            }
+
+        steps = max(1, min(int(max_steps or 20), 40))
+        try:
+            token_budget = int(max_tokens)
+        except (TypeError, ValueError):
+            token_budget = DEFAULT_MAX_TOKENS
+        if token_budget < 0:
+            token_budget = DEFAULT_MAX_TOKENS
+        # Cap hard so MCP clients cannot request unbounded bulk runs.
+        if token_budget == 0:
+            token_budget = DEFAULT_MAX_TOKENS
+        token_budget = min(token_budget, 50000)
+
+        model_id = (model or "").strip() or os.environ.get(
+            "SHADOW_WEB_LLM_MODEL", "deepseek-chat"
+        )
+        engine = (browser or "camoufox").strip().lower() or "camoufox"
+        session_name = (session or "").strip() or None
+
+        def _run():
+            return run_agent_task(
+                goal_text,
+                model=model_id,
+                max_steps=steps,
+                max_tokens=token_budget,
+                browser_engine=engine,
+                session=session_name,
+            )
+
+        result = await asyncio.to_thread(_run)
+        return result.to_dict()
+
     return mcp
 
 

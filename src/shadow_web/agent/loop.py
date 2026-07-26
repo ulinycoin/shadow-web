@@ -14,6 +14,20 @@ from .tools import TOOL_SCHEMAS, ToolResult, ToolRouter, parse_tool_arguments
 # Default cumulative completion+prompt budget for one exec run.
 DEFAULT_MAX_TOKENS = 15000
 
+# Honest stop hints when a bounded run cannot finish a bulk job.
+HINT_BUDGET = (
+    "Bounded task run stopped (not a full-site scrape). "
+    "Narrow the goal, or use thin tools: navigate → schema_session / "
+    "content_outline(offset=…) pagination."
+)
+HINT_NO_PROGRESS = (
+    "Agent repeated the same observation. Narrow the goal or switch to thin MCP tools."
+)
+HINT_PARTIAL = (
+    "Answer is a task-sized slice, not the full dataset. "
+    "Continue with thin tools + pagination (schema_session / content_outline offset)."
+)
+
 
 class SupportsChat(Protocol):
     def chat(
@@ -34,6 +48,11 @@ class AgentResult:
     error: Optional[str] = None
     transcript: List[Dict[str, Any]] = field(default_factory=list)
     evidence: Dict[str, Any] = field(default_factory=dict)
+    # Completeness contract: thick tool = bounded task, not bulk dump.
+    stop_reason: str = "unknown"
+    complete: bool = False
+    truncated: bool = False
+    next_hint: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         out: Dict[str, Any] = {
@@ -42,14 +61,50 @@ class AgentResult:
             "steps": self.steps,
             "usage": self.usage,
             "url": self.url,
+            "stop_reason": self.stop_reason,
+            "complete": self.complete,
+            "truncated": self.truncated,
         }
         if self.browser:
             out["browser"] = self.browser
         if self.error:
             out["error"] = self.error
+        if self.next_hint:
+            out["next_hint"] = self.next_hint
         if self.evidence:
             out["evidence"] = self.evidence
         return out
+
+
+def _result(
+    *,
+    ok: bool,
+    answer: Optional[str],
+    steps: int,
+    usage: Dict[str, int],
+    url: str,
+    stop_reason: str,
+    complete: bool,
+    truncated: bool,
+    error: Optional[str] = None,
+    transcript: Optional[List[Dict[str, Any]]] = None,
+    evidence: Optional[Dict[str, Any]] = None,
+    next_hint: Optional[str] = None,
+) -> AgentResult:
+    return AgentResult(
+        ok=ok,
+        answer=answer,
+        steps=steps,
+        usage=usage,
+        url=url,
+        error=error,
+        transcript=transcript or [],
+        evidence=evidence or {},
+        stop_reason=stop_reason,
+        complete=complete,
+        truncated=truncated,
+        next_hint=next_hint,
+    )
 
 
 @dataclass
@@ -73,6 +128,7 @@ class AgentLoop:
         last_sig: Optional[str] = None
         stagnant = 0
         steps = 0
+        url = lambda: self.tools.shadow.last_url or ""
 
         for _ in range(self.max_steps):
             steps += 1
@@ -81,32 +137,42 @@ class AgentLoop:
                 usage_totals[key] += int(response.usage.get(key, 0))
 
             if self.max_tokens > 0 and usage_totals["total_tokens"] >= self.max_tokens:
-                return AgentResult(
+                return _result(
                     ok=False,
                     answer=None,
                     steps=steps,
                     usage=usage_totals,
-                    url=self.tools.shadow.last_url or "",
+                    url=url(),
+                    stop_reason="max_tokens",
+                    complete=False,
+                    truncated=True,
                     error=f"Exceeded max_tokens ({self.max_tokens})",
                     transcript=transcript,
+                    next_hint=HINT_BUDGET,
                 )
 
             if not response.tool_calls:
                 # Model tried to answer in plain text — accept as finish.
                 answer = (response.content or "").strip()
                 if answer:
-                    return AgentResult(
+                    return _result(
                         ok=True,
                         answer=answer,
                         steps=steps,
                         usage=usage_totals,
-                        url=self.tools.shadow.last_url or "",
+                        url=url(),
+                        stop_reason="plain_text",
+                        complete=True,
+                        truncated=False,
                         transcript=transcript,
                     )
                 messages.append(
                     ChatMessage(
                         role="user",
-                        content="No tools called and no answer. Call a tool or done(finalAnswer).",
+                        content=(
+                            "No tools called and no answer. "
+                            "Call a tool or done(finalAnswer, complete=…)."
+                        ),
                     )
                 )
                 continue
@@ -166,46 +232,70 @@ class AgentLoop:
                     break
 
                 if stagnant >= self.no_progress_limit:
-                    return AgentResult(
+                    return _result(
                         ok=False,
                         answer=None,
                         steps=steps,
                         usage=usage_totals,
-                        url=self.tools.shadow.last_url or "",
-                        error=f"No progress after {self.no_progress_limit} identical tool results",
+                        url=url(),
+                        stop_reason="no_progress",
+                        complete=False,
+                        truncated=True,
+                        error=(
+                            f"No progress after {self.no_progress_limit} "
+                            "identical tool results"
+                        ),
                         transcript=transcript,
+                        next_hint=HINT_NO_PROGRESS,
                     )
 
             if finished is not None:
-                return AgentResult(
+                evidence = dict(finished.data or {})
+                complete = bool(evidence.pop("complete", True))
+                next_hint = evidence.pop("next_hint", None)
+                if not complete and not next_hint:
+                    next_hint = HINT_PARTIAL
+                return _result(
                     ok=True,
                     answer=finished.final_answer,
                     steps=steps,
                     usage=usage_totals,
-                    url=self.tools.shadow.last_url or "",
+                    url=url(),
+                    stop_reason="done",
+                    complete=complete,
+                    truncated=not complete,
                     transcript=transcript,
-                    evidence=finished.data or {},
+                    evidence=evidence,
+                    next_hint=next_hint,
                 )
 
             if self.max_tokens > 0 and usage_totals["total_tokens"] >= self.max_tokens:
-                return AgentResult(
+                return _result(
                     ok=False,
                     answer=None,
                     steps=steps,
                     usage=usage_totals,
-                    url=self.tools.shadow.last_url or "",
+                    url=url(),
+                    stop_reason="max_tokens",
+                    complete=False,
+                    truncated=True,
                     error=f"Exceeded max_tokens ({self.max_tokens})",
                     transcript=transcript,
+                    next_hint=HINT_BUDGET,
                 )
 
-        return AgentResult(
+        return _result(
             ok=False,
             answer=None,
             steps=steps,
             usage=usage_totals,
-            url=self.tools.shadow.last_url or "",
+            url=url(),
+            stop_reason="max_steps",
+            complete=False,
+            truncated=True,
             error=f"Exceeded max_steps ({self.max_steps})",
             transcript=transcript,
+            next_hint=HINT_BUDGET,
         )
 
 
