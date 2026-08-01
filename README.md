@@ -10,7 +10,7 @@
 
 # Shadow Web
 
-**Cut 64–99% of tokens from web pages before your LLM sees them — then extract structured data.**  
+**Cut up to 99% of tokens from web pages before your LLM sees them — then extract structured data.**  
 Open-source Python SDK + MCP + standalone `shadow-web exec` agent: flattens Shadow DOM, builds a typed Action Map, indexes rendered text on demand, heals broken selectors, and turns tables/forms/lists into clean JSON — Camoufox by default, no cloud required.
 
 > **v0.4.0** — `pip install "shadow-web[agent]"` → `shadow-web exec "…"` (observe→act→verify, SchemaSnap, single-call finish).
@@ -427,8 +427,27 @@ deploy/
 | Wikipedia + Content Index | 57,778 | 599¹ | — | **−99% (96×)** |
 | GitHub Trending | 167,875 | 37,833 | 1,290 | **−77% (4.4×)** |
 
-¹ `content_outline(max_tokens=600)` — 141 blocks, agent picks what to fetch.
-Full benchmark: `python benchmarks/run.py`
+¹ `content_outline(max_tokens=600)` — 141 blocks, agent picks what to fetch.  
+Full compression benchmark: `python benchmarks/run.py`
+
+### Agent Task Benchmark (end-to-end, v0.4.1-dev)
+
+Measured on live pages with `deepseek-chat` via `shadow-web exec`.  
+Each task: navigate → observe → extract → done.
+
+| Task | Page type | Raw HTML | Agent tokens | Reduction | Steps | Time | Success |
+|------|-----------|----------|-------------|-----------|-------|------|---------|
+| HN top story | table | 11,776 | 7,223 | **−39% (1.6×)** | 3 | 7.4s | ✓ |
+| Form fields | form | 62,718 | 11,705 | **−81% (5.4×)** | 5 | 12.9s | ✓ |
+| Wikipedia fact | text-heavy | 72,431 | 12,436 | **−83% (5.8×)** | 5 | 23.6s | ✓ |
+| GitHub trending count | SPA | 199,634 | 10,507 | **−95% (19×)** | 4 | 17.0s | ✓ |
+| Page heading | static | 162 | 5,652 | +overhead² | 3 | 18.0s | ✓ |
+| **Total** | — | **346,721** | **47,523** | **−86% (7.3×)** | — | — | **5/5** |
+
+² Tiny pages incur fixed agent overhead (system prompt, navigate, observe).  
+On pages above ~5K tokens, shadow-web delivers net savings.
+
+Reproduce: `DEEPSEEK_API_KEY=sk-... python benchmarks/agent_tasks.py`
 
 ---
 

@@ -41,25 +41,48 @@ def resolve_api_credentials(
     api_key: Optional[str] = None,
     base_url: Optional[str] = None,
 ) -> tuple[str, Optional[str]]:
-    """Resolve API key and optional base_url from args / environment."""
+    """Resolve API key and optional base_url from args / environment.
+
+    When explicit args are given they always win. Without them, each
+    provider is resolved as an *atomic* (key, default_url) pair so a
+    DeepSeek key never lands on the OpenAI endpoint and vice versa.
+    """
     from shadow_web.runtime_env import load_dotenv_files, missing_llm_key_message
 
     load_dotenv_files()
-    key = api_key or (
-        os.environ.get("DEEPSEEK_API_KEY")
-        or os.environ.get("OPENAI_API_KEY")
-        or os.environ.get("OPENROUTER_API_KEY")
-        or os.environ.get("SHADOW_WEB_LLM_API_KEY")
-    )
-    if not key:
-        raise RuntimeError(missing_llm_key_message())
 
-    url = base_url or os.environ.get("SHADOW_WEB_LLM_BASE_URL")
-    if url is None and os.environ.get("DEEPSEEK_API_KEY") and not os.environ.get("OPENAI_API_KEY"):
-        url = "https://api.deepseek.com"
-    if url is None and os.environ.get("OPENROUTER_API_KEY") and not os.environ.get("OPENAI_API_KEY"):
-        url = "https://openrouter.ai/api/v1"
-    return key, url
+    # Explicit args → no inference
+    if base_url or api_key:
+        key = api_key or (
+            os.environ.get("DEEPSEEK_API_KEY")
+            or os.environ.get("OPENAI_API_KEY")
+            or os.environ.get("OPENROUTER_API_KEY")
+            or os.environ.get("SHADOW_WEB_LLM_API_KEY")
+        )
+        if not key:
+            raise RuntimeError(missing_llm_key_message())
+        url = base_url or os.environ.get("SHADOW_WEB_LLM_BASE_URL")
+        return key, url
+
+    # No explicit args: resolve provider + default URL as an atomic pair.
+    # Order: DeepSeek → OpenAI → OpenRouter → SHADOW_WEB_LLM (generic).
+    providers: list[tuple[str, Optional[str]]] = [
+        ("DEEPSEEK_API_KEY", "https://api.deepseek.com"),
+        ("OPENAI_API_KEY", None),  # OpenAI SDK default
+        ("OPENROUTER_API_KEY", "https://openrouter.ai/api/v1"),
+    ]
+    custom_url = os.environ.get("SHADOW_WEB_LLM_BASE_URL")
+    for env_key, default_url in providers:
+        key = os.environ.get(env_key)
+        if key:
+            return key, default_url
+
+    # Last resort: SHADOW_WEB_LLM_API_KEY + optional SHADOW_WEB_LLM_BASE_URL
+    key = os.environ.get("SHADOW_WEB_LLM_API_KEY")
+    if key:
+        return key, custom_url
+
+    raise RuntimeError(missing_llm_key_message())
 
 
 class OpenAICompatibleAdapter:

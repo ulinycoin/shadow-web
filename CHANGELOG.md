@@ -4,7 +4,18 @@ All notable changes to this project are documented in this file.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.4.1] - 2026-08-01
+
+### Fixed
+
+- **P0 credential resolution**: `resolve_api_credentials()` now resolves provider key and default URL as an atomic pair — a DeepSeek API key no longer lands on the OpenAI endpoint when both `DEEPSEEK_API_KEY` and `OPENAI_API_KEY` are set.
+- **P0 multi-tool protocol**: nudge/hint messages are now appended *after* all tool result messages, not interleaved between them. Fixes invalid message ordering when the model issues multiple parallel tool calls and one returns a nudge.
+- **P1 content_blocks stale guard**: `_ensure_content_index()` is called *before* the repeat guard so DOM changes (click/fill/navigate) correctly reset the per-page fetch budget.
+
+### Changed
+
+- CLI `--browser` help now correctly states Chromium fallback is opt-in (`SHADOW_WEB_ALLOW_CHROMIUM_FALLBACK=1`), not automatic.
+- README headline: "Cut up to 99%" (matching published benchmark table), not unsupported "64–99%".
 
 ### Added
 

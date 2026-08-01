@@ -186,6 +186,8 @@ class AgentLoop:
             )
 
             finished: Optional[ToolResult] = None
+            results_collected: list[tuple[dict[str, Any], ToolResult]] = []
+
             for tc in response.tool_calls:
                 fn = tc.get("function") or {}
                 name = fn.get("name") or ""
@@ -199,7 +201,12 @@ class AgentLoop:
                     )
                 else:
                     result = self.tools.dispatch(name, args)
+                results_collected.append((tc, result))
 
+            # Append all tool messages first (required by OpenAI-compatible
+            # protocol), then one combined user nudge afterwards.
+            nudges: list[str] = []
+            for tc, result in results_collected:
                 transcript.append(
                     {
                         "step": steps,
@@ -216,9 +223,8 @@ class AgentLoop:
                         content=result.content,
                     )
                 )
-
                 if result.nudge:
-                    messages.append(ChatMessage(role="user", content=result.nudge))
+                    nudges.append(result.nudge)
 
                 sig = f"{result.name}:{result.content}"
                 if sig == last_sig:
@@ -248,6 +254,18 @@ class AgentLoop:
                         transcript=transcript,
                         next_hint=HINT_NO_PROGRESS,
                     )
+
+            if finished is None and nudges:
+                # Deduplicate order-preserving — same nudge from multiple
+                # tools (schema_page + snapshot) shouldn't repeat.
+                seen: set[str] = set()
+                unique: list[str] = []
+                for n in nudges:
+                    if n not in seen:
+                        seen.add(n)
+                        unique.append(n)
+                combined = " · ".join(unique)
+                messages.append(ChatMessage(role="user", content=combined))
 
             if finished is not None:
                 evidence = dict(finished.data or {})

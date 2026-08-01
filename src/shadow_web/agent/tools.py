@@ -602,6 +602,10 @@ class ToolRouter:
     def _tool_content_blocks(self, args: Dict[str, Any]) -> ToolResult:
         from shadow_web.content_index import fetch
 
+        # Refresh index *before* the repeat guard — a DOM change
+        # (click/fill/navigate) resets the fetch budget here.
+        blocks, _quality = self._ensure_content_index()
+
         if self._content_blocks_fetches >= 1:
             data = {
                 "url": self.shadow.last_url,
@@ -631,7 +635,6 @@ class ToolRouter:
             max_tokens = DEFAULT_BLOCKS_TOKENS
         # Cap hard so SPA listings cannot blow the exec context window.
         max_tokens = max(50, min(max_tokens, 1200))
-        blocks, _quality = self._ensure_content_index()
         fetched = fetch(blocks, block_ids, max_tokens=max_tokens)
         data = {
             "url": self.shadow.last_url,

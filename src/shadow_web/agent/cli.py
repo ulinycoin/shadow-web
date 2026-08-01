@@ -63,7 +63,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--browser",
         choices=("camoufox", "chromium"),
         default=os.environ.get("SHADOW_WEB_BROWSER", "camoufox"),
-        help="Browser engine (default: camoufox; falls back to chromium if unavailable)",
+        help="Browser engine (default: camoufox; Chromium fallback only with SHADOW_WEB_ALLOW_CHROMIUM_FALLBACK=1)",
     )
     exec_p.add_argument(
         "--session",
