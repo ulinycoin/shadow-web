@@ -66,6 +66,8 @@ def resolve_api_credentials(
 
     # No explicit args: resolve provider + default URL as an atomic pair.
     # Order: DeepSeek → OpenAI → OpenRouter → SHADOW_WEB_LLM (generic).
+    # SHADOW_WEB_LLM_BASE_URL, when set, overrides the provider default —
+    # so a DeepSeek key can safely hit a compatible proxy.
     providers: list[tuple[str, Optional[str]]] = [
         ("DEEPSEEK_API_KEY", "https://api.deepseek.com"),
         ("OPENAI_API_KEY", None),  # OpenAI SDK default
@@ -75,7 +77,7 @@ def resolve_api_credentials(
     for env_key, default_url in providers:
         key = os.environ.get(env_key)
         if key:
-            return key, default_url
+            return key, custom_url if custom_url else default_url
 
     # Last resort: SHADOW_WEB_LLM_API_KEY + optional SHADOW_WEB_LLM_BASE_URL
     key = os.environ.get("SHADOW_WEB_LLM_API_KEY")

@@ -13,7 +13,7 @@
 **Cut up to 99% of tokens from web pages before your LLM sees them — then extract structured data.**  
 Open-source Python SDK + MCP + standalone `shadow-web exec` agent: flattens Shadow DOM, builds a typed Action Map, indexes rendered text on demand, heals broken selectors, and turns tables/forms/lists into clean JSON — Camoufox by default, no cloud required.
 
-> **v0.4.0** — `pip install "shadow-web[agent]"` → `shadow-web exec "…"` (observe→act→verify, SchemaSnap, single-call finish).
+> **v0.4.1** — `pip install "shadow-web[agent]"` → `shadow-web exec "…"` (observe→act→verify, SchemaSnap, single-call finish).
 
 ```python
 from shadow_web.compressor import process_html
@@ -112,13 +112,18 @@ This is for answering a question / short flow — **not** a full-site scrape. La
 Unlike a11y-tree browser wrappers, observations are **HTML Action Maps + SchemaSnap** (works on any HTML, not only Playwright CDP). Default browser is **Camoufox** (Firefox fingerprint); Chromium is opt-in.
 
 ```bash
-pip install "shadow-web[agent]"
-camoufox fetch          # once — required for default --browser camoufox
-# playwright install chromium   # only if you use --browser chromium
+# 30-second demo (Chromium path — no camoufox fetch)
+pip install "shadow-web[agent]" && playwright install chromium
 export DEEPSEEK_API_KEY="..."   # or OPENAI_API_KEY / OPENROUTER_API_KEY
+SHADOW_WEB_ALLOW_CHROMIUM_FALLBACK=1 \
+  shadow-web exec "What is the heading on https://example.com?" \
+  --browser chromium --model deepseek-chat
 
-shadow-web exec "What is the title of https://example.com?" \
-  --model deepseek-chat
+# one-liner from a clone:
+# bash scripts/demo_30s.sh
+
+# Default production path (Camoufox fingerprint):
+# camoufox fetch && shadow-web exec "…" --model deepseek-chat
 ```
 
 ```json
@@ -430,24 +435,35 @@ deploy/
 ¹ `content_outline(max_tokens=600)` — 141 blocks, agent picks what to fetch.  
 Full compression benchmark: `python benchmarks/run.py`
 
-### Agent Task Benchmark (end-to-end, v0.4.1-dev)
+### Agent Task Benchmark (end-to-end, v0.4.1)
 
-Measured on live pages with `deepseek-chat` via `shadow-web exec`.  
-Each task: navigate → observe → extract → done.
+Measured 2026-08-01 with `deepseek-chat` on **10** bounded public-page tasks.  
+**Fair baseline:** Playwright Chromium HTML → one LLM call (same model/goal, HTML capped at 24k tokens).  
+**Shadow Web:** `shadow-web exec` agent loop.  
+Success uses shared answer checks (`expected_contains` / `expected_any` / regex) — not “any non-empty string”.
 
-| Task | Page type | Raw HTML | Agent tokens | Reduction | Steps | Time | Success |
-|------|-----------|----------|-------------|-----------|-------|------|---------|
-| HN top story | table | 11,776 | 7,223 | **−39% (1.6×)** | 3 | 7.4s | ✓ |
-| Form fields | form | 62,718 | 11,705 | **−81% (5.4×)** | 5 | 12.9s | ✓ |
-| Wikipedia fact | text-heavy | 72,431 | 12,436 | **−83% (5.8×)** | 5 | 23.6s | ✓ |
-| GitHub trending count | SPA | 199,634 | 10,507 | **−95% (19×)** | 4 | 17.0s | ✓ |
-| Page heading | static | 162 | 5,652 | +overhead² | 3 | 18.0s | ✓ |
-| **Total** | — | **346,721** | **47,523** | **−86% (7.3×)** | — | — | **5/5** |
+```bash
+DEEPSEEK_API_KEY=sk-... python benchmarks/agent_tasks.py
+# python benchmarks/agent_tasks.py --only mdn-404 --limit 3
+```
 
-² Tiny pages incur fixed agent overhead (system prompt, navigate, observe).  
-On pages above ~5K tokens, shadow-web delivers net savings.
+| Task | Page type | Baseline LLM tok | SW tok | vs baseline | Steps | Success (BL/SW) |
+|------|-----------|-----------------:|-------:|-------------|------:|-----------------|
+| Page heading | static | 225 | 5,652 | overhead² | 3 | ✓ / ✓ |
+| Wikipedia fact | text-heavy | 26,466 | 12,456 | **2.1×** | 5 | ✓ / ✓ |
+| HN top story | table | 12,000 | 9,671 | **1.2×** | 4 | ✓ / ✓ |
+| GitHub trending | SPA | 25,622 | 7,176 | **3.6×** | 3 | ✓ / ✓ |
+| Form fields | form | 24,848 | 6,756 | **3.7×** | 3 | ✓ / ✓ |
+| Books first price | catalog | 10,340 | 6,273 | **1.6×** | 3 | ✓ / ✓ |
+| Quotes count | list | 2,965 | 9,042 | overhead² | 4 | ✓ / ✓ |
+| Login fields | form | 750 | 3,678 | overhead² | 2 | ✓ / ✓ |
+| MDN HTTP 404 | text-heavy | 25,350 | 13,644 | **1.9×** | 5 | ✓ / ✓ |
+| Table Due (Smith) | table | 1,899 | 6,233 | overhead² | 3 | ✓ / ✓ |
+| **Total** | — | **130,465** | **80,581** | **1.6× (6/10 wins)** | — | **10/10** |
 
-Reproduce: `DEEPSEEK_API_KEY=sk-... python benchmarks/agent_tasks.py`
+² Tiny / already-small pages: agent system prompt + tool loop costs more than dumping HTML.  
+Advantage shows on pages where naive HTML ≥ ~5–10k tokens.  
+Raw JSON: `benchmarks/results/agent_tasks_live_20260801_094423_corrected.json`.
 
 ---
 

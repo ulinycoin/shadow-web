@@ -137,6 +137,7 @@ def test_credential_explicit_base_url_respected(monkeypatch):
 def test_credential_explicit_api_key_wins(monkeypatch):
     monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-deep")
     monkeypatch.setenv("OPENAI_API_KEY", "sk-openai")
+    monkeypatch.delenv("SHADOW_WEB_LLM_BASE_URL", raising=False)
 
     import importlib
     import shadow_web.runtime_env as re
@@ -149,6 +150,26 @@ def test_credential_explicit_api_key_wins(monkeypatch):
     assert key == "sk-explicit"
     # Explicit api_key without base_url -> no inference
     assert url is None
+
+
+def test_credential_custom_base_url_overrides_provider_default(monkeypatch):
+    """SHADOW_WEB_LLM_BASE_URL must win over DeepSeek's default endpoint."""
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-deep")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("SHADOW_WEB_LLM_API_KEY", raising=False)
+    monkeypatch.setenv("SHADOW_WEB_LLM_BASE_URL", "https://proxy.example.com/v1")
+
+    import importlib
+    import shadow_web.runtime_env as re
+    monkeypatch.setattr(re, "load_dotenv_files", lambda *a, **kw: [])
+    import shadow_web.agent.models as m
+    re._DOTENV_LOADED = False
+    importlib.reload(m)
+
+    key, url = m.resolve_api_credentials()
+    assert key == "sk-deep"
+    assert url == "https://proxy.example.com/v1"
 
 
 # ---------------------------------------------------------------------------

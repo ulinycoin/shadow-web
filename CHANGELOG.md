@@ -9,6 +9,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - **P0 credential resolution**: `resolve_api_credentials()` now resolves provider key and default URL as an atomic pair — a DeepSeek API key no longer lands on the OpenAI endpoint when both `DEEPSEEK_API_KEY` and `OPENAI_API_KEY` are set.
+- **P0 credential proxy override**: `SHADOW_WEB_LLM_BASE_URL` overrides the provider default URL when a named provider key is selected (DeepSeek/OpenAI/OpenRouter proxy use case).
 - **P0 multi-tool protocol**: nudge/hint messages are now appended *after* all tool result messages, not interleaved between them. Fixes invalid message ordering when the model issues multiple parallel tool calls and one returns a nudge.
 - **P1 content_blocks stale guard**: `_ensure_content_index()` is called *before* the repeat guard so DOM changes (click/fill/navigate) correctly reset the per-page fetch budget.
 
@@ -16,6 +17,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - CLI `--browser` help now correctly states Chromium fallback is opt-in (`SHADOW_WEB_ALLOW_CHROMIUM_FALLBACK=1`), not automatic.
 - README headline: "Cut up to 99%" (matching published benchmark table), not unsupported "64–99%".
+- Agent task benchmark (`benchmarks/agent_tasks.py`): 10 bounded tasks, Playwright→LLM oneshot baseline, shared answer checks, `--limit` / `--no-llm-baseline`.
+- Paste-ready demo: `scripts/demo_30s.sh` + README 30-second Chromium path.
 
 ### Added
 
