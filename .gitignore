@@ -20,9 +20,15 @@ venv/
 .cursor/
 server.log
 
+# Weekly LocalPDF scan dumps (latest mirrored under examples/localpdf/)
+reports/localpdf/
+
 # Internal / agent memory (not for public repo)
 CLAUDE.md
 PLAN.md
+
+# ORI eval scratch / logs
+.ori/
 
 # Unrelated scripts
 scripts/iub_tender_search.py

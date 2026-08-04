@@ -1,7 +1,7 @@
 {
   "identifier": "ulinycoin-shadow-web",
   "name": "Shadow Web",
-  "version": "0.3.5",
+  "version": "0.4.1",
   "author": "ulinycoin",
   "authorUrl": "https://github.com/ulinycoin",
   "description": "Agent-facing web interaction toolkit. Compress HTML to action maps, drive browsers via Playwright, extract structured data (tables, forms, lists), search the web, and fill forms — all from MCP.",

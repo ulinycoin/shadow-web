@@ -39,7 +39,7 @@ load_env()
 app = FastAPI(
     title="Shadow Web API",
     description="Stateless DOM compression and verified self-healing selector APIs for AI agents.",
-    version="0.3.5",
+    version="0.4.1",
 )
 
 _RATE_BUCKETS: Dict[str, List[float]] = defaultdict(list)
