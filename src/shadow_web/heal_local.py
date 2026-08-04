@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
+import threading
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 from typing import Any, Dict, List, Optional
@@ -12,6 +14,7 @@ from urllib.parse import urlparse
 from .utils import _parse_eval_res
 
 PageLike = Any
+logger = logging.getLogger(__name__)
 
 HEAL_THRESHOLD = 0.85
 CACHE_DIR = os.path.expanduser("~/.shadow-web")
@@ -101,6 +104,7 @@ class HealCache:
     def __init__(self, path: str = CACHE_FILE):
         self.path = path
         self._data: Dict[str, str] = {}
+        self._lock = threading.Lock()
         self._load()
 
     def _load(self) -> None:
@@ -108,14 +112,27 @@ class HealCache:
             return
         try:
             with open(self.path, "r", encoding="utf-8") as f:
-                self._data = json.load(f)
-        except (json.JSONDecodeError, OSError):
+                loaded = json.load(f)
+            if not isinstance(loaded, dict):
+                raise ValueError("cache file root must be an object")
+            self._data = loaded
+        except (json.JSONDecodeError, OSError, ValueError) as exc:
+            logger.warning(
+                "Heal cache %s is unreadable (%s); starting empty. "
+                "Quality of local healing may degrade until new entries are saved.",
+                self.path,
+                exc,
+            )
             self._data = {}
 
     def _save(self) -> None:
         os.makedirs(os.path.dirname(self.path) or ".", exist_ok=True)
-        with open(self.path, "w", encoding="utf-8") as f:
+        tmp_path = self.path + f".tmp.{os.getpid()}"
+        with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(self._data, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, self.path)
 
     @staticmethod
     def cache_key(url: str, label: str, action_type: str) -> str:
@@ -126,21 +143,25 @@ class HealCache:
         return f"{domain}|{path}|{base_tag}|{norm_label}"
 
     def get(self, url: str, label: str, action_type: str) -> Optional[str]:
-        return self._data.get(self.cache_key(url, label, action_type))
+        with self._lock:
+            return self._data.get(self.cache_key(url, label, action_type))
 
     def set(self, url: str, label: str, action_type: str, selector: str) -> None:
-        self._data[self.cache_key(url, label, action_type)] = selector
-        self._save()
+        with self._lock:
+            self._data[self.cache_key(url, label, action_type)] = selector
+            self._save()
 
     def invalidate(self, url: str, label: str, action_type: str) -> None:
         key = self.cache_key(url, label, action_type)
-        if key in self._data:
-            del self._data[key]
-            self._save()
+        with self._lock:
+            if key in self._data:
+                del self._data[key]
+                self._save()
 
     def clear(self) -> None:
-        self._data = {}
-        self._save()
+        with self._lock:
+            self._data = {}
+            self._save()
 
 
 def fuzzy_ratio(a: str, b: str) -> float:

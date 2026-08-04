@@ -143,18 +143,18 @@ class BrowserSession:
         try:
             if self._context is not None:
                 self._context.close()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("[BrowserSession] context close failed: %s", exc)
         try:
             if self._browser is not None:
                 self._browser.close()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("[BrowserSession] browser close failed: %s", exc)
         try:
             if self._pw is not None:
                 self._pw.stop()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("[BrowserSession] playwright stop failed: %s", exc)
         self._context = None
         self._browser = None
         self._pw = None

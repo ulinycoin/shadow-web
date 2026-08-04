@@ -527,15 +527,23 @@ class AsyncShadowPage:
                 raise ValueError(f"Unknown action: {action}")
         else:
             if action == "click":
-                await self.page.evaluate(
-                    "((selector) => { const el = document.querySelector(selector); if (el) el.click(); })",
+                result = _parse_eval_res(await self.page.evaluate(
+                    "((selector) => { const el = document.querySelector(selector); if (!el) return { ok: false, error: 'element_not_found' }; el.click(); return { ok: true }; })",
                     selector
-                )
+                ))
+                if not isinstance(result, dict) or not result.get("ok"):
+                    raise RuntimeError(
+                        f"Click failed for selector {selector!r}: {result.get('error', 'unknown') if isinstance(result, dict) else result}"
+                    )
             elif action == "fill":
-                await self.page.evaluate(
-                    "((selector, val) => { const el = document.querySelector(selector); if (el) { el.focus(); el.value = val; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); } })",
+                result = _parse_eval_res(await self.page.evaluate(
+                    "((selector, val) => { const el = document.querySelector(selector); if (!el) return { ok: false, error: 'element_not_found' }; const tag = (el.tagName || '').toLowerCase(); const editable = tag === 'input' || tag === 'textarea' || el.isContentEditable; if (!editable) return { ok: false, error: 'element_not_fillable' }; el.focus(); el.value = val; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); return { ok: true }; })",
                     selector, value or ""
-                )
+                ))
+                if not isinstance(result, dict) or not result.get("ok"):
+                    raise RuntimeError(
+                        f"Fill failed for selector {selector!r}: {result.get('error', 'unknown') if isinstance(result, dict) else result}"
+                    )
             else:
                 raise ValueError(f"Unknown action: {action}")
 

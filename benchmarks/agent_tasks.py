@@ -256,7 +256,7 @@ def baseline_raw_html(url: str, goal: str) -> Dict[str, Any]:
     try:
         import ssl
         import urllib.request
-        ctx = ssl._create_unverified_context()
+        ctx = ssl.create_default_context()
         req = urllib.request.Request(
             url,
             headers={"User-Agent": "shadow-web-benchmark/0.4"},

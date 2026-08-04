@@ -89,9 +89,20 @@ def _is_local_request(request: Request) -> bool:
     return host in {"127.0.0.1", "::1", "localhost", "testclient"}
 
 
+def _allow_unauthenticated_local() -> bool:
+    """Unauthenticated local mode requires an explicit opt-in env flag.
+
+    Client IP is NOT a security boundary (reverse proxies rewrite it), so
+    relying on it silently would open the API to the network. The flag is
+    the operator's explicit choice to run a no-key local instance.
+    """
+    flag = os.environ.get("SHADOW_WEB_ALLOW_UNAUTHENTICATED_LOCAL", "").strip().lower()
+    return flag in {"1", "true", "yes", "on"}
+
+
 def verify_api_key(
     request: Request,
-    authorization: Optional[str] = Header(None),
+    authorization: str | None = Header(None),
 ) -> str:
     """Require configured bearer keys for every non-local request."""
     allowed_raw = os.environ.get("SHADOW_WEB_API_KEYS", "").strip()
@@ -101,6 +112,15 @@ def verify_api_key(
             raise HTTPException(
                 status_code=503,
                 detail="API authentication is not configured",
+            )
+        if not _allow_unauthenticated_local():
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "API authentication is not configured; refusing to run "
+                    "unauthenticated. Set SHADOW_WEB_ALLOW_UNAUTHENTICATED_LOCAL=1 "
+                    "only for a loopback-bound local instance."
+                ),
             )
         return "local"
 
@@ -158,6 +178,9 @@ def _llm_heal_selector(client: OpenAI, req: HealRequest, model: str) -> str:
         "compatible with document.querySelectorAll. Do not use :contains, :has-text, text search, "
         "markdown, quotes, or explanations."
     )
+    # context_html is untrusted page content: neutralise markdown fences so a
+    # page can never close the code block and inject instructions.
+    safe_context = req.context_html.replace("```", "`\u200b`\u200b`")
     user_prompt = f"""
 The original CSS selector '{req.broken_selector}' is broken.
 Target type: '{req.action_type}'.
@@ -165,7 +188,7 @@ Target label, placeholder, or text: '{req.action_label}'.
 
 Parent HTML:
 ```html
-{req.context_html}
+{safe_context}
 ```
 
 Return the most specific reliable standard CSS selector only.

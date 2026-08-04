@@ -82,11 +82,25 @@ def test_remote_request_rejects_missing_api_key_configuration():
 
 
 def test_local_development_uses_one_fixed_rate_bucket():
-    with patch.dict(os.environ, {}, clear=True):
+    with patch.dict(
+        os.environ,
+        {"SHADOW_WEB_ALLOW_UNAUTHENTICATED_LOCAL": "1"},
+        clear=True,
+    ):
         first = verify_api_key(_request("127.0.0.1"), "Bearer attacker-a")
         second = verify_api_key(_request("127.0.0.1"), "Bearer attacker-b")
 
     assert first == second == "local"
+
+
+def test_local_development_without_explicit_flag_refuses_unauthenticated():
+    # Client IP is not a security boundary: without the explicit opt-in flag,
+    # even a loopback request must be refused when no API key is configured.
+    with patch.dict(os.environ, {}, clear=True):
+        with pytest.raises(HTTPException) as exc_info:
+            verify_api_key(_request("127.0.0.1"), None)
+
+    assert exc_info.value.status_code == 503
 
 
 def test_configured_bearer_key_is_required():
