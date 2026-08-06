@@ -1,0 +1,226 @@
+{
+  "scanned_at": "2026-08-06T18:52:45.466756+00:00",
+  "n": 10,
+  "products": [
+    {
+      "id": "allbirds_pdp",
+      "kind": "shopify_pdp",
+      "url": "https://www.allbirds.com/products/mens-tree-runners",
+      "identity": "https://www.allbirds.com/products/mens-tree-runners",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Closed Shadow",
+      "title": "Allbirds: Sustainable Men’s Shoes, Wear-All-Day Comfort",
+      "price_raw": "$50",
+      "price_norm": 50.0,
+      "currency": null,
+      "stock": "in_stock",
+      "promo": false,
+      "confidence": "low",
+      "needs_review": true,
+      "planes": [
+        "content_outline"
+      ],
+      "needs_review_reason": "price from regex only (low confidence)"
+    },
+    {
+      "id": "brooklinen_pdp",
+      "kind": "shopify_pdp",
+      "url": "https://www.brooklinen.com/products/classic-core-sheet-set",
+      "identity": "https://www.brooklinen.com/products/classic-core-sheet-set",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Closed Shadow",
+      "title": "Classic Percale Sheet Set | Cooling Cotton Sheets | Brooklinen",
+      "price_raw": "USD 135.15",
+      "price_norm": 135.15,
+      "currency": "USD",
+      "stock": "in_stock",
+      "promo": false,
+      "confidence": "high",
+      "needs_review": false,
+      "planes": [
+        "content_outline",
+        "jsonld"
+      ]
+    },
+    {
+      "id": "colourpop_coll",
+      "kind": "shopify_collection",
+      "url": "https://colourpop.com/collections/best-sellers",
+      "identity": "https://colourpop.com/collections/best-sellers",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Closed Shadow",
+      "title": "ColourPop®: Shop Best Sellers | Top Trending Makeup Picks",
+      "price_raw": "$54.00",
+      "price_norm": 54.0,
+      "currency": null,
+      "stock": "unknown",
+      "promo": false,
+      "confidence": "low",
+      "needs_review": true,
+      "planes": [
+        "content_outline"
+      ],
+      "needs_review_reason": "price from regex only (low confidence)"
+    },
+    {
+      "id": "tentree_pdp",
+      "kind": "shopify_pdp",
+      "url": "https://www.tentree.com/products/mens-classic-t-shirt",
+      "identity": "https://www.tentree.com/products/mens-classic-t-shirt",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Closed Shadow",
+      "title": "404 Not Found",
+      "price_raw": "$20",
+      "price_norm": 20.0,
+      "currency": null,
+      "stock": "in_stock",
+      "promo": false,
+      "confidence": "low",
+      "needs_review": true,
+      "planes": [
+        "content_outline"
+      ],
+      "needs_review_reason": "price from regex only (low confidence)"
+    },
+    {
+      "id": "publicgoods_pdp",
+      "kind": "shopify_pdp",
+      "url": "https://www.publicgoods.com/products/hand-soap",
+      "identity": "https://www.publicgoods.com/products/hand-soap",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Closed Shadow",
+      "title": "Hand Soap – Public Goods",
+      "price_raw": "USD 14.95",
+      "price_norm": 14.95,
+      "currency": "USD",
+      "stock": "in_stock",
+      "promo": false,
+      "confidence": "high",
+      "needs_review": false,
+      "planes": [
+        "content_outline",
+        "jsonld"
+      ]
+    },
+    {
+      "id": "glossier_pdp",
+      "kind": "shopify_pdp",
+      "url": "https://www.glossier.com/products/boy-brow",
+      "identity": "https://www.glossier.com/products/boy-brow",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Closed Shadow",
+      "title": "Boy Brow | Tinted Brow Gel – Glossier",
+      "price_raw": "EUR 27",
+      "price_norm": 27.0,
+      "currency": "EUR",
+      "stock": "in_stock",
+      "promo": false,
+      "confidence": "high",
+      "needs_review": false,
+      "planes": [
+        "content_outline",
+        "jsonld"
+      ]
+    },
+    {
+      "id": "meundies_pdp",
+      "kind": "shopify_pdp",
+      "url": "https://www.meundies.com/products/mens-brief",
+      "identity": "https://www.meundies.com/products/mens-brief",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Closed Shadow",
+      "title": "Men's Brief Underwear | Men's Basics",
+      "price_raw": "USD 26.0",
+      "price_norm": 26.0,
+      "currency": "USD",
+      "stock": "in_stock",
+      "promo": false,
+      "confidence": "high",
+      "needs_review": false,
+      "planes": [
+        "content_outline",
+        "jsonld"
+      ]
+    },
+    {
+      "id": "spacious_shop",
+      "kind": "woo_collection",
+      "url": "https://themegrilldemos.com/spacious/shop/",
+      "identity": "https://themegrilldemos.com/spacious/shop/",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Static",
+      "title": "Shop – Spacious",
+      "price_raw": "£ 20.00",
+      "price_norm": 20.0,
+      "currency": null,
+      "stock": "in_stock",
+      "promo": false,
+      "confidence": "low",
+      "needs_review": true,
+      "planes": [
+        "content_outline"
+      ],
+      "needs_review_reason": "price from regex only (low confidence)"
+    },
+    {
+      "id": "bombas_coll",
+      "kind": "shopify_collection",
+      "url": "https://bombas.com/collections/mens-socks",
+      "identity": "https://bombas.com/collections/mens-socks",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Closed Shadow",
+      "title": "All Men's Socks",
+      "price_raw": "€64",
+      "price_norm": 64.0,
+      "currency": null,
+      "stock": "unknown",
+      "promo": false,
+      "confidence": "low",
+      "needs_review": true,
+      "planes": [
+        "content_outline"
+      ],
+      "needs_review_reason": "price from regex only (low confidence)"
+    },
+    {
+      "id": "ridge_coll",
+      "kind": "shopify_collection",
+      "url": "https://ridge.com/collections/wallets",
+      "identity": "https://ridge.com/collections/wallets",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Shadow DOM",
+      "title": "All Wallets - In Aluminum, Titanium, & Carbon Fiber // The Ridge",
+      "price_raw": "$150",
+      "price_norm": 150.0,
+      "currency": null,
+      "stock": "unknown",
+      "promo": false,
+      "confidence": "low",
+      "needs_review": true,
+      "planes": [
+        "content_outline"
+      ],
+      "needs_review_reason": "price from regex only (low confidence)"
+    }
+  ]
+}
