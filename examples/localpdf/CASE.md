@@ -140,8 +140,14 @@ Shadow Web: `navigate(detail=minimal)` → `shadow_query` по фичам кон
 
 ## Следующий шаг
 
-1. Запустить `localpdf_competitor_scan.py` по cron / Cursor Automation раз в неделю.  
-2. Один PR в LocalPDF: pricing row на `localpdf-vs-smallpdf.astro` + расширить `/pdf-tools-without-upload`.  
-3. Закрыть P0 из SEO-аудита.
+Полный план фаз: [`PLAN.md`](./PLAN.md).
 
-Скажи «делай PR» — сделаю compare + thin page в `LocalPDF_V6`.
+```bash
+python scripts/localpdf_competitor_scan.py
+python scripts/localpdf_scan_diff.py
+# digest → reports/localpdf/diff-latest.md
+```
+
+1. Weekly scan + diff (фаза 1).  
+2. PR в LocalPDF compare по high-signal / content_actions.  
+3. Закрыть P0 из SEO-аудита.

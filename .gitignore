@@ -34,3 +34,6 @@ PLAN.md
 scripts/iub_tender_search.py
 scripts/lv_tender.py
 tests/test_lv_tender.py
+
+# Browser profile (machine-local)
+.camoufox/

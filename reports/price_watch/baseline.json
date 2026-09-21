@@ -1,28 +1,32 @@
 {
-  "scanned_at": "2026-08-06T18:52:45.466756+00:00",
+  "scanned_at": "2026-08-13T05:34:08.776000+00:00",
   "n": 10,
   "products": [
     {
       "id": "allbirds_pdp",
       "kind": "shopify_pdp",
-      "url": "https://www.allbirds.com/products/mens-tree-runners",
-      "identity": "https://www.allbirds.com/products/mens-tree-runners",
+      "url": "https://www.allbirds.com/products/mens-tree-runner-go",
+      "identity": "https://www.allbirds.com/products/mens-tree-runner-go",
       "ok": true,
       "success": true,
       "fail_reason": "",
       "page_class": "Closed Shadow",
-      "title": "Allbirds: Sustainable Men’s Shoes, Wear-All-Day Comfort",
-      "price_raw": "$50",
-      "price_norm": 50.0,
-      "currency": null,
-      "stock": "in_stock",
+      "title": "Men's Tree Runner Go - Blizzard (Blizzard Sole)",
+      "price_raw": "USD 89",
+      "price_norm": 89.0,
+      "currency": "USD",
+      "stock": "out_of_stock",
       "promo": false,
-      "confidence": "low",
-      "needs_review": true,
+      "confidence": "high",
+      "needs_review": false,
       "planes": [
-        "content_outline"
+        "content_outline",
+        "jsonld",
+        "og_meta"
       ],
-      "needs_review_reason": "price from regex only (low confidence)"
+      "requested_url": "https://www.allbirds.com/products/mens-tree-runner-go",
+      "http_status": 200,
+      "variant": "MENS_TREE_RUNNER_GO"
     },
     {
       "id": "brooklinen_pdp",
@@ -44,57 +48,16 @@
       "planes": [
         "content_outline",
         "jsonld"
-      ]
-    },
-    {
-      "id": "colourpop_coll",
-      "kind": "shopify_collection",
-      "url": "https://colourpop.com/collections/best-sellers",
-      "identity": "https://colourpop.com/collections/best-sellers",
-      "ok": true,
-      "success": true,
-      "fail_reason": "",
-      "page_class": "Closed Shadow",
-      "title": "ColourPop®: Shop Best Sellers | Top Trending Makeup Picks",
-      "price_raw": "$54.00",
-      "price_norm": 54.0,
-      "currency": null,
-      "stock": "unknown",
-      "promo": false,
-      "confidence": "low",
-      "needs_review": true,
-      "planes": [
-        "content_outline"
       ],
-      "needs_review_reason": "price from regex only (low confidence)"
-    },
-    {
-      "id": "tentree_pdp",
-      "kind": "shopify_pdp",
-      "url": "https://www.tentree.com/products/mens-classic-t-shirt",
-      "identity": "https://www.tentree.com/products/mens-classic-t-shirt",
-      "ok": true,
-      "success": true,
-      "fail_reason": "",
-      "page_class": "Closed Shadow",
-      "title": "404 Not Found",
-      "price_raw": "$20",
-      "price_norm": 20.0,
-      "currency": null,
-      "stock": "in_stock",
-      "promo": false,
-      "confidence": "low",
-      "needs_review": true,
-      "planes": [
-        "content_outline"
-      ],
-      "needs_review_reason": "price from regex only (low confidence)"
+      "requested_url": "https://www.brooklinen.com/products/classic-core-sheet-set",
+      "http_status": 200,
+      "variant": "COR-T1"
     },
     {
       "id": "publicgoods_pdp",
       "kind": "shopify_pdp",
-      "url": "https://www.publicgoods.com/products/hand-soap",
-      "identity": "https://www.publicgoods.com/products/hand-soap",
+      "url": "https://www.publicgoods.com/products/natural-hand-soap",
+      "identity": "https://www.publicgoods.com/products/natural-hand-soap",
       "ok": true,
       "success": true,
       "fail_reason": "",
@@ -109,14 +72,18 @@
       "needs_review": false,
       "planes": [
         "content_outline",
-        "jsonld"
-      ]
+        "jsonld",
+        "og_meta"
+      ],
+      "requested_url": "https://www.publicgoods.com/products/natural-hand-soap",
+      "http_status": 200,
+      "variant": null
     },
     {
       "id": "glossier_pdp",
       "kind": "shopify_pdp",
-      "url": "https://www.glossier.com/products/boy-brow",
-      "identity": "https://www.glossier.com/products/boy-brow",
+      "url": "https://www.glossier.com/en-lv/products/boy-brow",
+      "identity": "https://www.glossier.com/en-lv/products/boy-brow",
       "ok": true,
       "success": true,
       "fail_reason": "",
@@ -131,21 +98,102 @@
       "needs_review": false,
       "planes": [
         "content_outline",
-        "jsonld"
-      ]
+        "jsonld",
+        "og_meta"
+      ],
+      "requested_url": "https://www.glossier.com/products/boy-brow",
+      "http_status": 200,
+      "variant": null
     },
     {
-      "id": "meundies_pdp",
+      "id": "tentree_pdp",
       "kind": "shopify_pdp",
-      "url": "https://www.meundies.com/products/mens-brief",
-      "identity": "https://www.meundies.com/products/mens-brief",
+      "url": "https://www.tentree.com/products/mens-classic-cotton-t-shirt",
+      "identity": "https://www.tentree.com/products/mens-classic-cotton-t-shirt",
       "ok": true,
       "success": true,
       "fail_reason": "",
       "page_class": "Closed Shadow",
-      "title": "Men's Brief Underwear | Men's Basics",
-      "price_raw": "USD 26.0",
-      "price_norm": 26.0,
+      "title": "Mens Classic Cotton T-Shirt | Organic Cotton",
+      "price_raw": "$45",
+      "price_norm": 45.0,
+      "currency": null,
+      "stock": "in_stock",
+      "promo": false,
+      "confidence": "low",
+      "needs_review": true,
+      "planes": [
+        "content_outline"
+      ],
+      "requested_url": "https://www.tentree.com/products/mens-classic-cotton-t-shirt",
+      "http_status": 200,
+      "variant": null,
+      "needs_review_reason": "price from regex only (low confidence)"
+    },
+    {
+      "id": "colourpop_pdp",
+      "kind": "shopify_pdp",
+      "url": "https://colourpop.com/products/toast-ultra-matte-lip",
+      "identity": "https://colourpop.com/products/toast-ultra-matte-lip",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Closed Shadow",
+      "title": "Toast | Ultra Matte Lip | ColourPop",
+      "price_raw": "USD 6.30",
+      "price_norm": 6.3,
+      "currency": "USD",
+      "stock": "in_stock",
+      "promo": false,
+      "confidence": "high",
+      "needs_review": false,
+      "planes": [
+        "content_outline",
+        "jsonld",
+        "og_meta"
+      ],
+      "requested_url": "https://colourpop.com/products/toast-ultra-matte-lip",
+      "http_status": 200,
+      "variant": "UltraMatteLip-Toast"
+    },
+    {
+      "id": "koio_pdp",
+      "kind": "shopify_pdp",
+      "url": "https://www.koio.co/products/capri-nero-womens?variant=42048974160041",
+      "identity": "https://www.koio.co/products/capri-nero-womens",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Closed Shadow",
+      "title": "Women's All Black Leather Low-top Sneaker | Capri in Nero | Koio",
+      "price_raw": "USD 70,95",
+      "price_norm": 70.95,
+      "currency": "USD",
+      "stock": "unknown",
+      "promo": false,
+      "confidence": "high",
+      "needs_review": false,
+      "planes": [
+        "content_outline",
+        "og_meta"
+      ],
+      "requested_url": "https://www.koio.co/products/capri-nero-womens",
+      "http_status": 200,
+      "variant": null,
+      "needs_review_reason": "no stock signal"
+    },
+    {
+      "id": "drsquatch_pdp",
+      "kind": "shopify_pdp",
+      "url": "https://www.drsquatch.com/products/pine-tar",
+      "identity": "https://www.drsquatch.com/products/pine-tar",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Static",
+      "title": "Pine Tar Soap – Natural Soap for Men | Dr. Squatch",
+      "price_raw": "USD 7.00",
+      "price_norm": 7.0,
       "currency": "USD",
       "stock": "in_stock",
       "promo": false,
@@ -154,20 +202,23 @@
       "planes": [
         "content_outline",
         "jsonld"
-      ]
+      ],
+      "requested_url": "https://www.drsquatch.com/products/pine-tar",
+      "http_status": 200,
+      "variant": "BAR-PNT-01"
     },
     {
-      "id": "spacious_shop",
-      "kind": "woo_collection",
-      "url": "https://themegrilldemos.com/spacious/shop/",
-      "identity": "https://themegrilldemos.com/spacious/shop/",
+      "id": "outdoorvoices_pdp",
+      "kind": "d2c_pdp",
+      "url": "https://www.outdoorvoices.com/products/w-the-exercise-dress-twilight",
+      "identity": "https://www.outdoorvoices.com/products/w-the-exercise-dress-twilight",
       "ok": true,
       "success": true,
       "fail_reason": "",
-      "page_class": "Static",
-      "title": "Shop – Spacious",
-      "price_raw": "£ 20.00",
-      "price_norm": 20.0,
+      "page_class": "Closed Shadow",
+      "title": "The Exercise Dress with Built-In Shorts - Twilight | OV",
+      "price_raw": "$18",
+      "price_norm": 18.0,
       "currency": null,
       "stock": "in_stock",
       "promo": false,
@@ -176,51 +227,35 @@
       "planes": [
         "content_outline"
       ],
+      "requested_url": "https://www.outdoorvoices.com/products/w-the-exercise-dress-twilight",
+      "http_status": 200,
+      "variant": null,
       "needs_review_reason": "price from regex only (low confidence)"
     },
     {
-      "id": "bombas_coll",
-      "kind": "shopify_collection",
-      "url": "https://bombas.com/collections/mens-socks",
-      "identity": "https://bombas.com/collections/mens-socks",
-      "ok": true,
-      "success": true,
-      "fail_reason": "",
-      "page_class": "Closed Shadow",
-      "title": "All Men's Socks",
-      "price_raw": "€64",
-      "price_norm": 64.0,
-      "currency": null,
-      "stock": "unknown",
-      "promo": false,
-      "confidence": "low",
-      "needs_review": true,
-      "planes": [
-        "content_outline"
-      ],
-      "needs_review_reason": "price from regex only (low confidence)"
-    },
-    {
-      "id": "ridge_coll",
-      "kind": "shopify_collection",
-      "url": "https://ridge.com/collections/wallets",
-      "identity": "https://ridge.com/collections/wallets",
+      "id": "rothys_pdp",
+      "kind": "d2c_pdp",
+      "url": "https://rothys.com/en-at/products/the-flat",
+      "identity": "https://rothys.com/en-at/products/the-flat",
       "ok": true,
       "success": true,
       "fail_reason": "",
       "page_class": "Shadow DOM",
-      "title": "All Wallets - In Aluminum, Titanium, & Carbon Fiber // The Ridge",
-      "price_raw": "$150",
-      "price_norm": 150.0,
-      "currency": null,
-      "stock": "unknown",
+      "title": "The Flat",
+      "price_raw": "EUR 45,00",
+      "price_norm": 45.0,
+      "currency": "EUR",
+      "stock": "out_of_stock",
       "promo": false,
-      "confidence": "low",
-      "needs_review": true,
+      "confidence": "high",
+      "needs_review": false,
       "planes": [
-        "content_outline"
+        "content_outline",
+        "og_meta"
       ],
-      "needs_review_reason": "price from regex only (low confidence)"
+      "requested_url": "https://www.rothys.com/products/the-flat",
+      "http_status": 200,
+      "variant": null
     }
   ]
 }
