@@ -1,0 +1,46 @@
+{
+  "run": "live",
+  "model": "deepseek-chat",
+  "timestamp": "2026-09-21T17:26:57.827634+00:00",
+  "method": {
+    "http_baseline": "urllib raw HTML token count",
+    "llm_baseline": "playwright chromium HTML → single LLM call (cap 24000 tokens)",
+    "shadow_web": "shadow-web exec agent loop"
+  },
+  "results": [
+    {
+      "task": "static-title",
+      "category": "static",
+      "baseline_tokens": 162,
+      "baseline_llm_ok": null,
+      "baseline_llm_html_tokens": 0,
+      "baseline_llm_tokens": 0,
+      "baseline_llm_wall_time_s": 0,
+      "baseline_llm_answer": "",
+      "baseline_llm_truncated_html": false,
+      "agent_ok": false,
+      "agent_answer": "",
+      "agent_steps": 0,
+      "agent_tokens": 0,
+      "agent_prompt_tokens": 0,
+      "agent_wall_time_s": 0,
+      "agent_stop_reason": "error",
+      "agent_complete": false,
+      "agent_truncated": false,
+      "answer_matches": false,
+      "run": "live"
+    }
+  ],
+  "summary": {
+    "tasks": 1,
+    "ok": 0,
+    "baseline_llm_ok": 0,
+    "token_wins_vs_baseline_llm": 0,
+    "honest": 0,
+    "total_http_tokens": 162,
+    "total_baseline_llm_tokens": 0,
+    "total_agent_tokens": 0,
+    "token_ratio_vs_http": null,
+    "token_ratio_vs_baseline_llm": null
+  }
+}

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Protocol
 
+from .jev import JevSelector, observation_from
 from .models import ChatMessage, ModelResponse, OpenAICompatibleAdapter
 from .prompt import SYSTEM_PROMPT
 from .session import BrowserSession
@@ -117,8 +119,80 @@ class AgentLoop:
     max_tokens: int = DEFAULT_MAX_TOKENS
     no_progress_limit: int = 3
     system_prompt: str = SYSTEM_PROMPT
+    # Optional Jev (TypeSafe System One) step selector. Injected for tests;
+    # run_agent_task() builds it from env when SHADOW_WEB_AGENT_JEV=1.
+    selector: Optional[JevSelector] = None
+    max_selector_steps: int = 2
+    selector_stats: Dict[str, Any] = field(default_factory=dict)
 
     def run(self, task: str) -> AgentResult:
+        """Run the loop, recording selector telemetry in the result evidence."""
+        self.selector_stats = {
+            "enabled": self.selector is not None,
+            "steps_taken": 0,
+            "fallbacks": 0,
+            "calls": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "picks": [],
+            "rejected": [],
+        }
+        result = self._run(task)
+        if self.selector is not None:
+            evidence = dict(result.evidence or {})
+            evidence["jev_selector"] = {
+                k: v for k, v in self.selector_stats.items() if v not in (0, [], None)
+            }
+            result.evidence = evidence
+        return result
+
+    def _selector_response(
+        self,
+        task: str,
+        observation: str,
+        url: str,
+        step: int,
+    ) -> Optional[ModelResponse]:
+        """Let Jev pre-empt the LLM step when it is positive and confident."""
+        assert self.selector is not None
+        if self.selector_stats.get("steps_taken", 0) >= self.max_selector_steps:
+            return None
+        decision = self.selector.select(goal=task, observation=observation, url=url)
+        self.selector_stats["calls"] = self.selector_stats.get("calls", 0) + 1
+        if decision is not None:
+            self.selector_stats["prompt_tokens"] = self.selector_stats.get("prompt_tokens", 0) + int(
+                decision.usage.get("input_tokens", 0)
+            )
+            self.selector_stats["completion_tokens"] = self.selector_stats.get(
+                "completion_tokens", 0
+            ) + int(decision.usage.get("output_tokens", 0))
+        if decision is None or not decision.usable(self.selector.threshold):
+            self.selector_stats["fallbacks"] = self.selector_stats.get("fallbacks", 0) + 1
+            reason = (
+                f"skip:{self.selector.last_skip_reason}"
+                if decision is None and self.selector.last_skip_reason
+                else ("error" if decision is None else decision.describe())
+            )
+            self.selector_stats.setdefault("rejected", []).append(reason)
+            return None
+        self.selector_stats["steps_taken"] = self.selector_stats.get("steps_taken", 0) + 1
+        self.selector_stats.setdefault("picks", []).append(decision.describe())
+        return ModelResponse(
+            content=None,
+            tool_calls=[
+                {
+                    "id": f"jev-{step}",
+                    "type": "function",
+                    "function": {
+                        "name": decision.name,
+                        "arguments": json.dumps(decision.args),
+                    },
+                }
+            ],
+            usage={},
+        )
+
+    def _run(self, task: str) -> AgentResult:
         messages: List[ChatMessage] = [
             ChatMessage(role="system", content=self.system_prompt),
             ChatMessage(role="user", content=task),
@@ -126,13 +200,21 @@ class AgentLoop:
         usage_totals = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
         transcript: List[Dict[str, Any]] = []
         last_sig: Optional[str] = None
+        last_observation: Optional[str] = None
         stagnant = 0
         steps = 0
         url = lambda: self.tools.shadow.last_url or ""
 
         for _ in range(self.max_steps):
             steps += 1
-            response = self.llm.chat(messages, TOOL_SCHEMAS)
+            response: Optional[ModelResponse] = None
+            if self.selector is not None and last_observation:
+                response = self._selector_response(task, last_observation, url(), steps)
+                if response is not None:
+                    # Consumed: the acted-on observation must not be reused.
+                    last_observation = None
+            if response is None:
+                response = self.llm.chat(messages, TOOL_SCHEMAS)
             for key in usage_totals:
                 usage_totals[key] += int(response.usage.get(key, 0))
 
@@ -207,14 +289,18 @@ class AgentLoop:
             # protocol), then one combined user nudge afterwards.
             nudges: list[str] = []
             for tc, result in results_collected:
-                transcript.append(
-                    {
-                        "step": steps,
-                        "tool": result.name,
-                        "ok": result.ok,
-                        "terminal": result.terminal,
-                    }
-                )
+                entry: Dict[str, Any] = {
+                    "step": steps,
+                    "tool": result.name,
+                    "ok": result.ok,
+                    "terminal": result.terminal,
+                }
+                if str(tc.get("id") or "").startswith("jev-"):
+                    entry["by"] = "jev"
+                transcript.append(entry)
+                observed = observation_from(result)
+                if observed:
+                    last_observation = observed
                 messages.append(
                     ChatMessage(
                         role="tool",
@@ -332,6 +418,7 @@ def run_agent_task(
     llm: Optional[SupportsChat] = None,
     tools: Optional[ToolRouter] = None,
     browser: Optional[BrowserSession] = None,
+    selector: Optional[JevSelector] = None,
 ) -> AgentResult:
     """
     Run a browser task to completion and return one result envelope.
@@ -361,11 +448,20 @@ def run_agent_task(
             api_key=api_key,
             base_url=base_url,
         )
+        selected = selector if selector is not None else JevSelector.from_env()
+        max_selector_steps = 2
+        if selected is not None:
+            try:
+                max_selector_steps = int(os.environ.get("SHADOW_WEB_JEV_MAX_STEPS", "2"))
+            except (TypeError, ValueError):
+                max_selector_steps = 2
         loop = AgentLoop(
             llm=adapter,
             tools=router,
             max_steps=max_steps,
             max_tokens=max_tokens,
+            selector=selected,
+            max_selector_steps=max_selector_steps,
         )
         result = loop.run(task)
         if session_obj is not None:

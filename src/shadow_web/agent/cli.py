@@ -80,6 +80,20 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Include step transcript in the JSON output",
     )
+    exec_p.add_argument(
+        "--jev",
+        action="store_true",
+        help=(
+            "Let TypeSafe Jev pre-select cheap steps (needs TYPESAFE_API_KEY); "
+            "low-confidence picks still go to the model"
+        ),
+    )
+    exec_p.add_argument(
+        "--jev-threshold",
+        type=float,
+        default=None,
+        help="Confidence gate for Jev steps (default 0.6, or SHADOW_WEB_JEV_THRESHOLD)",
+    )
 
     models_p = sub.add_parser(
         "models",
@@ -129,6 +143,11 @@ def _cmd_models(source: Optional[str]) -> int:
 
 def _cmd_exec(args: argparse.Namespace) -> int:
     from .loop import run_agent_task
+
+    if args.jev:
+        os.environ["SHADOW_WEB_AGENT_JEV"] = "1"
+    if args.jev_threshold is not None:
+        os.environ["SHADOW_WEB_JEV_THRESHOLD"] = str(args.jev_threshold)
 
     result = run_agent_task(
         args.task,

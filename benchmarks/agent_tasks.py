@@ -610,6 +610,7 @@ def main() -> None:
             "agent_complete": bool(sw.get("complete", False)),
             "agent_truncated": bool(sw.get("truncated", False)),
             "answer_matches": sw.get("answer_matches"),
+            "agent_evidence": sw.get("evidence") or {},
             "run": run_label,
         }
         results.append(entry)
