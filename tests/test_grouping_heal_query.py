@@ -65,6 +65,51 @@ class TestHealLocal(unittest.TestCase):
         cache.invalidate("https://shop.example/checkout", "Pay", "button")
         self.assertIsNone(cache.get("https://shop.example/checkout", "Pay", "button"))
 
+    def test_cache_key_differs_by_query(self):
+        """A selector healed for ?step=1 must not replay on ?step=2."""
+        step1 = HealCache.cache_key("https://shop.example/checkout?step=1", "Pay", "button")
+        step2 = HealCache.cache_key("https://shop.example/checkout?step=2", "Pay", "button")
+        self.assertNotEqual(step1, step2)
+        with_query = HealCache.cache_key("https://shop.example/checkout?step=1", "Pay", "button")
+        without_query = HealCache.cache_key("https://shop.example/checkout", "Pay", "button")
+        self.assertNotEqual(with_query, without_query)
+
+    def test_cache_key_differs_by_fragment(self):
+        """SPA routes share a path; #/billing and #/settings are different pages."""
+        billing = HealCache.cache_key("https://app.example/#/billing", "Pay", "button")
+        settings = HealCache.cache_key("https://app.example/#/settings", "Pay", "button")
+        self.assertNotEqual(billing, settings)
+        pay_step = HealCache.cache_key("https://shop.example/checkout#pay", "Pay", "button")
+        review_step = HealCache.cache_key("https://shop.example/checkout#review", "Pay", "button")
+        self.assertNotEqual(pay_step, review_step)
+
+    def test_cache_key_stable_for_same_target(self):
+        first = HealCache.cache_key(
+            "https://shop.example/checkout?step=1#pay", "Pay Now", "button"
+        )
+        second = HealCache.cache_key(
+            "https://shop.example/checkout?step=1#pay", "  pay   NOW  ", "button"
+        )
+        self.assertEqual(first, second)
+        self.assertNotEqual(
+            HealCache.cache_key("https://shop.example/checkout", "Pay", "button"),
+            HealCache.cache_key("https://shop.example/checkout", "Pay", "input"),
+        )
+        self.assertNotEqual(
+            HealCache.cache_key("https://shop.example/checkout", "Pay", "button"),
+            HealCache.cache_key("https://shop.example/checkout", "Buy", "button"),
+        )
+
+    def test_cache_key_separates_non_http_inputs(self):
+        """Schemeless/opaque URLs must not share one catch-all namespace."""
+        keys = {
+            HealCache.cache_key("app.test/#/billing", "Pay", "button"),
+            HealCache.cache_key("app.test/#/settings", "Pay", "button"),
+            HealCache.cache_key("about:blank", "Pay", "button"),
+            HealCache.cache_key("", "Pay", "button"),
+        }
+        self.assertEqual(len(keys), 4)
+
 
 class TestQuery(unittest.TestCase):
     def setUp(self):

@@ -8,6 +8,8 @@ from typing import Any, Dict, List, Literal, Optional
 
 from lxml import etree
 
+from .compressor import _xml_safe
+
 INTENT_PATTERNS = {
     "login": re.compile(r"login|log\s*in|sign\s*in|signin|password|username", re.I),
     "search": re.compile(r"search|query|find", re.I),
@@ -75,8 +77,10 @@ class QueryResult:
     def xml(self, url: str = "", title: str = "") -> str:
         """Grouped XML subset for matched actions only."""
         if not self.matches:
-            root = etree.Element("page", url=url or "about:blank", title=title or "Query")
-            etree.SubElement(root, "query", text=self.query, count="0")
+            root = etree.Element(
+                "page", url=_xml_safe(url or "about:blank"), title=_xml_safe(title or "Query")
+            )
+            etree.SubElement(root, "query", text=_xml_safe(self.query), count="0")
             return etree.tostring(root, encoding="unicode", pretty_print=True)
 
         buckets: Dict[str, List[Dict[str, Any]]] = {}
@@ -88,14 +92,16 @@ class QueryResult:
                 order.append(group_name)
             buckets[group_name].append(action)
 
-        root = etree.Element("page", url=url or "about:blank", title=title or "Query")
-        etree.SubElement(root, "query", text=self.query, count=str(self.count))
+        root = etree.Element(
+            "page", url=_xml_safe(url or "about:blank"), title=_xml_safe(title or "Query")
+        )
+        etree.SubElement(root, "query", text=_xml_safe(self.query), count=str(self.count))
         for group_name in order:
-            group_el = etree.SubElement(root, "group", name=group_name)
+            group_el = etree.SubElement(root, "group", name=_xml_safe(group_name))
             for action in buckets[group_name]:
                 action_el = etree.SubElement(group_el, "action")
                 for key, val in action.items():
-                    action_el.set(key, str(val))
+                    action_el.set(key, _xml_safe(val))
         return etree.tostring(root, encoding="unicode", pretty_print=True)
 
 

@@ -9,6 +9,8 @@ from typing import Any, Dict, List, Optional
 
 from lxml import etree
 
+from .compressor import _xml_safe
+
 
 @dataclass
 class PageSnapshot:
@@ -160,17 +162,17 @@ def generate_diff_xml(diff: PageDiff, full_xml: str = "") -> str:
 
     root = etree.Element(
         "page",
-        url=diff.url,
-        title=diff.title,
-        mode=diff.interaction_mode,
+        url=_xml_safe(diff.url),
+        title=_xml_safe(diff.title),
+        mode=_xml_safe(diff.interaction_mode),
         diff="true",
     )
     skeleton = etree.SubElement(root, "skeleton")
-    etree.SubElement(skeleton, "url").text = diff.url
-    etree.SubElement(skeleton, "title").text = diff.title
+    etree.SubElement(skeleton, "url").text = _xml_safe(diff.url)
+    etree.SubElement(skeleton, "title").text = _xml_safe(diff.title)
     groups_el = etree.SubElement(skeleton, "groups")
     for name in diff.skeleton_groups:
-        etree.SubElement(groups_el, "group", name=name)
+        etree.SubElement(groups_el, "group", name=_xml_safe(name))
 
     delta = etree.SubElement(root, "delta")
     _append_diff_section(delta, "appeared", diff.appeared)
@@ -275,16 +277,16 @@ def _append_diff_section(
     section = etree.SubElement(parent, tag, count=str(len(entries)))
     for entry in entries:
         attrs = {
-            "id": entry.sid,
-            "breadcrumb": entry.breadcrumb,
-            "fingerprint": entry.fingerprint,
+            "id": _xml_safe(entry.sid),
+            "breadcrumb": _xml_safe(entry.breadcrumb),
+            "fingerprint": _xml_safe(entry.fingerprint),
         }
         action_el = etree.SubElement(section, "action", **attrs)
         for key, value in entry.action.items():
             if value:
-                action_el.set(key, str(value))
+                action_el.set(key, _xml_safe(value))
         if include_previous and entry.previous:
             prev_el = etree.SubElement(action_el, "previous")
             for key, value in entry.previous.items():
                 if value:
-                    prev_el.set(key, str(value))
+                    prev_el.set(key, _xml_safe(value))

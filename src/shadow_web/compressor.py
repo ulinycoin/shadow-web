@@ -20,6 +20,28 @@ KEEP_ATTRS = {
 # Interactive tag types
 INTERACTIVE_TAGS = {'a', 'button', 'input', 'select', 'textarea'}
 
+# Hard caps on page-controlled fields (token-budget hygiene: a hostile page
+# must not be able to push hundreds of KB through one observation).
+LABEL_MAX = 100
+HREF_MAX = 300
+PLACEHOLDER_MAX = 200
+BIND_ID_MAX = 100
+
+# XML 1.0 forbids most C0 control characters; page-controlled text can carry them.
+_XML_ILLEGAL_RE = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f]')
+
+
+def _xml_safe(value) -> str:
+    """Coerce a page-controlled value into a string lxml can put into XML.
+
+    Strips C0 control characters so a hostile page degrades the XML output
+    instead of raising ``ValueError: All strings must be XML compatible``.
+    """
+    if value is None:
+        return ""
+    return _XML_ILLEGAL_RE.sub('', str(value))
+
+
 def clean_text(text: str) -> str:
     if not text:
         return ""
@@ -56,10 +78,18 @@ def process_html(html_text: str) -> Tuple[str, List[Dict[str, Any]], List[Dict[s
     Parses HTML, strips styles/scripts, adds shadow IDs (data-sid) to interactive
     elements, extracts an Action Map, and builds semantic groups.
 
+    Empty, whitespace-only, comment-only and ``None`` input yield an empty
+    result instead of raising.
+
     Returns:
         Tuple of (clean_html_string, action_map_list, groups_list)
     """
-    tree = html.fromstring(html_text)
+    if html_text is None or not str(html_text).strip():
+        return "", [], []
+    try:
+        tree = html.fromstring(html_text)
+    except (etree.ParserError, ValueError):
+        return "", [], []
     
     # 1. Remove non-content tags
     for tag in REMOVE_TAGS:
@@ -95,10 +125,10 @@ def process_html(html_text: str) -> Tuple[str, List[Dict[str, Any]], List[Dict[s
             action_info = {
                 "id": sid,
                 "type": el_type,
-                "label": label[:100],  # Truncate long labels
-                "href": el.get('href', ''),
-                "placeholder": el.get('placeholder', ''),
-                "bind_id": el.get('data-sw-bind', ''),
+                "label": label[:LABEL_MAX],
+                "href": (el.get('href') or '')[:HREF_MAX],
+                "placeholder": (el.get('placeholder') or '')[:PLACEHOLDER_MAX],
+                "bind_id": (el.get('data-sw-bind') or '')[:BIND_ID_MAX],
             }
             # Remove empty fields
             action_info = {k: v for k, v in action_info.items() if v}
@@ -123,11 +153,11 @@ def process_html(html_text: str) -> Tuple[str, List[Dict[str, Any]], List[Dict[s
 
 def generate_xml_map(url: str, title: str, action_map: List[Dict[str, Any]]) -> str:
     """Flat Action Map as XML (legacy)."""
-    root = etree.Element("page", url=url, title=title)
+    root = etree.Element("page", url=_xml_safe(url), title=_xml_safe(title))
     for action in action_map:
         action_el = etree.SubElement(root, "action")
         for k, v in action.items():
-            action_el.set(k, str(v))
+            action_el.set(k, _xml_safe(v))
 
     return etree.tostring(root, encoding='unicode', pretty_print=True)
 
@@ -136,12 +166,12 @@ def generate_grouped_xml_map(
     url: str, title: str, groups: List[Dict[str, Any]]
 ) -> str:
     """Grouped Action Map as XML for LLM consumption."""
-    root = etree.Element("page", url=url, title=title)
+    root = etree.Element("page", url=_xml_safe(url), title=_xml_safe(title))
     for block in groups:
-        group_el = etree.SubElement(root, "group", name=block.get("name", "Page"))
+        group_el = etree.SubElement(root, "group", name=_xml_safe(block.get("name", "Page")))
         for action in block.get("elements", []):
             action_el = etree.SubElement(group_el, "action")
             for k, v in action.items():
-                action_el.set(k, str(v))
+                action_el.set(k, _xml_safe(v))
 
     return etree.tostring(root, encoding='unicode', pretty_print=True)

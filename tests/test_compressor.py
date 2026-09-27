@@ -1,5 +1,7 @@
 import unittest
 from src.shadow_web.compressor import process_html, generate_xml_map, generate_grouped_xml_map
+# query/diff reuse compressor._xml_safe; keep their XML generators covered here too
+from src.shadow_web.query import QueryResult
 
 class TestShadowWebCompressor(unittest.TestCase):
     def setUp(self):
@@ -93,6 +95,54 @@ class TestShadowWebCompressor(unittest.TestCase):
         self.assertIn('<action id="1" type="button" label="Buy Dog Toy Now" group="Main"/>', xml_map)
         self.assertIn('<action id="3" type="input[email]"', xml_map)
         self.assertIn('group="Login Form"', xml_map)
+
+
+class TestDegenerateInput(unittest.TestCase):
+    def test_empty_whitespace_comment_and_none_input(self):
+        for value in ("", "   ", "<!-- comment -->", None):
+            self.assertEqual(process_html(value), ("", [], []))
+
+
+class TestFieldLimits(unittest.TestCase):
+    def test_oversized_page_controlled_fields_are_clipped(self):
+        html = (
+            '<a href="/%s" data-sw-bind="%s">Link</a>'
+            '<input placeholder="%s">'
+        ) % ("h" * 500, "b" * 500, "p" * 500)
+        _, action_map, _ = process_html(html)
+        link, field = action_map
+        self.assertEqual(len(link["href"]), 300)
+        self.assertEqual(len(link["bind_id"]), 100)
+        self.assertEqual(len(field["placeholder"]), 200)
+        # fields must survive, only clipped
+        self.assertTrue(link["href"].startswith("/hhh"))
+        self.assertTrue(field["placeholder"].startswith("ppp"))
+
+
+class TestXmlSafety(unittest.TestCase):
+    HOSTILE_HTML = '<button aria-label="Buy\x01 now\x0b">Go</button>'
+
+    def test_compressors_strip_illegal_control_characters(self):
+        _, action_map, groups = process_html(self.HOSTILE_HTML)
+        xml_map = generate_xml_map("https://e\x01xample.com", "Ti\x01tle", action_map)
+        grouped = generate_grouped_xml_map("https://e\x01xample.com", "Ti\x01tle", groups)
+        for output in (xml_map, grouped):
+            self.assertNotIn("\x01", output)
+            self.assertNotIn("\x0b", output)
+            self.assertIn("Buy now", output)
+            self.assertIn('title="Title"', output)
+
+    def test_query_xml_strips_illegal_control_characters(self):
+        result = QueryResult(
+            query="la\x01bel",
+            matches=[{"id": "1", "type": "button", "label": "A\x01B", "group": "G\x01roup"}],
+            total=1,
+        )
+        xml_out = result.xml("https://e\x01xample.com", "Ti\x01tle")
+        self.assertNotIn("\x01", xml_out)
+        self.assertIn('label="AB"', xml_out)
+        self.assertIn('name="Group"', xml_out)
+
 
 if __name__ == "__main__":
     unittest.main()

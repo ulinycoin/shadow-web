@@ -18,6 +18,7 @@ import csv
 import io
 import re
 from typing import Any, Dict, List, Optional, Union
+from lxml import etree
 from lxml import html as lxml_html
 
 
@@ -26,11 +27,18 @@ from lxml import html as lxml_html
 _SAFE_PARSER = lxml_html.HTMLParser(no_network=True)
 
 
-def _parse_html(html: str):
-    """Parse HTML string into lxml tree. Returns None for empty input."""
-    if not html or not html.strip():
+def _parse_html(html: Optional[str]):
+    """Parse HTML string into lxml tree. Returns None for empty input.
+
+    Empty, whitespace-only, comment-only and ``None`` input all return None
+    instead of raising, so callers degrade to an empty result.
+    """
+    if html is None or not html.strip():
         return None
-    return lxml_html.fromstring(html, parser=_SAFE_PARSER)
+    try:
+        return lxml_html.fromstring(html, parser=_SAFE_PARSER)
+    except (etree.ParserError, ValueError):
+        return None
 
 
 # -- Text helpers ---------------------------------------------------------------
@@ -145,39 +153,54 @@ def _infer_column_type(values: List[str]) -> str:
 # -- Table extraction -----------------------------------------------------------
 
 
+def _own_table_rows(table_el) -> List[Any]:
+    """Rows owned by this table, excluding rows of nested <table> elements."""
+    rows = []
+    for tr in table_el.iter("tr"):
+        ancestor = tr.getparent()
+        nested = False
+        while ancestor is not None and ancestor is not table_el:
+            if ancestor.tag == "table":
+                nested = True
+                break
+            ancestor = ancestor.getparent()
+        if not nested:
+            rows.append(tr)
+    return rows
+
+
 def _extract_table(table_el) -> Dict[str, Any]:
     """Parse a single <table> element into column schema + rows."""
 
-    # -- Extract headers --
-    thead = table_el.find(".//thead")
+    own_rows = _own_table_rows(table_el)
+
+    # -- Extract headers: first own <tr> containing <th> (thead or tbody) --
     columns: List[str] = []
-    if thead is not None:
-        for th in thead.iterfind(".//th"):
-            columns.append(_text_or_empty(th))
-    else:
-        # Fallback: first <tr> that's not in <tbody>
-        first_tr = table_el.find(".//tr")
-        if first_tr is not None:
-            parent = first_tr.getparent()
-            if parent is not None and parent.tag != "tbody":
-                for cell in first_tr.iterfind("th"):
-                    columns.append(_text_or_empty(cell))
-                if not columns:
-                    for cell in first_tr.iterfind("td"):
-                        columns.append(_text_or_empty(cell))
+    header_tr = None
+    for tr in own_rows:
+        th_cells = tr.xpath("./th")
+        if th_cells:
+            header_tr = tr
+            columns = [_text_or_empty(cell) for cell in th_cells]
+            break
 
-    # -- Extract rows (include <th> in body cells too) --
+    # Legacy fallback: a leading <tr> outside <tbody> names the columns
+    if header_tr is None and own_rows:
+        first_tr = own_rows[0]
+        parent = first_tr.getparent()
+        if parent is not None and parent.tag not in ("tbody", "tfoot"):
+            columns = [_text_or_empty(cell) for cell in first_tr.xpath("./td")]
+
+    # -- Extract rows (the header row and any <thead> row are never data) --
+    thead = table_el.find("./thead")
+    excluded_rows = set(thead.iter("tr")) if thead is not None else set()
+    if header_tr is not None:
+        excluded_rows.add(header_tr)
+
     rows: List[List[str]] = []
-    tbody = table_el.find(".//tbody")
-    if tbody is not None:
-        tr_elements = list(tbody.iterfind(".//tr"))
-    else:
-        tr_elements = list(table_el.iterfind(".//tr"))
-        if thead is not None:
-            header_trs = set(thead.iterfind(".//tr"))
-            tr_elements = [tr for tr in tr_elements if tr not in header_trs]
-
-    for tr in tr_elements:
+    for tr in own_rows:
+        if tr in excluded_rows:
+            continue
         row = []
         for cell in tr.xpath("./td | ./th"):
             row.append(_text_or_empty(cell))

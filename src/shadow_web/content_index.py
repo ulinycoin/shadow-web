@@ -9,11 +9,14 @@ Excludes navigation/data zones handled by dedicated tools.
 from __future__ import annotations
 
 from collections import Counter
+import logging
 import re
 from typing import Any
 
 from lxml import etree
 from lxml import html as _html_parser
+
+logger = logging.getLogger(__name__)
 
 # Tags that carry readable content for agents
 _CONTENT_TAGS = frozenset({
@@ -37,14 +40,30 @@ _STRUCTURAL_ROOT_TAGS = frozenset({"html", "body"})
 
 # Price signals for retention diagnostics. Covers major retail currencies —
 # symbols and ISO/local codes — without site-specific selectors.
+#
+# The `(?<![\d.,])` lookbehind on the amount is load-bearing: it rejects
+# interior start positions inside a digit run in O(1). Without it the engine
+# retries the greedy amount group at every position of a comma/space-separated
+# number, which is quadratic on untrusted input ("1" + ",000" * n) and blocks
+# the GIL for the whole match (CPython's re does not release it, and there is
+# no timeout parameter). Do NOT loosen it — e.g. to `(?<!\d)` — that brings
+# O(n²) back on inputs such as "1.000.000.000…" without a currency.
+#
+# Documented limitations (deliberate; the previous pattern also missed these):
+#   "nur .99 €"      — cents without a leading zero
+#   "1500 руб"       — ungrouped amount
+#   "руб.1 500"      — currency glued to the amount through a dot, no space
 _CURRENCY_SYMBOLS = r"[€$£¥₽]"
+# Letter lookarounds instead of \b: `\b` cannot sit between `D` and `1`
+# (USD1,234.56), and `\.?` stays outside the group so `руб. 1 500` matches.
 _CURRENCY_CODES = (
-    r"(?:\b(?:EUR|USD|GBP|RUB|PLN|CZK|SEK|NOK|DKK|UAH|KZT|TRY|руб\.?)\b)"
+    r"(?<![A-Za-z])(?:EUR|USD|GBP|RUB|PLN|CZK|SEK|NOK|DKK|UAH|KZT|TRY|руб)"
+    r"\.?(?![A-Za-z])"
 )
-_AMOUNT = r"\d{1,3}(?:[\s\u00a0.,]\d{3})*(?:[.,]\d{1,2})?"
+_CURRENCY = rf"(?:{_CURRENCY_SYMBOLS}|{_CURRENCY_CODES})"
+_AMOUNT = r"(?<![\d.,])\d{1,3}(?:[\s\u00a0.,]\d{3})*(?:[.,]\d{1,2})?(?![\d.,])"
 _PRICE_RE = re.compile(
-    rf"(?:{_AMOUNT}\s*(?:{_CURRENCY_SYMBOLS}|{_CURRENCY_CODES}))"
-    rf"|(?:(?:{_CURRENCY_SYMBOLS}|{_CURRENCY_CODES})\s*{_AMOUNT})",
+    rf"(?:{_AMOUNT}\s*{_CURRENCY})|(?:{_CURRENCY}\s*{_AMOUNT})",
     re.IGNORECASE,
 )
 
@@ -217,6 +236,52 @@ def _structural_records(scope) -> tuple[list[dict[str, Any]], dict[Any, int]]:
     return records, element_order
 
 
+# libxml2 caps HTML nesting at ~256 levels and silently drops deeper nodes.
+# A 400-deep <div> chain then indexes as [] — indistinguishable from a genuinely
+# empty page — so detection must be explicit (huge_tree=True is deliberately
+# not used: it changes the security posture of untrusted parsing).
+_DEPTH_TRUNCATION_MARKER = "Excessive depth"
+_DEPTH_LIMIT_HINT = 250
+
+
+def _max_element_depth(root) -> int:
+    """Return the deepest element nesting level in a parsed tree."""
+    depth = 0
+    stack = [(root, 1)]
+    while stack:
+        el, level = stack.pop()
+        if level > depth:
+            depth = level
+        for child in el:
+            stack.append((child, level + 1))
+    return depth
+
+
+def _parse_with_truncation_check(html_text: str) -> tuple[Any, bool]:
+    """Parse HTML, reporting whether libxml2 dropped nodes past its depth cap.
+
+    Raises whatever lxml raises so callers keep their existing error handling.
+    """
+    parser = _html_parser.HTMLParser()
+    root = _html_parser.fromstring(html_text, parser=parser)
+    depth_limited = any(
+        _DEPTH_TRUNCATION_MARKER in (entry.message or "")
+        for entry in parser.error_log
+    )
+    if not depth_limited and _max_element_depth(root) >= _DEPTH_LIMIT_HINT:
+        # Other libxml2 builds may not log the diagnostic. Fall back to the
+        # observable symptom: the tree bottoms out at the nesting cap while the
+        # raw markup contains more elements than were parsed.
+        raw_tags = len(re.findall(r"<[A-Za-z][\w:-]*", html_text))
+        depth_limited = raw_tags > sum(1 for _ in root.iter())
+    if depth_limited:
+        logger.warning(
+            "content_index: libxml2 truncated deeply nested nodes (>~256 "
+            "levels); blocks below that depth are missing from the index"
+        )
+    return root, depth_limited
+
+
 def build(html_text: str) -> list[dict[str, Any]]:
     """Parse clean HTML and return semantic plus structural text blocks.
 
@@ -228,11 +293,14 @@ def build(html_text: str) -> list[dict[str, Any]]:
       text         str   — full text content
       tokens       int   — estimated token count (len/4)
       level        int   — heading level (0 for non-heading)
+
+    Deeply nested input that libxml2 truncated yields [] plus a logged warning;
+    `quality()` reports `depth_limited: True` for the same input.
     """
     if not html_text or not html_text.strip():
         return []
     try:
-        root = _html_parser.fromstring(html_text)
+        root, _ = _parse_with_truncation_check(html_text)
     except (etree.ParserError, ValueError):
         return []
     scope = _scope(root)
@@ -344,24 +412,33 @@ def build(html_text: str) -> list[dict[str, Any]]:
 
 
 def quality(html_text: str, blocks: list[dict[str, Any]]) -> dict[str, Any]:
-    """Measure text coverage, duplication, and price-signal retention."""
+    """Measure text coverage, duplication, and price-signal retention.
+
+    Degenerate inputs must not report success: empty/whitespace input returns
+    coverage 0.0 / retention 0.0 with `empty_input: True`, and input lxml
+    cannot parse returns `parse_error: True` (coverage is already 0.0 there).
+    `depth_limited: True` marks pages whose deep nodes libxml2 truncated.
+    """
     if not html_text or not html_text.strip():
         return {
             "source_tokens": 0,
             "indexed_tokens": 0,
-            "coverage_pct": 100.0,
+            "coverage_pct": 0.0,
             "duplicate_overhead_pct": 0.0,
             "source_price_signals": 0,
             "indexed_price_signals": 0,
-            "signal_retention_pct": 100.0,
+            "signal_retention_pct": 0.0,
             "structural_blocks": 0,
             "card_blocks": 0,
             "mode": "semantic",
+            "empty_input": True,
+            "parse_error": False,
+            "depth_limited": False,
         }
     try:
-        root = _html_parser.fromstring(html_text)
+        root, depth_limited = _parse_with_truncation_check(html_text)
     except (etree.ParserError, ValueError):
-        root = None
+        root, depth_limited = None, False
 
     source_parts: list[str] = []
     if root is not None:
@@ -402,12 +479,18 @@ def quality(html_text: str, blocks: list[dict[str, Any]]) -> dict[str, Any]:
         ),
         "source_price_signals": source_prices,
         "indexed_price_signals": indexed_prices,
-        "signal_retention_pct": round(
-            100 * indexed_prices / max(1, source_prices), 1
-        ) if source_prices else 100.0,
+        # Nothing readable means nothing retained — never report a false pass.
+        "signal_retention_pct": (
+            round(100 * indexed_prices / source_prices, 1)
+            if source_prices
+            else (0.0 if root is None or not source_text else 100.0)
+        ),
         "structural_blocks": structural_blocks,
         "card_blocks": sum(1 for block in blocks if _is_card_block(block)),
         "mode": "hybrid" if structural_blocks else "semantic",
+        "empty_input": False,
+        "parse_error": root is None,
+        "depth_limited": depth_limited,
     }
 
 

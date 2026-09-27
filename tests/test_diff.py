@@ -120,6 +120,18 @@ class TestPageDiff(unittest.TestCase):
         xml = generate_diff_xml(diff, full_xml=full)
         self.assertEqual(xml, full)
 
+    def test_generate_diff_xml_strips_illegal_control_characters(self):
+        actions = [
+            {"id": "1", "type": "button", "label": "A\x01B", "group": "G\x01roup"},
+        ]
+        groups = [{"name": "G\x01roup", "elements": actions}]
+        prev = self._snap([], [])
+        curr = self._snap(actions, groups)
+        diff = compute_page_diff(prev, curr)
+        xml = generate_diff_xml(diff)
+        self.assertNotIn("\x01", xml)
+        self.assertIn('label="AB"', xml)
+
 
 if __name__ == "__main__":
     unittest.main()

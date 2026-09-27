@@ -166,6 +166,42 @@ class TestParseTables:
         assert result[0]["columns"] == ["Name", "Age", "Email"]
         assert result[1]["columns"] == ["Product", "Price", "Discount", "Stock"]
 
+    def test_plain_header_row_is_not_exported_as_data(self):
+        html = "<table><tr><th>Name</th><th>Age</th></tr><tr><td>Alice</td><td>30</td></tr></table>"
+        table = parse_tables(html)[0]
+        assert table["columns"] == ["Name", "Age"]
+        assert table["rows"] == [["Alice", "30"]]
+        assert table["total_rows"] == 1
+        assert table["types"] == ["string", "integer"]
+
+    def test_header_inside_tbody_keeps_column_names(self):
+        html = """<table><tbody>
+          <tr><th>Name</th><th>Age</th></tr>
+          <tr><td>Alice</td><td>30</td></tr>
+        </tbody></table>"""
+        table = parse_tables(html)[0]
+        assert table["columns"] == ["Name", "Age"]
+        assert table["rows"] == [["Alice", "30"]]
+        assert table["total_rows"] == 1
+
+    def test_nested_table_rows_stay_in_nested_table(self):
+        html = """<table><tbody><tr>
+          <td>Outer</td>
+          <td><table><tbody><tr><td>City</td><td>Berlin</td></tr></tbody></table></td>
+        </tr></tbody></table>"""
+        outer, inner = parse_tables(html)
+        assert outer["total_rows"] == 1
+        assert outer["rows"] == [["Outer", "CityBerlin"]]
+        assert ["City", "Berlin"] not in outer["rows"]
+        assert inner["total_rows"] == 1
+        assert inner["rows"] == [["City", "Berlin"]]
+
+    def test_nested_table_without_tbody_adds_no_outer_rows(self):
+        html = '<table><tr><td>Outer<table><tr><td>City</td><td>Berlin</td></tr></table></td></tr></table>'
+        outer = parse_tables(html)[0]
+        assert outer["total_rows"] == 1
+        assert ["City", "Berlin"] not in outer["rows"]
+
 
 # ── Test: Form Parsing ──────────────────────────────────────────────────────
 
@@ -334,6 +370,28 @@ class TestEdgeCases:
         assert len(table["rows"]) == 10
         assert table["rows_truncated"] is True
         assert table["rows_returned"] == 10
+
+
+class TestDegenerateInput:
+    """Empty / whitespace / comment-only / None input must not raise."""
+
+    def test_parse_tables_empty_and_whitespace(self):
+        assert parse_tables("") == []
+        assert parse_tables("   ") == []
+
+    def test_parse_tables_comment_only(self):
+        assert parse_tables("<!-- c -->") == []
+
+    def test_parse_tables_none(self):
+        assert parse_tables(None) == []
+
+    def test_parse_page_and_others_none(self):
+        assert parse_page(None) == {"tables": [], "forms": [], "lists": []}
+        assert parse_forms(None) == []
+        assert parse_lists(None) == []
+
+    def test_parse_page_comment_only(self):
+        assert parse_page("<!-- c -->") == {"tables": [], "forms": [], "lists": []}
 
 
 class TestExport:

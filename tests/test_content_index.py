@@ -1,11 +1,13 @@
 """Tests for content_index — Content Block Index."""
 
+import logging
 from pathlib import Path
 from types import SimpleNamespace
+import time
 
 import pytest
 
-from shadow_web.content_index import build, fetch, outline_text, quality
+from shadow_web.content_index import _PRICE_RE, build, fetch, outline_text, quality
 from shadow_web.mcp import server as mcp_server
 
 # ── Fixtures ───────────────────────────────────────────────────────────
@@ -544,3 +546,120 @@ class TestQuality:
         stats = quality(html, build(html))
         assert stats["source_price_signals"] == 0
         assert stats["indexed_price_signals"] == 0
+
+    def test_empty_input_reports_zero_not_perfect(self):
+        stats = quality("", [])
+        assert stats["coverage_pct"] == 0.0
+        assert stats["signal_retention_pct"] == 0.0
+        assert stats["empty_input"] is True
+        assert stats["parse_error"] is False
+        assert stats["depth_limited"] is False
+
+    def test_whitespace_input_reports_zero_not_perfect(self):
+        stats = quality("  \n\t ", [])
+        assert stats["coverage_pct"] == 0.0
+        assert stats["signal_retention_pct"] == 0.0
+        assert stats["empty_input"] is True
+        assert stats["parse_error"] is False
+
+    def test_unparseable_input_marks_parse_error(self):
+        html = (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            "<html><body><p>Price 10 EUR</p></body></html>"
+        )
+        stats = quality(html, [])
+        assert stats["parse_error"] is True
+        assert stats["empty_input"] is False
+        assert stats["coverage_pct"] == 0.0
+        assert stats["signal_retention_pct"] == 0.0
+
+    def test_readable_input_without_prices_keeps_full_retention(self):
+        html = "<main><p>Plain article text without any price signal.</p></main>"
+        stats = quality(html, build(html))
+        assert stats["coverage_pct"] > 0
+        assert stats["empty_input"] is False
+        assert stats["parse_error"] is False
+        assert stats["signal_retention_pct"] == 100.0
+
+
+# ── _PRICE_RE tests (E1: linear matching on untrusted input) ───────────
+
+PRICE_POSITIVES = [
+    "USD1,234.56",
+    "руб. 1 500",
+    "Rub 500",
+    "РУБ 500",
+    "100 usd",
+    "$1,234.56",
+    "€1.320,50",
+    "10,000,000 ₽",
+    "TRY 250",
+    "от 1 300,00 руб.",
+]
+
+PRICE_NEGATIVES = [
+    "MOUSEDRUGS 5",
+    "REUSD5",
+    "USDX 5",
+    "5 USDX",
+    "1,299",
+    "2026-09-27",
+    "+371 2 000 000",
+    "1,0001 USD",
+]
+
+# Deliberate grammar limits: do not "fix" by loosening the lookbehind, that
+# brings O(n²) matching back on ungrouped digit runs.
+PRICE_DOCUMENTED_MISSES = ["nur .99 €", "1500 руб"]
+
+
+class TestPriceRegex:
+    @pytest.mark.parametrize("text", PRICE_POSITIVES)
+    def test_matches_currency_and_amount(self, text):
+        assert _PRICE_RE.search(text), f"missed price: {text!r}"
+
+    @pytest.mark.parametrize("text", PRICE_NEGATIVES)
+    def test_rejects_non_prices(self, text):
+        match = _PRICE_RE.search(text)
+        assert match is None, f"false price {match.group(0)!r} in {text!r}"
+
+    @pytest.mark.parametrize("text", PRICE_DOCUMENTED_MISSES)
+    def test_documented_limitations_stay_unmatched(self, text):
+        assert _PRICE_RE.search(text) is None, text
+
+    def test_adversarial_digit_run_is_linear(self):
+        # Quadratic backtracking took ~7 s here before the lookbehind anchor.
+        adversarial = "1" + ",000" * 2000
+        start = time.perf_counter()
+        _PRICE_RE.search(adversarial)
+        elapsed = time.perf_counter() - start
+        assert elapsed < 0.5, f"quadratic backtracking returned: {elapsed:.3f}s"
+
+
+# ── deep DOM truncation tests (E8) ─────────────────────────────────────
+
+DEEP_DIV_CHAIN = "<div>" * 400 + "Deep product 10 EUR" + "</div>" * 400
+
+
+class TestDeepDomTruncation:
+    def test_quality_flags_depth_limited_instead_of_silent_empty(self):
+        assert build(DEEP_DIV_CHAIN) == []
+        stats = quality(DEEP_DIV_CHAIN, [])
+        assert stats["depth_limited"] is True
+        assert stats["empty_input"] is False
+        assert stats["parse_error"] is False
+
+    def test_build_logs_warning_on_truncation(self, caplog):
+        with caplog.at_level(logging.WARNING, logger="shadow_web.content_index"):
+            build(DEEP_DIV_CHAIN)
+        assert any(
+            "truncated deeply nested" in record.message for record in caplog.records
+        )
+
+    def test_moderate_nesting_is_not_flagged(self):
+        html = "<div>" * 200 + "<p>Normal content 10 EUR</p>" + "</div>" * 200
+        blocks = build(html)
+        assert blocks
+        stats = quality(html, blocks)
+        assert stats["depth_limited"] is False
+        assert stats["coverage_pct"] > 0
