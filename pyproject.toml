@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "shadow-web"
-version = "0.4.1"
+version = "0.4.2"
 description = "Local-first Python SDK for AI agents: DOM compression, Action Map, SchemaSnap, self-healing selectors, MCP, and shadow-web exec agent loop"
 readme = "README.md"
 license = "MIT"
@@ -46,6 +46,13 @@ dev = [
     "twine>=5.0.0",
     "tiktoken>=0.6.0",
     "pytest>=8.0.0",
+    # A complete test environment: the suite constructs the MCP server and the
+    # FastAPI app, so those extras must be present (`pip install -e ".[dev]"`).
+    "fastapi>=0.110.0",
+    "uvicorn>=0.28.0",
+    "openai>=1.14.0",
+    "mcp>=1.2.0",
+    "httpx>=0.27.0",
 ]
 all = [
     "fastapi>=0.110.0",

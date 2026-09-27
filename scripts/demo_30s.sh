@@ -15,9 +15,8 @@ if [[ -z "${DEEPSEEK_API_KEY:-}${OPENAI_API_KEY:-}${OPENROUTER_API_KEY:-}" ]]; t
 fi
 
 echo "==> 3/3 one command → one JSON"
-SHADOW_WEB_ALLOW_CHROMIUM_FALLBACK=1 \
-  shadow-web exec \
-    "What is the heading text on https://example.com? Reply with the heading only." \
-    --browser chromium \
-    --model "${SHADOW_WEB_LLM_MODEL:-deepseek-chat}" \
-    --max-steps 5
+shadow-web exec \
+  "What is the heading text on https://example.com? Reply with the heading only." \
+  --browser chromium \
+  --model "${SHADOW_WEB_LLM_MODEL:-deepseek-chat}" \
+  --max-steps 5

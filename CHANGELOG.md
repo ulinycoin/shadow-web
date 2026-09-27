@@ -4,6 +4,132 @@ All notable changes to this project are documented in this file.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.2] - 2026-09-27
+
+Security and trust release: everything below was found by an adversarial review of
+the whole repository and is covered by a regression test that failed before the fix.
+Several entries are **breaking** for callers that relied on the old defaults — they
+are marked.
+
+### Security
+
+- **Navigation URL policy (SSRF / local file disclosure)**: agent-driven navigation
+  (`navigate`, `web_search`, `form_fill_plan`, agent `navigate` tool) now goes through
+  `shadow_web.url_guard`. Only `http`/`https` on globally routable hosts are allowed:
+  `file:`, `javascript:`, `data:`, `blob:` and friends are rejected, as are loopback,
+  private, link-local and cloud-metadata addresses — including the obfuscated IPv4
+  forms browsers accept (`http://2130706433/`, `http://0x7f000001/`, `http://127.1/`,
+  `[::1]`, IPv4-mapped IPv6) and internal host names. The final URL after redirects is
+  re-checked. Escape hatch for local development and tests:
+  `SHADOW_WEB_ALLOW_PRIVATE_URLS=1`. Optional best-effort DNS check (default on) is
+  controlled by `SHADOW_WEB_URL_DNS_CHECK`.
+- **Heal context redaction**: a broken-selector heal request no longer ships raw page
+  markup to the (possibly third-party) heal endpoint — `textarea` contents, input
+  `value`s (including password/hidden fields) and `data-*` secret attributes are
+  stripped and the payload is length-bounded. `SHADOW_WEB_HEAL_SHARE_CONTEXT=0` sends
+  only a minimal label stub.
+- **`session_name` path traversal**: persistent-profile names are validated against
+  `[A-Za-z0-9._-]{1,64}` and the resolved profile path must stay inside
+  `~/.shadow-web/sessions`.
+- **`.env` hijack**: dotenv discovery no longer reads `.env` from the current working
+  directory or its parent (a cloned repository could redirect the LLM base URL and
+  supply its own API key, sending prompts and page content to an attacker). Repository
+  root, explicit `--env-file`, and `extra_paths` keep working. The developer-machine
+  path hardcoded in published library code is gone.
+- **Prompt injection**: the exec agent's system prompt now states that page content is
+  data and never instructions (mitigation, not a substitute for the URL policy).
+
+### Fixed
+
+- **Form submission could not be declined and repeated (P0)**: `multi_step` hardcoded
+  `auto_submit=True`, ignoring the caller's wishes and re-submitting the same form up
+  to `max_steps` (three real submits of one lead form in a single MCP call). Both
+  multi-step executors take `auto_submit` (default `False`) and submit at most once per
+  URL; `form_fill_execute` exposes the flag. **Breaking**: `build_form_fill_plan` now
+  defaults to `auto_submit=False`.
+- **Forms were submitted with pending questions (P0)**: a plan with unanswered `ask`
+  steps no longer carries a submit step, and the executors return `questions_pending`
+  before clicking.
+- **Wrong-field filling (P0)**: below-threshold field matches no longer carry a `sid`
+  (a company name could be typed into a "Full name" input); such fields become a
+  `low_confidence_match` handoff instead of a silent auto-fill.
+- **Price monitoring false alarms**: currency and variant gates treat a missing value
+  as not comparable (a localization flip is no longer a high-severity price change);
+  `$100.00`/`$1.00` products are no longer skipped, which also removes a spurious
+  `price_lost` when a SKU crosses $100; stock availability is case-folded with explicit
+  pre-order/back-order/limited states, and a lost stock signal now raises
+  `stock_signal_lost` instead of silence; AggregateOffer `lowPrice` ("from $X") can no
+  longer be reported as a high-confidence price.
+- **Price monitoring missed changes**: a target that disappears between scans is
+  reported as `target_lost` instead of vanishing silently.
+- **Promo detection false positives**: promo is derived from structured evidence
+  (`compareAtPrice`, sale/list-price keys, an amount after "was") instead of substring
+  matches on the first 60 characters of any field, so product copy no longer flips
+  `promo` and raises alerts.
+- **Self-diff evidence (P0)**: `cmd_diff` refuses to compare a snapshot with itself
+  (identical or missing `scanned_at`), and the diff path re-evaluates the quality gates
+  before rendering, so a report can no longer be produced from evidence the pipeline
+  already rejected.
+- **`content_index._PRICE_RE` (remote DoS)**: the quadratic amount pattern froze the
+  whole process on a hostile page (CPython's `re` does not release the GIL during a
+  match) — measured 6.9 s on a 8 kB adversarial input. The anchored replacement is
+  linear (0.005 s) with identical matches on the existing fixtures; `quality()` no
+  longer reports perfect coverage/retention when nothing could be parsed, and deep-DOM
+  truncation is flagged (`depth_limited`) instead of silently returning no content.
+- **Table extraction**: a header row is no longer exported as data, a `<th>` inside
+  `<tbody>` keeps its column names, and rows of a nested `<table>` no longer merge into
+  the outer table.
+- **Degenerate input**: empty, whitespace-only, comment-only and `None` HTML now
+  returns empty results consistently across `process_html`/`parse_*` instead of raising
+  `ParserError`/`TypeError`.
+- **XML generation**: XML-illegal control characters in a page title or `aria-label`
+  no longer abort compression with `ValueError`; values are sanitised instead.
+- **Bounded page-controlled fields**: `href`, `placeholder` and `bind_id` are clipped
+  in the Action Map, so one page cannot push hundreds of kilobytes through a single
+  observation.
+- **MCP hard caps**: `max_rows=0` no longer bypasses `SHADOW_WEB_MCP_MAX_ROWS`, and
+  `compress_html_to_xml` enforces the HTML size cap like its siblings. Malformed cap
+  environment variables are ignored with a warning instead of breaking import.
+- **`agent_run` envelope**: the tool now always returns its documented envelope
+  (`stop_reason="error"|"timeout"|"invalid"`) instead of raising, validates the browser
+  engine, bounds concurrency (`SHADOW_WEB_AGENT_CONCURRENCY`) and wall-clock time
+  (`SHADOW_WEB_AGENT_TIMEOUT`).
+- **LLM calls are bounded**: the OpenAI-compatible client sets `timeout`
+  (`SHADOW_WEB_LLM_TIMEOUT`, default 60 s), `max_retries`, and a per-completion
+  `max_tokens` cap (`SHADOW_WEB_LLM_MAX_TOKENS`), so one slow provider can no longer
+  stall a run (and its browser) for minutes.
+- **Heal cache keying**: the key includes query string and fragment, and non-http URLs
+  no longer share one namespace — a selector healed on one SPA route/checkout step is no
+  longer reused on another. **Breaking**: existing `~/.shadow-web/heal_cache.json`
+  entries are invalidated (a cache miss, nothing else).
+- **Selector verification**: `LABEL_MATCH_THRESHOLD` raised to 0.8, plain substring
+  containment acceptance removed, and `_tag_matches` fails closed — "Logout" no longer
+  verifies as the healed "Login".
+- **Cookie-consent auto-dismiss**: candidates must live inside a consent context
+  (cookie/consent/gdpr markers, `role="dialog"`, `aria-modal`) and `a[href]` /
+  `input[type=submit]` are excluded, so a checkout "Continue" CTA is no longer clicked
+  during capture.
+- **MCP session isolation**: browser state is keyed per MCP session with a per-session
+  lock, so concurrent clients no longer interleave `navigate`/`click` on one shared
+  page (the previous lock covered browser creation only).
+- **Navigate failure hygiene**: a failed navigation clears the cached page/action map
+  instead of leaving a stale `ShadowPage` that later `click(sid)` would act on.
+- **Security scanner false verdicts**: the CORS probe now sends a foreign origin
+  (a same-origin echo is normal, not a misconfiguration) and SRI findings for
+  first-party assets are `low` severity instead of `high`.
+
+### Changed
+
+- README benchmarks: removed the unreproducible "−99% / 96×" row. The Rendered Text
+  Index is documented as a retrieval budget, the compression table as raw-HTML → XML,
+  and the end-to-end agent benchmark (1.6× total, overhead on 4/10 small pages) is
+  stated next to it.
+- README/`lhm.plugin.json` tool surface synced to the code (27 tools) and now guarded by
+  `tests/test_tool_surface.py`, which fails if the README, the LobeHub manifest and
+  `create_mcp_server()` disagree.
+- `.env` loading is centralised on `runtime_env` (the server no longer has its own
+  divergent loader).
+
 ## [0.4.1] - 2026-08-01
 
 ### Fixed

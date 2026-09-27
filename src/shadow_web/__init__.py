@@ -1,6 +1,6 @@
 """Shadow Web — agent-facing web interaction suite."""
 
-__version__ = "0.4.1"
+__version__ = "0.4.2"
 
 from .compressor import process_html, generate_xml_map, generate_grouped_xml_map
 from .dom_capture import capture_flattened_dom, FlattenResult, interact_by_binding

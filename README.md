@@ -10,7 +10,7 @@
 
 # Shadow Web
 
-**Cut up to 99% of tokens from web pages before your LLM sees them — then extract structured data.**  
+**Compress web pages 4–6× before your LLM sees them — then extract structured data.**  
 Open-source Python SDK + MCP + standalone `shadow-web exec` agent: flattens Shadow DOM, builds a typed Action Map, indexes rendered text on demand, heals broken selectors, and turns tables/forms/lists into clean JSON — Camoufox by default, no cloud required.
 
 > **v0.4.1** — `pip install "shadow-web[agent]"` → `shadow-web exec "…"` (observe→act→verify, SchemaSnap, single-call finish).
@@ -66,7 +66,7 @@ Shadow Web is what runs **between** the browser and the LLM: a compression layer
 |-------------------|----------------|
 | A browser-based AI agent | Action Map + self-healing + SchemaSnap = fewer failures, structured data |
 | A coding agent that needs one-shot browsing | `shadow-web exec` — one shell call, one JSON answer (transcript stays inside) |
-| An MCP tool for Cursor/Claude | Built-in MCP server with **26 tools**, one-command setup |
+| An MCP tool for Cursor/Claude | Built-in MCP server with **27 tools**, one-command setup |
 | A Playwright scraper that breaks on every deploy | `heal_local.py` catches DOM drift without LLM cost |
 | A Shadow DOM-heavy app (Web components, Lit, Angular) | Read-only flatten — no React/Vue breakage |
 | **An agent that needs data from web pages** | SchemaSnap parses tables, forms, and lists into clean JSON |
@@ -115,8 +115,7 @@ Unlike a11y-tree browser wrappers, observations are **HTML Action Maps + SchemaS
 # 30-second demo (Chromium path — no camoufox fetch)
 pip install "shadow-web[agent]" && playwright install chromium
 export DEEPSEEK_API_KEY="..."   # or OPENAI_API_KEY / OPENROUTER_API_KEY
-SHADOW_WEB_ALLOW_CHROMIUM_FALLBACK=1 \
-  shadow-web exec "What is the heading on https://example.com?" \
+shadow-web exec "What is the heading on https://example.com?" \
   --browser chromium --model deepseek-chat
 
 # one-liner from a clone:
@@ -126,6 +125,11 @@ SHADOW_WEB_ALLOW_CHROMIUM_FALLBACK=1 \
 # camoufox fetch && shadow-web exec "…" --model deepseek-chat
 ```
 
+An explicit `--browser chromium` needs no extra flag: the Camoufox→Chromium
+fallback switch (`SHADOW_WEB_ALLOW_CHROMIUM_FALLBACK=1`) only governs what
+happens when Camoufox is *requested* but unavailable, and by default that is a
+hard failure rather than a silent fallback.
+
 ```json
 {
   "ok": true,
@@ -133,7 +137,7 @@ SHADOW_WEB_ALLOW_CHROMIUM_FALLBACK=1 \
   "steps": 2,
   "usage": {"prompt_tokens": 1821, "completion_tokens": 144, "total_tokens": 1965},
   "url": "https://example.com/",
-  "browser": "camoufox",
+  "browser": "chromium",
   "stop_reason": "done",
   "complete": true,
   "truncated": false
@@ -429,11 +433,23 @@ deploy/
 |------|-------------------|----------------------|---------|-----------|
 | Hacker News | 8,637 | 6,704 | 227 | **−22% (1.3×)** |
 | Wikipedia (Web Scraping) | 99,343 | 16,462 | 501 | **−83% (6.0×)** |
-| Wikipedia + Content Index | 57,778 | 599¹ | — | **−99% (96×)** |
 | GitHub Trending | 167,875 | 37,833 | 1,290 | **−77% (4.4×)** |
 
-¹ `content_outline(max_tokens=600)` — 141 blocks, agent picks what to fetch.  
 Full compression benchmark: `python benchmarks/run.py`
+
+**Read this before quoting the numbers.** The table measures one thing: raw page
+HTML → grouped XML Action Map, on three pages, with `tiktoken`. It is not the
+token cost of an agent run. The project's own end-to-end agent benchmark
+(below) measures **1.6× total** across 10 tasks, with **overhead on 4 of 10**
+small pages, because the agent's system prompt and tool loop cost more than
+dumping a small page. The win is real on pages where naive HTML is ≳5–10k
+tokens, and that is the honest claim.
+
+The Rendered Text Index (`content_outline(max_tokens=…)`) is a **retrieval
+budget**, not a compression ratio: it returns at most the requested number of
+tokens, so a "99% smaller" framing of it would be true of any budget and
+therefore says nothing. Use it when you cannot afford the whole page, and read
+`coverage`/`mode`/`signals` in its response to see what was left out.
 
 ### Agent Task Benchmark (end-to-end, v0.4.1)
 
@@ -487,13 +503,14 @@ Or manually:
 }
 ```
 
-### All 26 tools
+### All 27 tools
 
 | Category | Tool | What it does |
 |----------|------|--------------|
-| **Browse** | `navigate` | Open URL → snapshot (`detail`: minimal / terse / xml / full) |
+| **Browse** | `navigate` | Open URL → snapshot (`detail`: minimal / terse / xml / full). http/https on the public web only |
 | | `snapshot` | Refresh page; `diff=true` for delta only |
 | | `click`, `fill` | Interact by `data-sid` |
+| **Agent** | `agent_run` | Thick observe→act→verify loop for one bounded task; always returns an envelope (`stop_reason`, `complete`, `truncated`, `next_hint`) |
 | **AgentOps** | `form_fill_plan` | Profile JSON → fill plan (auto_fill / ask / handoff) |
 | | `form_fill_execute` | Run plan (+ answers); validation_error feedback |
 | **Filter (control plane)** | `shadow_query` | grep-style filter on live session |

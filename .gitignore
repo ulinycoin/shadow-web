@@ -26,6 +26,7 @@ reports/localpdf/
 # Internal / agent memory (not for public repo)
 CLAUDE.md
 PLAN.md
+REVIEW.md
 
 # ORI eval scratch / logs
 .ori/
