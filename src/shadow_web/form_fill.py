@@ -39,6 +39,11 @@ FieldKind = Literal[
 
 SAFE_FIELD_KINDS = frozenset({"email", "name", "first_name", "last_name", "company", "role", "phone"})
 
+# Minimum similarity for a schema field to be linked to an Action Map element.
+# Below this the field is left unlinked (handoff/ask) rather than risking a
+# wrong-field fill.
+MATCH_THRESHOLD = 0.45
+
 KNOWN_PROFILE_KEYS = frozenset({
     "email",
     "name",
@@ -286,7 +291,12 @@ def link_form_to_actions(
                 best_score = score
                 best_sid = sid
 
-        if best_sid and best_score >= 0.45:
+        if best_sid and best_score < MATCH_THRESHOLD:
+            # Weak match: do not store the sid, so the field cannot be auto-filled
+            # into (or steal the sid of) the wrong input.
+            best_sid = None
+
+        if best_sid:
             used_sids.add(best_sid)
 
         kind = classify_field_kind(raw)
@@ -603,7 +613,7 @@ def build_form_fill_plan(
     page_class_reason: str = "",
     form_index: int = 0,
     allow_password: bool = False,
-    auto_submit: bool = True,
+    auto_submit: bool = False,
 ) -> FormFillPlan:
     """Build AgentOps plan: auto_fill safe fields, ask ambiguous, handoff blockers."""
     profile_validation = validate_profile(profile)
@@ -663,6 +673,18 @@ def build_form_fill_plan(
                     FormFillStep(action="auto_fill", sid=lf.sid, value=str(value), field=field_dict, reason="safe_field")
                 )
                 continue
+            if value and not lf.sid:
+                handoff = {
+                    "code": "low_confidence_match",
+                    "field": field_dict,
+                    "reason": f"No Action Map match above {MATCH_THRESHOLD} for: {lf.label or lf.name or lf.kind}",
+                    "handoff": "human",
+                }
+                plan.blockers.append(handoff)
+                plan.steps.append(
+                    FormFillStep(action="handoff", field=field_dict, handoff=handoff, reason="low_confidence_match")
+                )
+                continue
             if lf.required and not value:
                 question = _build_question(lf, reason="missing_profile_value")
                 plan.questions.append(question)
@@ -680,7 +702,7 @@ def build_form_fill_plan(
             plan.questions.append(question)
             plan.steps.append(FormFillStep(action="ask", field=field_dict, question=question, reason="unclassified_field"))
 
-    if auto_submit and not plan.blockers:
+    if auto_submit and not plan.blockers and not plan.questions:
         submit_sid = _find_submit_sid(forms[form_index], action_map, used_sids)
         if submit_sid:
             plan.steps.append(FormFillStep(action="submit", sid=submit_sid, reason="form_submit"))
@@ -808,6 +830,9 @@ async def execute_form_fill_plan_async(
                     return _execution_result(plan, results, status="validation_error", errors=errors)
             continue
         if step.action == "submit" and step.sid:
+            if any(s.action == "ask" for s in plan.steps):
+                # Unanswered questions: never fire a live submit with required fields empty.
+                return _execution_result(plan, results, status="questions_pending")
             await shadow.click(step.sid)
             results.append({"action": "click", "sid": step.sid, "reason": "submit"})
             if validate:
@@ -870,6 +895,9 @@ def execute_form_fill_plan(
                     return _execution_result(plan, results, status="validation_error", errors=errors)
             continue
         if step.action == "submit" and step.sid:
+            if any(s.action == "ask" for s in plan.steps):
+                # Unanswered questions: never fire a live submit with required fields empty.
+                return _execution_result(plan, results, status="questions_pending")
             shadow.click(step.sid)
             results.append({"action": "click", "sid": step.sid, "reason": "submit"})
             if validate:
@@ -890,15 +918,24 @@ async def execute_form_fill_plan_multi_step_async(
     answers: Optional[dict[str, str]] = None,
     allow_password: bool = False,
     validate: bool = True,
+    auto_submit: bool = False,
     wait_after_submit_ms: int = 1500,
 ) -> dict[str, Any]:
-    """Enterprise onboarding loop: plan → execute → snapshot → plan (next wizard step)."""
+    """Enterprise onboarding loop: plan → execute → snapshot → plan (next wizard step).
+
+    auto_submit defaults to False: submit is a live side effect and every call site
+    must opt in explicitly. Each URL is submitted at most once per call.
+    """
     steps_log: list[dict[str, Any]] = []
     answers = answers or {}
     previous_url = ""
+    submitted_urls: set[str] = set()
 
     for step_index in range(max(1, max_steps)):
         await shadow.refresh()
+        if shadow.last_url in submitted_urls:
+            # One live submit per URL: never re-plan/re-submit a page already submitted.
+            break
         plan = plan_from_session(
             url=shadow.last_url,
             clean_html=shadow.clean_html,
@@ -907,7 +944,7 @@ async def execute_form_fill_plan_multi_step_async(
             page_class=shadow.page_class,
             page_class_reason=shadow.page_class_reason,
             allow_password=allow_password,
-            auto_submit=True,
+            auto_submit=auto_submit,
         )
         if answers:
             apply_question_answers(plan, answers)
@@ -937,6 +974,9 @@ async def execute_form_fill_plan_multi_step_async(
         result["step_index"] = step_index
         steps_log.append(result)
 
+        if any(r.get("action") == "click" for r in result.get("results") or []):
+            submitted_urls.add(plan.url)
+
         if result["status"] in ("handoff", "validation_error", "questions_pending"):
             return {"status": result["status"], "steps": steps_log, **result}
 
@@ -946,7 +986,7 @@ async def execute_form_fill_plan_multi_step_async(
         if wait_after_submit_ms > 0:
             await shadow.page.wait_for_timeout(wait_after_submit_ms)
 
-        if shadow.last_url == previous_url and step_index > 0:
+        if shadow.last_url == previous_url and step_index >= 0:
             forms = parse_forms(shadow.clean_html)
             if not forms:
                 break
@@ -963,17 +1003,26 @@ def execute_form_fill_plan_multi_step(
     answers: Optional[dict[str, str]] = None,
     allow_password: bool = False,
     validate: bool = True,
+    auto_submit: bool = False,
     wait_after_submit_ms: int = 1500,
 ) -> dict[str, Any]:
-    """Sync multi-step form fill loop."""
+    """Sync multi-step form fill loop.
+
+    auto_submit defaults to False: submit is a live side effect and every call site
+    must opt in explicitly. Each URL is submitted at most once per call.
+    """
     import time
 
     steps_log: list[dict[str, Any]] = []
     answers = answers or {}
     previous_url = ""
+    submitted_urls: set[str] = set()
 
     for step_index in range(max(1, max_steps)):
         shadow.refresh()
+        if shadow.last_url in submitted_urls:
+            # One live submit per URL: never re-plan/re-submit a page already submitted.
+            break
         plan = plan_from_session(
             url=shadow.last_url,
             clean_html=shadow.clean_html,
@@ -982,7 +1031,7 @@ def execute_form_fill_plan_multi_step(
             page_class=shadow.page_class,
             page_class_reason=shadow.page_class_reason,
             allow_password=allow_password,
-            auto_submit=True,
+            auto_submit=auto_submit,
         )
         if answers:
             apply_question_answers(plan, answers)
@@ -1012,6 +1061,9 @@ def execute_form_fill_plan_multi_step(
         result["step_index"] = step_index
         steps_log.append(result)
 
+        if any(r.get("action") == "click" for r in result.get("results") or []):
+            submitted_urls.add(plan.url)
+
         if result["status"] in ("handoff", "validation_error", "questions_pending"):
             return {"status": result["status"], "steps": steps_log, **result}
 
@@ -1021,7 +1073,7 @@ def execute_form_fill_plan_multi_step(
         if wait_after_submit_ms > 0:
             time.sleep(wait_after_submit_ms / 1000.0)
 
-        if shadow.last_url == previous_url and step_index > 0:
+        if shadow.last_url == previous_url and step_index >= 0:
             forms = parse_forms(shadow.clean_html)
             if not forms:
                 break

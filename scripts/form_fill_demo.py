@@ -91,6 +91,7 @@ async def run_demo(
                         answers=answers or {},
                         max_steps=max_steps,
                         validate=validate,
+                        auto_submit=auto_submit,
                     )
                 elif any(s.action == "handoff" for s in plan.steps):
                     report["execution"] = {
