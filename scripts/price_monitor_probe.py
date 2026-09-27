@@ -80,6 +80,24 @@ def _loads_jsonld(raw: str):
         return json.loads(cleaned)
 
 
+def _is_aggregate_offer(offers: dict) -> bool:
+    """True for schema.org AggregateOffer — `lowPrice`/`highPrice` price ranges.
+
+    "from $X" is a range floor, not the product's price, so it must never be
+    presented as a high-confidence offer.
+    """
+    if not isinstance(offers, dict):
+        return False
+    types = offers.get("@type", "")
+    type_list = types if isinstance(types, list) else [types]
+    if any("AggregateOffer" in str(t) for t in type_list):
+        return True
+    empty = (None, "", 0, "0", "0.00")
+    return offers.get("price") in empty and (
+        offers.get("lowPrice") not in empty or offers.get("highPrice") not in empty
+    )
+
+
 def _offer_price_currency(offers: dict) -> tuple[object, object]:
     if not isinstance(offers, dict):
         return None, None
@@ -120,14 +138,21 @@ def _jsonld_products(page) -> list[dict]:
             offers = node.get("offers") or node.get("Offers") or {}
             if isinstance(offers, list):
                 offers = offers[0] if offers else {}
-            price, currency = _offer_price_currency(offers if isinstance(offers, dict) else {})
+            offers_dict = offers if isinstance(offers, dict) else {}
+            price, currency = _offer_price_currency(offers_dict)
+            from_price = None
+            if _is_aggregate_offer(offers_dict):
+                # Range floor only: keep it as evidence, never as `price` —
+                # otherwise "from $X" becomes a high-confidence product price.
+                from_price, price = price, None
             found.append(
                 {
                     "name": node.get("name"),
                     "sku": node.get("sku") or node.get("productID"),
                     "price": price,
+                    "from_price": from_price,
                     "currency": currency,
-                    "availability": offers.get("availability") if isinstance(offers, dict) else None,
+                    "availability": offers_dict.get("availability"),
                 }
             )
     return found
@@ -178,15 +203,21 @@ def _parse_amount(price_str: str) -> float | None:
         return None
 
 
-def _prices_in_text(text: str) -> list[str]:
+def _prices_in_text(text: str, *, structured: bool = False) -> list[str]:
+    """Price-like strings in free text.
+
+    The "noise" filter (free-shipping thresholds at $100, $0/$1 chrome) belongs
+    to the regex/candidate plane. Structured amounts (JSON-LD / og / schema) are
+    authoritative: a real $1.00 or $100.00 SKU must stay, so callers pass
+    ``structured=True`` to keep them.
+    """
     raw = list(dict.fromkeys(m.group(0) for m in _PRICE_RE.finditer(text or "")))[:40]
-    # Drop noise: free-shipping thresholds ($100), $0, tiny accessories ($1)
     kept: list[str] = []
     for p in raw:
         amt = _parse_amount(p)
-        if amt is None:
+        if amt is None or amt <= 0:
             continue
-        if amt <= 1.0 or amt == 100.0:
+        if not structured and (amt <= 1.0 or amt == 100.0):
             continue
         kept.append(p)
     return kept[:20]
@@ -314,17 +345,20 @@ def probe_one(page, target: dict) -> dict:
         jsonld_prices = []
         for p in jsonld:
             if p.get("price") in (None, "", 0, "0", "0.00", "0.0"):
+                # AggregateOffer rows keep only `from_price` — never a price.
                 continue
             label = f"{p.get('currency') or ''} {p.get('price')}".strip()
-            if _parse_amount(label) not in (None, 0.0, 1.0, 100.0):
+            # Structured plane: no shipping-threshold filter here.
+            if _parse_amount(label) not in (None, 0.0):
                 jsonld_prices.append(label)
         meta_prices = []
         if meta_offer and meta_offer.get("price") not in (None, "", 0, "0", "0.00"):
             label = f"{meta_offer.get('currency') or ''} {meta_offer['price']}".strip()
-            if _parse_amount(label) not in (None, 0.0, 1.0, 100.0):
+            # Structured plane: no shipping-threshold filter here.
+            if _parse_amount(label) not in (None, 0.0):
                 meta_prices.append(label)
-        # Re-filter schema vals through same noise rules
-        schema_prices = _prices_in_text(" ".join(schema_ps["price_vals"]))
+        # Schema table is a structured plane too — keep $1.00 / $100.00 values.
+        schema_prices = _prices_in_text(" ".join(schema_ps["price_vals"]), structured=True)
         all_prices = list(
             dict.fromkeys(
                 schema_prices + outline_prices + html_prices[:8] + jsonld_prices + meta_prices

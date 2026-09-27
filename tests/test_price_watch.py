@@ -20,12 +20,13 @@ def _isolate_jev_price(monkeypatch):
     monkeypatch.setattr(_pcr, "_JEV_PRICE_LAST", None, raising=False)
 
 from price_change_report import (  # noqa: E402
+    cmd_diff,
     diff_snapshots,
     evaluate_gates,
     identity_of,
     normalize_result,
 )
-from price_monitor_probe import _loads_jsonld, _offer_price_currency  # noqa: E402
+from price_monitor_probe import _is_aggregate_offer, _loads_jsonld, _offer_price_currency  # noqa: E402
 
 
 def _probe(**overrides):
@@ -180,14 +181,16 @@ def test_gates_pass_on_eight_trusted_pdps():
 
 
 def test_diff_flags_price_change():
+    # Currency is carried explicitly: unlabelled numbers are not comparable
+    # (see test_diff_missing_currency_on_either_side_is_review_only).
     prev = {
         "products": [
-            {"identity": "https://x.com/products/a", "id": "a", "price_norm": 50.0, "price_raw": "USD 50", "confidence": "high", "stock": "in_stock", "promo": False, "success": True}
+            {"identity": "https://x.com/products/a", "id": "a", "price_norm": 50.0, "price_raw": "USD 50", "currency": "USD", "confidence": "high", "stock": "in_stock", "promo": False, "success": True}
         ]
     }
     curr = {
         "products": [
-            {"identity": "https://x.com/products/a", "id": "a", "price_norm": 45.0, "price_raw": "USD 45", "confidence": "high", "stock": "in_stock", "promo": False, "success": True}
+            {"identity": "https://x.com/products/a", "id": "a", "price_norm": 45.0, "price_raw": "USD 45", "currency": "USD", "confidence": "high", "stock": "in_stock", "promo": False, "success": True}
         ]
     }
     changes = diff_snapshots(prev, curr)
@@ -452,3 +455,393 @@ def test_unknown_stock_flags_needs_review():
     assert snap["stock"] == "unknown"
     assert snap["needs_review"] is True
     assert snap["needs_review_reason"] == "no stock signal"
+
+
+# ---------------------------------------------------------------------------
+# Gate matrix (REVIEW B10-B16): false-alarm / missed-alert boundaries
+# ---------------------------------------------------------------------------
+
+def _write_snapshot(path, scanned_at, products):
+    import json
+
+    path.write_text(
+        json.dumps({"scanned_at": scanned_at, "n": len(products), "products": products}),
+        encoding="utf-8",
+    )
+    return path
+
+
+def _trusted_row(i=0, **kw):
+    row = {
+        "id": f"p{i}", "identity": f"https://shop.example/products/p{i}", "kind": "shopify_pdp",
+        "url": f"https://shop.example/products/p{i}", "success": True, "confidence": "high",
+        "price_norm": 20.0 + i, "price_raw": f"USD {20 + i}", "currency": "USD",
+        "stock": "in_stock", "promo": False, "variant": None,
+    }
+    row.update(kw)
+    return row
+
+
+def _args(tmp_path, prev, curr, name="sample-report.md"):
+    import argparse
+
+    return argparse.Namespace(previous=prev, current=curr, out=tmp_path / name)
+
+
+# --- B10: a self-diff is not evidence -------------------------------------
+
+def test_cmd_diff_refuses_identical_scanned_at(tmp_path):
+    rows = [_trusted_row(i) for i in range(10)]
+    prev = _write_snapshot(tmp_path / "baseline.json", "2026-08-13T05:34:08+00:00", rows)
+    curr = _write_snapshot(tmp_path / "check.json", "2026-08-13T05:34:08+00:00", rows)
+    out = tmp_path / "sample-report.md"
+
+    assert cmd_diff(_args(tmp_path, prev, curr)) == 2
+    assert not out.exists(), "a self-diff must not produce a report"
+    assert not out.with_suffix(".json").exists()
+
+
+def test_cmd_diff_refuses_snapshots_without_timestamps(tmp_path):
+    rows = [_trusted_row(i) for i in range(10)]
+    prev = _write_snapshot(tmp_path / "baseline.json", "", rows)
+    curr = _write_snapshot(tmp_path / "check.json", "", rows)
+    out = tmp_path / "sample-report.md"
+
+    assert cmd_diff(_args(tmp_path, prev, curr)) == 2
+    assert not out.exists()
+
+
+# --- B16: the diff path re-runs the gates ---------------------------------
+
+def test_cmd_diff_aborts_when_trusted_gate_fails(tmp_path):
+    weak = [
+        _trusted_row(i, success=True, confidence="low", currency=None, price_norm=None)
+        for i in range(10)
+    ]
+    prev = _write_snapshot(tmp_path / "baseline.json", "2026-08-13T05:34:08+00:00", weak)
+    curr = _write_snapshot(tmp_path / "check.json", "2026-08-20T05:34:08+00:00", weak)
+    out = tmp_path / "sample-report.md"
+
+    assert cmd_diff(_args(tmp_path, prev, curr)) == 2
+    assert not out.exists(), "a snapshot the pipeline rejected must not be rendered"
+
+
+def test_cmd_diff_aborts_on_404_leak(tmp_path):
+    rows = [_trusted_row(i) for i in range(10)]
+    rows[0] = _trusted_row(0, success=True, title="404 Not Found", fail_reason="title_404")
+    prev = _write_snapshot(tmp_path / "baseline.json", "2026-08-13T05:34:08+00:00", rows)
+    curr = _write_snapshot(tmp_path / "check.json", "2026-08-20T05:34:08+00:00", rows)
+    out = tmp_path / "sample-report.md"
+
+    assert cmd_diff(_args(tmp_path, prev, curr)) == 2
+    assert not out.exists()
+
+
+def test_cmd_diff_writes_report_when_gates_pass(tmp_path):
+    prev_rows = [_trusted_row(i) for i in range(10)]
+    curr_rows = [_trusted_row(i, price_norm=15.0 + i, price_raw=f"USD {15 + i}") for i in range(10)]
+    prev = _write_snapshot(tmp_path / "baseline.json", "2026-08-13T05:34:08+00:00", prev_rows)
+    curr = _write_snapshot(tmp_path / "check.json", "2026-08-20T05:34:08+00:00", curr_rows)
+    out = tmp_path / "sample-report.md"
+
+    assert cmd_diff(_args(tmp_path, prev, curr)) == 0
+    assert out.exists()
+    assert "Competitor Price Watch" in out.read_text(encoding="utf-8")
+
+
+# --- B12: structured $100.00 / $1.00 are real prices -----------------------
+
+def test_jsonld_hundred_dollars_is_priced():
+    snap = normalize_result(
+        _probe(jsonld_sample={"price": "100.00", "currency": "USD"}, prices=["$100.00"])
+    )
+    assert snap["price_norm"] == 100.0
+    assert snap["confidence"] == "high"
+    assert snap["needs_review"] is False
+
+
+def test_jsonld_one_dollar_is_priced():
+    snap = normalize_result(
+        _probe(jsonld_sample={"price": "1.00", "currency": "USD"}, prices=["$1.00"])
+    )
+    assert snap["price_norm"] == 1.0
+    assert snap["confidence"] == "high"
+
+
+def test_og_meta_hundred_dollars_is_priced():
+    snap = normalize_result(
+        _probe(meta_offer={"price": "100.00", "currency": "USD", "source": "og"})
+    )
+    assert snap["price_norm"] == 100.0
+    assert snap["confidence"] == "high"
+
+
+def test_regex_only_hundred_dollars_is_still_filtered():
+    """The shipping-threshold filter stays on the regex candidate plane."""
+    snap = normalize_result(_probe(prices=["$100.00", "$100.00"], jsonld_sample=None))
+    assert snap["price_norm"] is None
+    assert snap["confidence"] == "none"
+    assert snap["needs_review"] is True
+
+
+def test_regex_only_one_dollar_is_still_filtered():
+    snap = normalize_result(_probe(prices=["$1.00"], jsonld_sample=None))
+    assert snap["price_norm"] is None
+
+
+def test_hundred_dollar_sku_crossing_up_is_not_price_lost():
+    """JSON-LD $100.00 → $99.99 is a real move, not a lost price."""
+    prev = normalize_result(_probe(jsonld_sample={"price": "100.00", "currency": "USD"}))
+    curr = normalize_result(_probe(jsonld_sample={"price": "99.99", "currency": "USD"}))
+    changes = diff_snapshots({"products": [prev]}, {"products": [curr]})
+    types = [c["type"] for c in changes]
+    assert types == ["price"]
+    assert changes[0]["severity"] == "high"
+
+
+# --- B13: one-sided currency / variant are not comparable ------------------
+
+def test_diff_missing_currency_on_either_side_is_review_only():
+    prev = {"products": [_snap_row(price_norm=27.0, price_raw="EUR 27", currency=None)]}
+    curr = {"products": [_snap_row(price_norm=29.0, price_raw="29", currency=None)]}
+    changes = diff_snapshots(prev, curr)
+    types = [c["type"] for c in changes]
+    assert "price" not in types, "unlabelled numbers must not raise a price alert"
+    assert types == ["currency_unverified"]
+    assert curr["products"][0]["needs_review"] is True
+
+
+def test_diff_one_sided_currency_is_review_only():
+    prev = {"products": [_snap_row(price_norm=27.0, price_raw="EUR 27", currency="EUR")]}
+    curr = {"products": [_snap_row(price_norm=29.0, price_raw="29", currency=None)]}
+    changes = diff_snapshots(prev, curr)
+    types = [c["type"] for c in changes]
+    assert "price" not in types
+    assert "currency_unverified" in types
+    assert curr["products"][0]["needs_review"] is True
+
+
+def test_diff_one_sided_variant_is_not_a_price_change():
+    prev = {"products": [_snap_row(price_norm=70.95, variant=None)]}
+    curr = {"products": [_snap_row(price_norm=74.0, variant="42048974160041")]}
+    changes = diff_snapshots(prev, curr)
+    types = [c["type"] for c in changes]
+    assert "price" not in types, "a variant appearing is not a price move"
+    assert "variant" in types
+
+
+def test_query_variant_id_wins_over_product_sku():
+    snap = normalize_result(
+        _probe(
+            url="https://koio.com/products/mens-sneaker?variant=42048974160041",
+            jsonld_sample={"price": "70.95", "currency": "USD", "sku": "K1-PRODUCT"},
+            stock_hits=["Add to cart"],
+        )
+    )
+    assert snap["variant"] == "42048974160041"
+
+
+# --- B15: stock states ------------------------------------------------------
+
+def test_availability_tokens_are_case_folded_and_explicit():
+    def stock_of(availability):
+        return normalize_result(
+            _probe(jsonld_sample={"price": "70.95", "currency": "USD", "availability": availability})
+        )["stock"]
+
+    assert stock_of("https://schema.org/InStock") == "in_stock"
+    assert stock_of("instock") == "in_stock"
+    assert stock_of("OutOfStock") == "out_of_stock"
+    assert stock_of("https://schema.org/SoldOut") == "out_of_stock"
+    assert stock_of("BackOrder") == "backorder"
+    assert stock_of("PreOrder") == "preorder"
+    assert stock_of("LimitedAvailability") == "limited"
+
+
+def test_stock_text_hits_map_case_insensitively():
+    assert normalize_result(_probe(stock_hits=["BackOrder"]))["stock"] == "backorder"
+    assert normalize_result(_probe(stock_hits=["Pre-Order"]))["stock"] == "preorder"
+    assert normalize_result(_probe(stock_hits=["InStock"]))["stock"] == "in_stock"
+    assert normalize_result(_probe(stock_hits=["Sold Out"]))["stock"] == "out_of_stock"
+
+
+def test_stock_signal_lost_alerts_instead_of_staying_silent():
+    prev = {"products": [_snap_row(stock="in_stock")]}
+    curr = {"products": [_snap_row(stock="unknown")]}
+    changes = diff_snapshots(prev, curr)
+    assert [c["type"] for c in changes] == ["stock_signal_lost"]
+    assert changes[0]["from"] == "in_stock" and changes[0]["to"] == "unknown"
+
+
+def test_stock_unknown_to_unknown_is_still_silent():
+    prev = {"products": [_snap_row(stock="unknown")]}
+    curr = {"products": [_snap_row(stock="unknown")]}
+    assert diff_snapshots(prev, curr) == []
+
+
+def test_stock_sell_out_still_alerts_high():
+    prev = {"products": [_snap_row(stock="in_stock")]}
+    curr = {"products": [_snap_row(stock="out_of_stock")]}
+    changes = diff_snapshots(prev, curr)
+    assert [c["type"] for c in changes] == ["stock"]
+    assert changes[0]["severity"] == "high"
+
+
+# --- B14: AggregateOffer `lowPrice` never becomes a price ------------------
+
+def test_aggregate_offer_is_detected():
+    assert _is_aggregate_offer({"@type": "AggregateOffer", "lowPrice": "20.00"}) is True
+    assert _is_aggregate_offer({"lowPrice": "20.00", "highPrice": "80.00"}) is True
+    assert _is_aggregate_offer({"@type": "Offer", "price": "45.00"}) is False
+    # `_offer_price_currency` still surfaces the floor; callers must demote it.
+    assert _offer_price_currency({"lowPrice": "20.00", "priceCurrency": "USD"}) == ("20.00", "USD")
+
+
+def test_aggregate_low_price_never_gets_high_confidence():
+    snap = normalize_result(
+        _probe(
+            jsonld_sample={"price": None, "from_price": "45.00", "currency": "USD"},
+            prices=[],
+        )
+    )
+    assert snap["price_norm"] is None
+    assert snap["confidence"] != "high"
+    assert snap["from_price"] == 45.0
+    assert snap["needs_review"] is True
+    assert "aggregate" in snap["needs_review_reason"]
+
+
+def test_aggregate_page_text_fallback_stays_low_confidence():
+    """Even when the regex plane prices the page, it must never read as high."""
+    snap = normalize_result(
+        _probe(
+            jsonld_sample={"price": None, "from_price": "45.00", "currency": "USD"},
+            prices=["USD 45.00", "USD 120.00"],
+        )
+    )
+    assert snap["confidence"] == "low"
+    assert snap["needs_review"] is True
+    assert snap["from_price"] == 45.0
+
+
+def test_aggregate_row_is_not_trusted_by_gates():
+    snap = normalize_result(
+        _probe(jsonld_sample={"price": None, "from_price": "45.00", "currency": "USD"})
+    )
+    assert _pcr._is_trusted(snap) is False
+
+
+def test_aggregate_row_does_not_raise_a_high_price_lost():
+    prev = {"products": [_snap_row(price_norm=70.95, price_raw="USD 70.95")]}
+    curr = {"products": [_snap_row(price_norm=None, price_raw=None, from_price=45.0,
+                                   needs_review=True, needs_review_reason="aggregate")]}
+    changes = diff_snapshots(prev, curr)
+    types = [c["type"] for c in changes]
+    assert "price_lost" not in types
+    assert types == ["price_unverified"]
+    assert all(c["severity"] != "high" for c in changes)
+
+
+class _FakeScriptLocator:
+    """Minimal stand-in for a Playwright locator list (no browser in tests)."""
+
+    def __init__(self, texts):
+        self._texts = list(texts)
+
+    def all(self):
+        return [_FakeScriptLocator([t]) for t in self._texts]
+
+    def inner_text(self, timeout=None):  # noqa: ARG002 — mirrors Playwright's API
+        return self._texts[0]
+
+
+class _FakePage:
+    def __init__(self, scripts):
+        self._scripts = list(scripts)
+
+    def locator(self, _selector):
+        return _FakeScriptLocator(self._scripts)
+
+
+def test_jsonld_products_demotes_aggregate_low_price_to_from_price():
+    from price_monitor_probe import _jsonld_products, _strict_product_price
+
+    page = _FakePage(
+        [
+            '{"@type": "Product", "name": "Gift Card", "sku": "G1", "offers": '
+            '{"@type": "AggregateOffer", "lowPrice": "20.00", "highPrice": "80.00", '
+            '"priceCurrency": "USD", "availability": "https://schema.org/InStock"}}'
+        ]
+    )
+    products = _jsonld_products(page)
+    assert len(products) == 1
+    assert products[0]["price"] is None, "a range floor is not a product price"
+    assert products[0]["from_price"] == "20.00"
+    assert products[0]["currency"] == "USD"
+    # An aggregate-only node must not satisfy the strict product-price test,
+    # otherwise `has_price` turns "from $20" into a confirmed price.
+    assert _strict_product_price([], "", products, 0) is False
+
+
+def test_jsonld_products_keeps_a_plain_offer_price():
+    from price_monitor_probe import _jsonld_products
+
+    page = _FakePage(
+        ['{"@type": "Product", "name": "Tee", "offers": {"@type": "Offer", "price": "45.00", "priceCurrency": "USD"}}']
+    )
+    products = _jsonld_products(page)
+    assert products[0]["price"] == "45.00"
+    assert products[0]["from_price"] is None
+
+
+def test_prices_in_text_noise_filter_is_regex_plane_only():
+    from price_monitor_probe import _prices_in_text
+
+    text = "$100.00 $1.00 $45.00"
+    assert _prices_in_text(text) == ["$45.00"], "regex plane keeps the threshold filter"
+    assert set(_prices_in_text(text, structured=True)) == {"$100.00", "$1.00", "$45.00"}
+
+
+# ── Promo false positives and vanished targets ───────────────────────
+
+
+def test_promo_ignores_prose_in_description():
+    """Ordinary product copy must not register as a promotion."""
+    assert _pcr._promo_from({"description": "This shoe was designed for the trail."}, None) is False
+    assert _pcr._promo_from(None, {"description": "A great deal of comfort."}) is False
+
+
+def test_promo_ignores_name_and_title_even_with_promo_words():
+    assert _pcr._promo_from({"name": "Was $120 now $89"}, None) is False
+    assert _pcr._promo_from(None, {"title": "On sale: trail runner"}) is False
+
+
+def test_promo_detects_structured_compare_at():
+    assert _pcr._promo_from(None, {"compareAtPrice": "120.00"}) is True
+    assert _pcr._promo_from({"compare_at_price": 120}, None) is True
+
+
+def test_promo_detects_sale_price_key():
+    assert _pcr._promo_from({"sale_price": "79.00"}, None) is True
+    assert _pcr._promo_from(None, {"listPrice": "120.00"}) is True
+
+
+def test_promo_price_value_with_promo_word_is_a_signal():
+    assert _pcr._promo_from({"price": "was 120.00 now 89.00"}, None) is True
+
+
+def test_diff_reports_a_target_that_disappeared():
+    prev = {"products": [_snap_row()]}
+    curr = {"products": []}
+    changes = diff_snapshots(prev, curr)
+    lost = [c for c in changes if c["type"] == "target_lost"]
+    assert len(lost) == 1
+    assert lost[0]["identity"] == "https://x.com/products/a"
+    assert "not found" in lost[0]["to"]
+
+
+def test_diff_does_not_report_target_lost_when_identity_is_still_present():
+    prev = {"products": [_snap_row()]}
+    curr = {"products": [_snap_row(price_norm=60.0, price_raw="USD 60")]}
+    changes = diff_snapshots(prev, curr)
+    assert not [c for c in changes if c["type"] == "target_lost"]
