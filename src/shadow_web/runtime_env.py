@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 from typing import Iterable, Optional
 
+
+logger = logging.getLogger(__name__)
 
 _DOTENV_LOADED = False
 
@@ -18,7 +21,14 @@ LLM_KEY_NAMES = (
 
 
 def load_dotenv_files(extra_paths: Optional[Iterable[Path]] = None) -> list[str]:
-    """Load KEY=VALUE from common .env locations into os.environ (no overwrite).
+    """Load KEY=VALUE from an explicit path or the repository root into os.environ.
+
+    Only two sources are trusted: paths passed explicitly (``extra_paths`` /
+    ``--env-file``) and the repository root found by walking up from this
+    package (a ``pyproject.toml`` sitting next to ``.env``). The current working
+    directory is deliberately NOT a candidate: running ``shadow-web exec``
+    inside an untrusted checkout must not let that checkout's ``.env`` redirect
+    the LLM endpoint or swap in an attacker's API key.
 
     Safe no-op if files missing. Does not require python-dotenv.
     Returns list of paths that contributed at least one new key.
@@ -29,14 +39,6 @@ def load_dotenv_files(extra_paths: Optional[Iterable[Path]] = None) -> list[str]
     candidates: list[Path] = []
     if extra_paths:
         candidates.extend(Path(p) for p in extra_paths)
-    cwd = Path.cwd()
-    candidates.extend(
-        [
-            cwd / ".env",
-            cwd.parent / ".env",
-            Path.home() / "Desktop" / "shadow-web" / ".env",
-        ]
-    )
     # Repo root when running from src layout / editable install
     here = Path(__file__).resolve()
     for parent in here.parents:
@@ -56,9 +58,26 @@ def load_dotenv_files(extra_paths: Optional[Iterable[Path]] = None) -> list[str]
         seen.add(path)
         if _apply_dotenv(path):
             loaded.append(str(path))
+    if loaded:
+        logger.info("shadow-web: loaded env file(s): %s", ", ".join(loaded))
     if extra_paths is None:
         _DOTENV_LOADED = True
+    _warn_if_cwd_dotenv_ignored(seen)
     return loaded
+
+
+def _warn_if_cwd_dotenv_ignored(loaded: set[Path]) -> None:
+    """Make a would-be cwd hijack visible instead of silently obeying or ignoring it."""
+    try:
+        cwd_env = (Path.cwd() / ".env").resolve()
+    except OSError:
+        return
+    if cwd_env.is_file() and cwd_env not in loaded:
+        logger.warning(
+            "shadow-web: ignoring %s - a .env in the current working directory is "
+            "not loaded; pass it via --env-file to use it explicitly",
+            cwd_env,
+        )
 
 
 def _apply_dotenv(path: Path) -> bool:
@@ -94,7 +113,8 @@ def missing_llm_key_message() -> str:
         "No LLM API key in this process. "
         "Set DEEPSEEK_API_KEY / OPENAI_API_KEY / OPENROUTER_API_KEY, "
         "or pass --api-key (Hermes/tool runners often strip secrets from child env). "
-        "shadow-web also loads .env from cwd / project root if present."
+        "shadow-web also loads .env from the project root (next to pyproject.toml); "
+        "a .env in the current working directory is not loaded."
     )
 
 

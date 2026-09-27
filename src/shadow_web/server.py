@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import re
 import secrets
@@ -16,36 +17,60 @@ from openai import OpenAI
 from pydantic import BaseModel, Field
 
 from shadow_web.compressor import process_html
+from shadow_web.runtime_env import load_dotenv_files
 from shadow_web.verified_heal import verify_selector_in_html
 
+logger = logging.getLogger("shadow-web.server")
 
-def load_env() -> None:
-    """Load a repository-local .env without replacing explicit environment values."""
-    env_path = os.path.join(os.path.dirname(__file__), "../../.env")
-    env_path = os.path.abspath(env_path)
-    if not os.path.exists(env_path):
-        return
-    with open(env_path, "r", encoding="utf-8") as env_file:
-        for line in env_file:
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, value = line.split("=", 1)
-            os.environ.setdefault(key.strip(), value.strip().strip("\"'"))
-
-
-load_env()
+# Same .env discovery as `shadow-web exec` and the MCP server (repo root /
+# explicit extra paths). The old local loader read dirname(__file__)/../../.env,
+# which points outside site-packages under a wheel install and parsed files
+# differently (no `export ` support).
+load_dotenv_files()
 
 app = FastAPI(
     title="Shadow Web API",
     description="Stateless DOM compression and verified self-healing selector APIs for AI agents.",
-    version="0.4.1",
+    version="0.4.2",
 )
+
+def _env_int(name: str, default: int) -> int:
+    """Defensive env parsing: a malformed value must not break import."""
+    raw = os.environ.get(name)
+    if raw is None or not str(raw).strip():
+        return default
+    try:
+        value = int(str(raw).strip())
+    except (TypeError, ValueError):
+        logger.warning("Ignoring malformed %s=%r; using %d", name, raw, default)
+        return default
+    return value
+
 
 _RATE_BUCKETS: Dict[str, List[float]] = defaultdict(list)
 _RATE_LOCK = threading.Lock()
-_RATE_LIMIT = int(os.environ.get("SHADOW_WEB_RATE_LIMIT", "100"))
+_RATE_LIMIT = _env_int("SHADOW_WEB_RATE_LIMIT", 100)
 _RATE_WINDOW_SEC = 86400
+# Concurrent /v1/heal requests (each one holds a thread + a verification browser).
+_HEAL_CONCURRENCY = _env_int("SHADOW_WEB_HEAL_CONCURRENCY", 4)
+_heal_slots: asyncio.Semaphore = asyncio.Semaphore(max(1, _HEAL_CONCURRENCY))
+# Bodies are buffered by the ASGI server before pydantic sees them, so the
+# model's max_length is not a memory bound. Reject oversized requests up front.
+_MAX_REQUEST_BYTES = _env_int("SHADOW_WEB_MAX_REQUEST_BYTES", 3_000_000)
+
+
+@app.middleware("http")
+async def _limit_request_size(request: Request, call_next):
+    if _MAX_REQUEST_BYTES > 0:
+        declared = request.headers.get("content-length")
+        if declared and declared.isdigit() and int(declared) > _MAX_REQUEST_BYTES:
+            from fastapi.responses import JSONResponse
+
+            return JSONResponse(
+                status_code=413,
+                content={"detail": f"Request body too large (max {_MAX_REQUEST_BYTES} bytes)"},
+            )
+    return await call_next(request)
 
 
 class CompressRequest(BaseModel):
@@ -169,7 +194,15 @@ def get_llm_client() -> Optional[OpenAI]:
     settings = get_llm_settings()
     if not settings:
         return None
-    return OpenAI(api_key=settings["api_key"], base_url=settings["base_url"])
+    # Bound the provider call: without a timeout a slow/hanging endpoint keeps
+    # a worker thread (and the caller) busy for the SDK default of ~10 minutes.
+    timeout_s = float(os.environ.get("SHADOW_WEB_HEAL_TIMEOUT", "30") or 30)
+    return OpenAI(
+        api_key=settings["api_key"],
+        base_url=settings["base_url"],
+        timeout=timeout_s,
+        max_retries=1,
+    )
 
 
 def _llm_heal_selector(client: OpenAI, req: HealRequest, model: str) -> str:
@@ -226,8 +259,11 @@ async def compress_html_endpoint(
         return CompressResponse(clean_html=clean_html, action_map=action_map, groups=groups)
     except HTTPException:
         raise
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Failed to process HTML: {exc}") from exc
+    except Exception:
+        # Log the cause, return a generic detail: the raw parser exception can
+        # disclose internal paths and configuration to the caller.
+        logger.exception("compress failed")
+        raise HTTPException(status_code=400, detail="Failed to process HTML")
 
 
 @app.post("/v1/heal", response_model=HealResponse)
@@ -240,33 +276,47 @@ async def heal_selector_endpoint(
     if not settings:
         raise HTTPException(status_code=503, detail="LLM API key is not configured")
 
-    client = get_llm_client()
-    if client is None:
-        raise HTTPException(status_code=503, detail="LLM API key is not configured")
+    # Each heal occupies a worker thread for up to the provider timeout plus a
+    # Playwright verification; bound concurrency so a burst cannot occupy the
+    # whole anyio thread pool and starve /v1/compress. Fail fast (429) instead
+    # of queueing, so callers learn immediately.
     try:
-        selector = await asyncio.to_thread(
-            _llm_heal_selector,
-            client,
-            req,
-            settings["model"],
+        await asyncio.wait_for(_heal_slots.acquire(), timeout=0.05)
+    except asyncio.TimeoutError:
+        raise HTTPException(
+            status_code=429, detail="Too many concurrent heal requests; retry shortly"
         )
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"LLM healing request failed: {exc}") from exc
-
-    verified = False
-    if req.verify:
-        verified = await asyncio.to_thread(
-            verify_selector_in_html,
-            req.context_html,
-            selector,
-            req.action_label,
-            req.action_type,
-        )
-        if not verified:
-            raise HTTPException(
-                status_code=422,
-                detail=f"Selector failed Playwright verification: {selector}",
+    try:
+        client = get_llm_client()
+        if client is None:
+            raise HTTPException(status_code=503, detail="LLM API key is not configured")
+        try:
+            selector = await asyncio.to_thread(
+                _llm_heal_selector,
+                client,
+                req,
+                settings["model"],
             )
+        except Exception:
+            logger.exception("LLM healing request failed")
+            raise HTTPException(status_code=502, detail="LLM healing request failed")
+
+        verified = False
+        if req.verify:
+            verified = await asyncio.to_thread(
+                verify_selector_in_html,
+                req.context_html,
+                selector,
+                req.action_label,
+                req.action_type,
+            )
+            if not verified:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Selector failed Playwright verification: {selector}",
+                )
+    finally:
+        _heal_slots.release()
 
     return HealResponse(selector=selector, verified=verified, source="llm")
 
