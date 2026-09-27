@@ -99,7 +99,7 @@ class HealResult:
 
 
 class HealCache:
-    """Persistent cache: (domain, label, type) -> selector."""
+    """Persistent cache: (origin, path, query, fragment, label, type) -> selector."""
 
     def __init__(self, path: str = CACHE_FILE):
         self.path = path
@@ -136,11 +136,28 @@ class HealCache:
 
     @staticmethod
     def cache_key(url: str, label: str, action_type: str) -> str:
-        domain = urlparse(url).netloc or "local"
-        path = urlparse(url).path or "/"
+        """Scope the key to the full page identity, not just host + path.
+
+        Query and fragment are part of the key because SPA routes and checkout
+        wizard steps share a path (``/checkout?step=1#pay`` vs
+        ``/checkout?step=2#review``); a selector healed on one step must not be
+        replayed on another. Schemeless input has no origin to scope by, so it
+        lands in the ``about:blank`` namespace while the path/query/fragment
+        keep distinct inputs apart.
+        """
+        parsed = urlparse(url or "")
+        if parsed.netloc:
+            namespace = f"{parsed.scheme}://{parsed.netloc}"
+        elif parsed.scheme:
+            namespace = f"{parsed.scheme}:"
+        else:
+            namespace = "about:blank"
+        path = parsed.path or "/"
+        query = re.sub(r"\s+", " ", parsed.query.strip())
+        fragment = re.sub(r"\s+", " ", parsed.fragment.strip())
         norm_label = re.sub(r"\s+", " ", (label or "").strip().lower())
         base_tag = action_type.split("[")[0].lower()
-        return f"{domain}|{path}|{base_tag}|{norm_label}"
+        return f"{namespace}|{path}|{query}|{fragment}|{base_tag}|{norm_label}"
 
     def get(self, url: str, label: str, action_type: str) -> Optional[str]:
         with self._lock:

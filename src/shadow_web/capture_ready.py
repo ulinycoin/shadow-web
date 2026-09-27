@@ -45,6 +45,10 @@ _DISMISS_CONSENT_JS = r"""
     "ablehnen", "nur erforderliche", "refus", "rechazar",
     "отклонить", "только необходимые", "rifiuta", "recusar",
   ];
+  // Bare words like "continue"/"accept" are page-wide CTAs. Only a control
+  // inside a consent container may be auto-clicked, otherwise a wizard or
+  // checkout "Continue" fires before the agent ever reads the page.
+  const CONTEXT_RE = /cookie|consent|gdpr|notice/i;
 
   const normalize = (s) => (s || "").replace(/\s+/g, " ").trim().toLowerCase();
 
@@ -88,13 +92,53 @@ _DISMISS_CONSENT_JS = r"""
     return best;
   }
 
+  function isConsentContainer(el) {
+    if ((el.getAttribute("role") || "").toLowerCase() === "dialog") return true;
+    if ((el.getAttribute("aria-modal") || "").toLowerCase() === "true") return true;
+    const identifiers = [
+      el.id,
+      el.getAttribute("class"),
+      el.getAttribute("name"),
+      el.getAttribute("data-testid"),
+      el.getAttribute("aria-label"),
+    ].join(" ");
+    return CONTEXT_RE.test(identifiers);
+  }
+
+  function inConsentContext(el) {
+    let node = el;
+    while (node) {
+      if (node.nodeType === 1) {
+        if (isConsentContainer(node)) return true;
+        node = node.parentNode;
+      } else if (node.nodeType === 11) {
+        node = node.host || node.parentNode;
+      } else {
+        node = node.parentNode;
+      }
+    }
+    return false;
+  }
+
   const candidates = [];
   for (const root of collectRoots(document)) {
     const nodes = root.querySelectorAll(
-      "button, [role='button'], input[type='button'], input[type='submit'], a"
+      "button, [role='button'], input[type='button'], input[type='submit'], a[href]"
     );
     for (const el of nodes) {
       if (!isVisible(el)) continue;
+      // The element must live inside a consent surface. This is what keeps a
+      // page-wide "Continue" CTA (checkout, wizard) from being clicked: it has
+      // no cookie/consent/gdpr/notice/dialog ancestor.
+      if (!inConsentContext(el)) continue;
+      // Inside a consent surface an <a href> or a submit input is a legitimate
+      // "Accept all" control on many banners, so they stay eligible - but only
+      // when the link cannot navigate away (in-page anchors and javascript:).
+      if (el.tagName === "A" && el.hasAttribute("href")) {
+        const href = (el.getAttribute("href") || "").trim().toLowerCase();
+        const inertLink = href === "" || href.startsWith("#") || href.startsWith("javascript:");
+        if (!inertLink) continue;
+      }
       const label = labelOf(el);
       const s = score(label);
       if (s > 0) candidates.push({ el, label, s });

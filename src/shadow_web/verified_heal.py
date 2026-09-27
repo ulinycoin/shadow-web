@@ -12,7 +12,9 @@ from .heal_local import fuzzy_ratio
 PageLike = Any
 logger = logging.getLogger(__name__)
 
-LABEL_MATCH_THRESHOLD = 0.5
+# Fuzzy ratio only; a plain substring relation is not evidence that the element
+# is the same control ("login" vs "logout" scores 0.545, so 0.5 accepted it).
+LABEL_MATCH_THRESHOLD = 0.8
 
 # Cap concurrent Playwright verification launches. Each browser instance is
 # expensive (CPU/RAM), and /v1/heal can otherwise fan out one browser per
@@ -69,8 +71,8 @@ def verify_selector_on_page(
         actual = str(actual or "").strip()
         if fuzzy_ratio(label, actual) >= label_threshold:
             return True
-        if actual and (label.lower() in actual.lower() or actual.lower() in label.lower()):
-            return True
+        # Empty/absent label text: fall back to the type check, which itself
+        # fails closed when the tag cannot be read.
         return not actual and _tag_matches(target, action_type)
     except Exception:
         return False
@@ -116,8 +118,8 @@ async def averify_selector_on_page(
         actual = str(actual or "").strip()
         if fuzzy_ratio(label, actual) >= label_threshold:
             return True
-        if actual and (label.lower() in actual.lower() or actual.lower() in label.lower()):
-            return True
+        # Empty/absent label text: fall back to the type check, which itself
+        # fails closed when the tag cannot be read.
         return not actual and await _atag_matches(target, action_type)
     except Exception:
         return False
@@ -179,7 +181,8 @@ def _tag_matches(target: Any, action_type: str) -> bool:
             return True
         return tag == base_tag
     except Exception:
-        return True
+        # Unreadable tag is not evidence of a type match: fail closed.
+        return False
 
 
 async def _atag_matches(target: Any, action_type: str) -> bool:
@@ -196,4 +199,5 @@ async def _atag_matches(target: Any, action_type: str) -> bool:
             return True
         return tag == base_tag
     except Exception:
-        return True
+        # Unreadable tag is not evidence of a type match: fail closed.
+        return False

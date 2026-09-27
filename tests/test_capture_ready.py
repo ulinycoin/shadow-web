@@ -1,5 +1,6 @@
 """Tests for universal consent dismiss + capture readiness."""
 
+import re
 from types import SimpleNamespace
 
 import pytest
@@ -7,6 +8,7 @@ import pytest
 from shadow_web.a11y_capture import detect_page_class
 from shadow_web.capture_ready import (
     CaptureReadyResult,
+    _DISMISS_CONSENT_JS,
     _content_grew,
     _should_scroll,
     dismiss_cookie_consent,
@@ -14,6 +16,9 @@ from shadow_web.capture_ready import (
     is_sparse_shell,
     prepare_page_for_capture,
 )
+
+# The candidate selector literal passed to querySelectorAll in the dismiss JS.
+_CANDIDATE_QUERY_RE = re.compile(r'querySelectorAll\(\s*"(button[^"]*)"')
 
 
 class TestProbeHeuristics:
@@ -132,6 +137,43 @@ class TestConsentDismiss:
         result = dismiss_cookie_consent(page)
         assert result["dismissed"] is False
         assert result["method"].startswith("error:")
+
+    def test_dismiss_evaluates_the_consent_gated_matcher(self):
+        seen = {}
+
+        def evaluate(script, *args, **kwargs):
+            seen["script"] = script
+            return {"dismissed": False, "label": None, "method": "none"}
+
+        dismiss_cookie_consent(SimpleNamespace(evaluate=evaluate))
+        assert seen["script"] is _DISMISS_CONSENT_JS
+
+    def test_candidate_query_allows_consent_controls_but_not_navigation(self):
+        """Accept controls may be anchors or submit inputs *inside* a consent
+        surface; what must never happen is clicking a link that navigates away
+        or a page-wide control with no consent ancestor."""
+        match = _CANDIDATE_QUERY_RE.search(_DISMISS_CONSENT_JS)
+        assert match, "candidate querySelectorAll(...) literal not found"
+        selector = match.group(1)
+        assert "input[type='submit']" in selector
+        assert "a[href]" in selector
+        # a consent ancestor is still mandatory for every candidate
+        assert "if (!inConsentContext(el)) continue;" in _DISMISS_CONSENT_JS
+        # and links that would navigate away are rejected by an inert-href guard
+        assert 'el.tagName === "A" && el.hasAttribute("href")' in _DISMISS_CONSENT_JS
+        assert 'href.startsWith("#")' in _DISMISS_CONSENT_JS
+        assert 'href.startsWith("javascript:")' in _DISMISS_CONSENT_JS
+
+    def test_candidates_require_a_consent_ancestor(self):
+        """Bare "Continue"/"Accept" CTAs must not be auto-clicked page-wide."""
+        for token in ("cookie", "consent", "gdpr", "notice"):
+            assert token in _DISMISS_CONSENT_JS
+        assert "isConsentContainer" in _DISMISS_CONSENT_JS
+        assert 'getAttribute("role")' in _DISMISS_CONSENT_JS
+        assert '"dialog"' in _DISMISS_CONSENT_JS
+        assert 'getAttribute("aria-modal")' in _DISMISS_CONSENT_JS
+        # the predicate must gate candidates, not merely exist
+        assert "if (!inConsentContext(el)) continue;" in _DISMISS_CONSENT_JS
 
 
 class TestPreparePage:
