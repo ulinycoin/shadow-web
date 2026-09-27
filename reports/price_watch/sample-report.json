@@ -1,5 +1,55 @@
 {
   "baseline": "2026-08-13T05:34:08.776000+00:00",
-  "check": "2026-08-13T05:34:08.776000+00:00",
-  "changes": []
+  "check": "2026-09-27T10:41:09.790301+00:00",
+  "note": "real cross-run diff (2026-08-13 -> 2026-09-27); the previous file was a self-diff of one scan",
+  "changes_total": 6,
+  "severity_counts": {
+    "high": 1,
+    "medium": 5,
+    "low": 0
+  },
+  "changes": [
+    {
+      "type": "price",
+      "id": "allbirds_pdp",
+      "severity": "high",
+      "from": "USD 89",
+      "to": "USD 120"
+    },
+    {
+      "type": "variant",
+      "id": "brooklinen_pdp",
+      "severity": "medium",
+      "from": "COR-T1",
+      "to": "COR-X1"
+    },
+    {
+      "type": "currency_unverified",
+      "id": "tentree_pdp",
+      "severity": "medium",
+      "from": "n/a",
+      "to": "n/a"
+    },
+    {
+      "type": "new_target",
+      "id": "koio_pdp",
+      "severity": "medium",
+      "from": "",
+      "to": "Koio | Handcrafted Italian Leather Sneakers"
+    },
+    {
+      "type": "currency_unverified",
+      "id": "outdoorvoices_pdp",
+      "severity": "medium",
+      "from": "n/a",
+      "to": "n/a"
+    },
+    {
+      "type": "target_lost",
+      "id": "koio_pdp",
+      "severity": "medium",
+      "from": "USD 70,95",
+      "to": "not found in current scan"
+    }
+  ]
 }

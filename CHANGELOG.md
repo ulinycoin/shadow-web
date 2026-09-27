@@ -129,6 +129,13 @@ are marked.
   `create_mcp_server()` disagree.
 - `.env` loading is centralised on `runtime_env` (the server no longer has its own
   divergent loader).
+- `reports/price_watch/sample-report.md`/`.json` are regenerated from a real
+  cross-run diff (2026-08-13 → 2026-09-27 live scan). The previous pair was a
+  diff of one scan against itself; `baseline.json`/`check.json` are kept as
+  history, and `cmd_diff` now refuses to reproduce that report.
+- `new_target` is reported at `medium` (assortment information) instead of
+  `high`, matching the report's own severity legend where `high` means a
+  price/stock/availability change.
 
 ## [0.4.1] - 2026-08-01
 

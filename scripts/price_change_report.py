@@ -464,7 +464,11 @@ def diff_snapshots(prev: dict, curr: dict) -> list[dict]:
         p = prev_map.get(c["identity"])
         entry = {"id": c.get("id"), "identity": c["identity"], "kind": c.get("kind"), "url": c.get("url")}
         if not p:
-            changes.append({**entry, "type": "new_target", "severity": "high", "from": "", "to": c.get("title", "")})
+            # A target appearing for the first time is assortment information,
+            # not a price/stock flip: the report's own legend reserves "high"
+            # for price/stock/availability changes, and marking new rows high
+            # inflated the severity counts (every row is "new" in a baseline run).
+            changes.append({**entry, "type": "new_target", "severity": "medium", "from": "", "to": c.get("title", "")})
             continue
 
         # Currency and variant gate — checked BEFORE the numbers.

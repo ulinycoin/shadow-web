@@ -845,3 +845,18 @@ def test_diff_does_not_report_target_lost_when_identity_is_still_present():
     curr = {"products": [_snap_row(price_norm=60.0, price_raw="USD 60")]}
     changes = diff_snapshots(prev, curr)
     assert not [c for c in changes if c["type"] == "target_lost"]
+
+
+def test_new_target_is_not_reported_as_a_price_flip():
+    """The legend reserves 'high' for price/stock/availability changes."""
+    prev = {"products": []}
+    curr = {"products": [_snap_row()]}
+    changes = diff_snapshots(prev, curr)
+    new = [c for c in changes if c["type"] == "new_target"]
+    assert new and new[0]["severity"] == "medium"
+
+
+def test_baseline_run_does_not_produce_high_severity_noise():
+    curr = {"products": [_snap_row(id=f"p{i}", identity=f"https://x.com/products/{i}") for i in range(5)]}
+    changes = diff_snapshots({"products": []}, curr)
+    assert changes and not [c for c in changes if c["severity"] == "high"]

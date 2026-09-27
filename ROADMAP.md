@@ -142,7 +142,7 @@ Full detail in `CHANGELOG.md`. Blockers first:
 - **Ограничения ценового паттерна** — `nur .99 €`, `1500 руб`, `руб.1 500` дают `None`; ослаблять lookbehind нельзя (вернётся O(n²)).
 - **Разделяемый lxml-парсер** — шарится между потоками; измерено, что thread-local не ускоряет (узкое место GIL), но явное владение лучше.
 - **Нет lint/type-гейта в CI** (ruff/mypy/coverage отсутствуют как зависимости).
-- **Артефакты `reports/`** — `sample-report.md` построен на self-diff и должен быть перегенерирован из реального кросс-ран diff'а; в `benchmarks/results/` лежит вручную исправленный `…_corrected.json`.
+- **Артефакты `reports/`** — ✅ `sample-report.md`/`.json` перегенерированы из реального кросс-ран diff'а (13 авг → 27 сен 2026, живой скан: 1 high — allbirds USD 89→120, 5 medium; self-diff'ы `baseline.json` vs `check.json` остались историческими, но `cmd_diff` их больше не воспроизводит). В `benchmarks/results/` по-прежнему лежит вручную исправленный `…_corrected.json`.
 
 ## Anti-Patterns (do not do)
 
