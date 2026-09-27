@@ -566,3 +566,47 @@ def test_content_outline_and_blocks():
     assert again.ok is False
     assert again.nudge == CONTENT_BLOCKS_REPEAT_NUDGE
     assert json.loads(again.content).get("blocked") is True
+
+
+# ── Provider failures are part of the envelope contract ──────────────
+
+
+class RaisingLLM:
+    def __init__(self, exc: Exception):
+        self._exc = exc
+        self.calls = 0
+
+    def chat(self, messages, tools):
+        self.calls += 1
+        raise self._exc
+
+
+def _router(shadow=None):
+    return ToolRouter(shadow or FakeShadow())  # type: ignore[arg-type]
+
+
+def test_llm_failure_returns_the_envelope_instead_of_raising():
+    llm = RaisingLLM(RuntimeError("Authentication Fails, Your api key is invalid"))
+    result = AgentLoop(llm=llm, tools=_router()).run("what is the title?")
+
+    assert result.ok is False
+    assert result.stop_reason == "llm_error"
+    assert result.complete is False
+    assert "invalid" in (result.error or "")
+    assert result.next_hint, "an auth failure should tell the caller what to check"
+
+
+def test_timeout_failure_is_reported_without_a_hint():
+    llm = RaisingLLM(TimeoutError("request timed out"))
+    result = AgentLoop(llm=llm, tools=_router()).run("what is the title?")
+
+    assert result.stop_reason == "llm_error"
+    assert result.next_hint is None
+
+
+def test_llm_failure_still_produces_a_serialisable_result():
+    llm = RaisingLLM(ValueError("bad model id"))
+    payload = AgentLoop(llm=llm, tools=_router()).run("x").to_dict()
+
+    assert payload["stop_reason"] == "llm_error"
+    assert json.dumps(payload)  # must stay JSON-serialisable for the CLI/MCP

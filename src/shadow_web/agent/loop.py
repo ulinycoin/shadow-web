@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Protocol
@@ -12,6 +13,8 @@ from .models import ChatMessage, ModelResponse, OpenAICompatibleAdapter
 from .prompt import SYSTEM_PROMPT
 from .session import BrowserSession
 from .tools import TOOL_SCHEMAS, ToolResult, ToolRouter, parse_tool_arguments
+
+logger = logging.getLogger(__name__)
 
 # Default cumulative completion+prompt budget for one exec run.
 DEFAULT_MAX_TOKENS = 15000
@@ -126,7 +129,12 @@ class AgentLoop:
     selector_stats: Dict[str, Any] = field(default_factory=dict)
 
     def run(self, task: str) -> AgentResult:
-        """Run the loop, recording selector telemetry in the result evidence."""
+        """Run the loop, recording selector telemetry in the result evidence.
+
+        A provider failure (bad key, rate limit, timeout, outage) is part of the
+        contract, not an exception: the caller gets the same envelope as any
+        other unsuccessful run, with ``stop_reason="llm_error"``.
+        """
         self.selector_stats = {
             "enabled": self.selector is not None,
             "steps_taken": 0,
@@ -137,7 +145,24 @@ class AgentLoop:
             "picks": [],
             "rejected": [],
         }
-        result = self._run(task)
+        try:
+            result = self._run(task)
+        except Exception as exc:  # noqa: BLE001 - any provider/SDK failure
+            logger.warning("agent run failed: %s", exc, exc_info=True)
+            result = AgentResult(
+                ok=False,
+                answer=None,
+                steps=0,
+                error=f"{exc.__class__.__name__}: {exc}",
+                stop_reason="llm_error",
+                complete=False,
+                truncated=False,
+                next_hint=(
+                    "check the API key, base URL and model id, then retry"
+                    if "auth" in str(exc).lower() or "401" in str(exc)
+                    else None
+                ),
+            )
         if self.selector is not None:
             evidence = dict(result.evidence or {})
             evidence["jev_selector"] = {
