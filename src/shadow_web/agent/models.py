@@ -7,6 +7,28 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Sequence
 
 
+def _env_int(name: str, default: int) -> int:
+    """Defensive env parsing: a malformed value must never break the adapter."""
+    raw = os.environ.get(name)
+    if raw is None or not str(raw).strip():
+        return default
+    try:
+        return int(str(raw).strip())
+    except (TypeError, ValueError):
+        return default
+
+
+def _env_float(name: str, default: float) -> float:
+    raw = os.environ.get(name)
+    if raw is None or not str(raw).strip():
+        return default
+    try:
+        value = float(str(raw).strip())
+    except (TypeError, ValueError):
+        return default
+    return value if value > 0 else default
+
+
 @dataclass
 class ChatMessage:
     role: str
@@ -108,7 +130,17 @@ class OpenAICompatibleAdapter:
         key, url = resolve_api_credentials(api_key=api_key, base_url=base_url)
         self.model = model
         self.temperature = temperature
-        kwargs: Dict[str, Any] = {"api_key": key}
+        # Bound every HTTP call: the SDK default is minutes per attempt with
+        # retries, which would stall an agent run (and its browser) for a long
+        # time, and the per-call budget check only runs afterwards.
+        timeout_s = _env_float("SHADOW_WEB_LLM_TIMEOUT", 60.0)
+        max_retries = _env_int("SHADOW_WEB_LLM_MAX_RETRIES", 1)
+        self.max_tokens = _env_int("SHADOW_WEB_LLM_MAX_TOKENS", 4096)
+        kwargs: Dict[str, Any] = {
+            "api_key": key,
+            "timeout": timeout_s,
+            "max_retries": max_retries,
+        }
         if url:
             kwargs["base_url"] = url
         self._client = OpenAI(**kwargs)
@@ -118,13 +150,17 @@ class OpenAICompatibleAdapter:
         messages: Sequence[ChatMessage],
         tools: Sequence[Dict[str, Any]],
     ) -> ModelResponse:
-        response = self._client.chat.completions.create(
-            model=self.model,
-            messages=[m.to_api() for m in messages],
-            tools=list(tools) if tools else None,
-            tool_choice="auto" if tools else None,
-            temperature=self.temperature,
-        )
+        request: Dict[str, Any] = {
+            "model": self.model,
+            "messages": [m.to_api() for m in messages],
+            "tools": list(tools) if tools else None,
+            "tool_choice": "auto" if tools else None,
+            "temperature": self.temperature,
+        }
+        # Cap a single completion so one verbose answer cannot blow the run budget.
+        if self.max_tokens > 0:
+            request["max_tokens"] = self.max_tokens
+        response = self._client.chat.completions.create(**request)
         choice = response.choices[0].message
         tool_calls: List[Dict[str, Any]] = []
         if choice.tool_calls:

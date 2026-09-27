@@ -12,6 +12,7 @@ from shadow_web.dom_capture import _INTERACT_SCRIPT
 from shadow_web.a11y_capture import CaptureMode, acapture_page, ainteract_by_a11y_binding, detect_page_class
 from shadow_web.capture_ready import CaptureReadyResult, aprepare_page_for_capture
 from shadow_web.heal_local import HealCache, rank_candidates, HEAL_THRESHOLD, _COLLECT_CANDIDATES_SCRIPT
+from shadow_web.heal_context import minimal_context, redact_for_llm, share_page_context
 from shadow_web.query import QueryResult, shadow_grep
 from shadow_web.verified_heal import averify_selector_on_page
 from shadow_web.webmcp import (
@@ -446,7 +447,15 @@ class AsyncShadowPage:
 
         logger.info("[Shadow Web Async] LLM heal for ID %s (local heal below threshold)", sid)
 
-        context_html = await self._get_element_context_html(sid)
+        raw_context = await self._get_element_context_html(sid)
+        # The heal endpoint may be a third-party service: never send typed text,
+        # password/hidden field values or the whole page in the clear.
+        if share_page_context():
+            context_html = redact_for_llm(raw_context)
+        else:
+            context_html = minimal_context(
+                action.get("label", ""), action.get("type", "")
+            )
 
         payload = {
             "broken_selector": original_selector,

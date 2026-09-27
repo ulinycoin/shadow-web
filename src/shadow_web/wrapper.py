@@ -6,6 +6,7 @@ from .dom_capture import interact_by_binding
 from .a11y_capture import CaptureMode, capture_page, detect_page_class
 from .capture_ready import CaptureReadyResult, prepare_page_for_capture
 from .heal_local import HealCache, local_heal
+from .heal_context import minimal_context, redact_for_llm, share_page_context
 from .query import QueryResult, shadow_grep
 from .webmcp import (
     WebMcpSnapshot,
@@ -432,7 +433,15 @@ class ShadowPage:
 
         logger.info("[Shadow Web] LLM heal for ID %s (local heal below threshold)", sid)
 
-        context_html = self._get_element_context_html(sid)
+        raw_context = self._get_element_context_html(sid)
+        # The heal endpoint may be a third-party service: never send typed text,
+        # password/hidden field values or the whole page in the clear.
+        if share_page_context():
+            context_html = redact_for_llm(raw_context)
+        else:
+            context_html = minimal_context(
+                action.get("label", ""), action.get("type", "")
+            )
 
         payload = {
             "broken_selector": original_selector,

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 from typing import Any, Literal, Optional
 
@@ -12,6 +13,27 @@ from shadow_web.wrapper import ShadowPage
 logger = logging.getLogger(__name__)
 
 BrowserEngine = Literal["camoufox", "chromium"]
+
+# Session names become directory names under ~/.shadow-web/sessions, so they are
+# restricted to a conservative character set (an unrestricted name such as
+# "../../../tmp/x" would create arbitrary directories, and an absolute path
+# would replace the whole prefix).
+_SESSION_NAME_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
+
+
+def sanitize_session_name(name: Optional[str]) -> Optional[str]:
+    """Validate a persistent-profile name.  Empty/None means "no profile"."""
+    if name is None:
+        return None
+    cleaned = str(name).strip()
+    if not cleaned:
+        return None
+    if not _SESSION_NAME_RE.match(cleaned) or cleaned in {".", ".."}:
+        raise ValueError(
+            f"invalid session name {name!r}: expected [A-Za-z0-9._-]{{1,64}} "
+            "(it is used as a directory under ~/.shadow-web/sessions)"
+        )
+    return cleaned
 
 
 def normalize_browser_engine(value: Optional[str]) -> BrowserEngine:
@@ -36,7 +58,7 @@ class BrowserSession:
         allow_chromium_fallback_flag: Optional[bool] = None,
     ):
         self.headed = headed
-        self.session_name = session_name
+        self.session_name = sanitize_session_name(session_name)
         self.heal_api_url = heal_api_url
         self.api_key = api_key
         self.requested_browser = normalize_browser_engine(browser)
@@ -55,7 +77,15 @@ class BrowserSession:
 
     def _session_dir(self) -> Path:
         assert self.session_name
-        profile = Path.home() / ".shadow-web" / "sessions" / self.session_name
+        base = Path.home() / ".shadow-web" / "sessions"
+        profile = base / self.session_name
+        # Defence in depth: even if a caller bypassed sanitize_session_name, the
+        # profile must stay inside the sessions directory.
+        resolved = profile.resolve()
+        if base.resolve() not in resolved.parents and resolved != base.resolve():
+            raise ValueError(
+                f"session path {resolved} escapes {base} - refusing to use it"
+            )
         profile.mkdir(parents=True, exist_ok=True)
         return profile
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from typing import Any, Dict, Literal
 
@@ -14,12 +15,30 @@ from shadow_web.runtime_env import (
     load_dotenv_files,
     preferred_browser_engine,
 )
+from shadow_web.url_guard import assert_navigation_landed, validate_navigation_url
 
-# Lazy browser session for navigate/snapshot/click tools.
+logger = logging.getLogger("shadow-web.mcp")
+
+# Per-session browser state for navigate/snapshot/click tools.
+#
+# Every entry is keyed by an MCP session key (see _current_session_key) so two
+# concurrent MCP clients own two Playwright Pages instead of interleaving
+# goto/refresh on one shared document.
+_SESSIONS: Dict[str, Dict[str, Any]] = {}
+# One asyncio.Lock per session key: it serialises a single client's own
+# browser actions (page.goto -> refresh must not interleave with a click),
+# while different clients proceed in parallel on their own pages.
+_SESSION_LOCKS: Dict[str, Any] = {}  # asyncio.Lock per key, created lazily
+# Key used whenever no MCP request context is available: stdio single-client
+# servers, direct calls from tests/scripts, and the mcp-less import path.
+_DEFAULT_SESSION_KEY = "__default__"
+# The default session's state, kept under the historical module name so
+# external callers/tests that monkeypatch ``_session`` still address the
+# fallback session. Module code must go through _sess() instead.
 _session: Dict[str, Any] = {}
-# Serialises browser lifecycle + navigation so concurrent MCP clients cannot
-# interleave navigate/click/fill on each other's pages.
-_session_lock: Any = None  # asyncio.Lock, created lazily (no running loop at import)
+_SESSIONS[_DEFAULT_SESSION_KEY] = _session
+# Running FastMCP app, set by create_mcp_server(); None until then.
+_mcp_app: Any = None
 load_dotenv_files()
 
 _SEARCH_NAV_JUNK = (
@@ -47,17 +66,80 @@ _SEARCH_ENGINES = (
 
 # Hard caps for thin MCP tools. The thick agent path already bounds these;
 # the thin path must not let one call allocate unbounded work or context.
-_MAX_HTML_CHARS = int(os.environ.get("SHADOW_WEB_MCP_MAX_HTML", "2_000_000"))
-_MAX_ROWS = int(os.environ.get("SHADOW_WEB_MCP_MAX_ROWS", "5_000"))
-_MAX_OUTLINE_TOKENS = int(os.environ.get("SHADOW_WEB_MCP_MAX_OUTLINE_TOKENS", "10_000"))
-_MAX_BLOCK_TOKENS = int(os.environ.get("SHADOW_WEB_MCP_MAX_BLOCK_TOKENS", "50_000"))
-_MAX_BLOCK_IDS = int(os.environ.get("SHADOW_WEB_MCP_MAX_BLOCK_IDS", "200"))
+def _env_int(name: str, default: int) -> int:
+    """Parse an integer cap defensively: a malformed value must not break import."""
+    raw = os.environ.get(name)
+    if raw is None or not str(raw).strip():
+        return default
+    try:
+        value = int(str(raw).strip())
+    except (TypeError, ValueError):
+        logger.warning("Ignoring malformed %s=%r; using %d", name, raw, default)
+        return default
+    return value if value > 0 else default
+
+
+_MAX_HTML_CHARS = _env_int("SHADOW_WEB_MCP_MAX_HTML", 2_000_000)
+_MAX_ROWS = _env_int("SHADOW_WEB_MCP_MAX_ROWS", 5_000)
+_MAX_OUTLINE_TOKENS = _env_int("SHADOW_WEB_MCP_MAX_OUTLINE_TOKENS", 10_000)
+_MAX_BLOCK_TOKENS = _env_int("SHADOW_WEB_MCP_MAX_BLOCK_TOKENS", 50_000)
+_MAX_BLOCK_IDS = _env_int("SHADOW_WEB_MCP_MAX_BLOCK_IDS", 200)
+
+# Each thick agent run owns a whole browser, so concurrency is bounded and the
+# run has a wall-clock ceiling (the LLM client also has its own HTTP timeout).
+_AGENT_RUN_TIMEOUT_SEC = float(_env_int("SHADOW_WEB_AGENT_TIMEOUT", 600))
+_AGENT_CONCURRENCY = _env_int("SHADOW_WEB_AGENT_CONCURRENCY", 1)
+_agent_semaphore: Any = None
+
+
+def _get_agent_semaphore():
+    global _agent_semaphore
+    if _agent_semaphore is None:
+        import asyncio
+
+        _agent_semaphore = asyncio.Semaphore(_AGENT_CONCURRENCY)
+    return _agent_semaphore
+
+
+def _current_session_key() -> str:
+    """Return a stable key identifying the calling MCP client session.
+
+    When the running FastMCP app is known, the key is derived from the
+    request-scoped ServerSession object. On ANY failure - no request context,
+    stdio single-client transport, direct call from a test, or the mcp package
+    not being importable - fall back to the constant default key. This function
+    is deliberately import-safe and never raises.
+    """
+    app = _mcp_app
+    if app is None:
+        return _DEFAULT_SESSION_KEY
+    try:
+        ctx = app.get_context()
+        session = getattr(ctx, "session", None)
+    except Exception:  # noqa: BLE001 - key derivation must never break a tool
+        return _DEFAULT_SESSION_KEY
+    if session is None:
+        return _DEFAULT_SESSION_KEY
+    return str(id(session))
+
+
+def _sess() -> Dict[str, Any]:
+    """Return the calling session's mutable state dict, creating it lazily."""
+    key = _current_session_key()
+    if key == _DEFAULT_SESSION_KEY:
+        # Honour a rebound ``_session`` (tests / legacy callers) by re-pointing
+        # the registry at it; in normal operation the alias never changes.
+        if _SESSIONS.get(key) is not _session:
+            _SESSIONS[key] = _session
+        return _session
+    return _SESSIONS.setdefault(key, {})
 
 
 def _get_shadow_page():
-    if "shadow_page" not in _session:
+    session = _sess()
+    if "shadow_page" not in session:
         raise RuntimeError("No browser session. Call navigate(url) first.")
-    return _session["shadow_page"]
+    return session["shadow_page"]
 
 
 def _get_content_index_blocks() -> list[dict[str, Any]]:
@@ -70,20 +152,21 @@ def _get_content_index_blocks() -> list[dict[str, Any]]:
         raise RuntimeError(
             "Current page has no captured HTML. Navigate to a DOM page first."
         )
-    if _session.get("content_index_html") != clean_html:
-        _session["content_index_html"] = clean_html
-        _session["content_index_blocks"] = build(clean_html)
-        _session["content_index_quality"] = quality(
+    session = _sess()
+    if session.get("content_index_html") != clean_html:
+        session["content_index_html"] = clean_html
+        session["content_index_blocks"] = build(clean_html)
+        session["content_index_quality"] = quality(
             clean_html,
-            _session["content_index_blocks"],
+            session["content_index_blocks"],
         )
-    return _session["content_index_blocks"]
+    return session["content_index_blocks"]
 
 
 def _get_content_index_quality() -> dict[str, Any]:
     """Return cached coverage and signal-retention diagnostics."""
     _get_content_index_blocks()
-    return _session["content_index_quality"]
+    return _sess()["content_index_quality"]
 
 
 def _extract_search_results(
@@ -131,29 +214,34 @@ def _extract_search_results(
 
 
 def _get_session_lock():
-    """Return the process-wide asyncio.Lock, created on first use."""
-    global _session_lock
-    if _session_lock is None:
-        import asyncio
-        _session_lock = asyncio.Lock()
-    return _session_lock
+    """Return the calling session's asyncio.Lock, created on first use."""
+    import asyncio
+
+    key = _current_session_key()
+    lock = _SESSION_LOCKS.get(key)
+    if lock is None:
+        # asyncio.Lock() no longer binds a loop at construction (3.10+), so
+        # this is safe to call before the loop runs.
+        lock = asyncio.Lock()
+        _SESSION_LOCKS[key] = lock
+    return lock
 
 
-async def _close_browser_resources() -> None:
-    """Best-effort close of page/context/browser/playwright before a reset."""
+async def _close_session_state(session: Dict[str, Any]) -> None:
+    """Best-effort close of page/context/browser/playwright for one session."""
     import logging
     logger = logging.getLogger("shadow-web.mcp")
 
-    page = _session.pop("page", None)
-    context = _session.pop("context", None)
-    browser = _session.pop("browser", None)
-    pw = _session.pop("playwright_driver", None)
-    _session.pop("playwright", None)
-    _session.pop("shadow_page", None)
-    _session.pop("clean_html", None)
-    _session.pop("content_index_html", None)
-    _session.pop("content_index_blocks", None)
-    _session.pop("content_index_quality", None)
+    page = session.pop("page", None)
+    context = session.pop("context", None)
+    browser = session.pop("browser", None)
+    pw = session.pop("playwright_driver", None)
+    session.pop("playwright", None)
+    session.pop("shadow_page", None)
+    session.pop("clean_html", None)
+    session.pop("content_index_html", None)
+    session.pop("content_index_blocks", None)
+    session.pop("content_index_quality", None)
 
     try:
         if page is not None:
@@ -177,69 +265,88 @@ async def _close_browser_resources() -> None:
         logger.warning("Playwright stop failed during session reset: %s", exc)
 
 
+async def _close_browser_resources() -> None:
+    """Best-effort close of the CURRENT session's browser resources."""
+    await _close_session_state(_sess())
+
+
+async def _close_all_sessions() -> None:
+    """Best-effort close of every registered session (process shutdown hook)."""
+    for key, session in list(_SESSIONS.items()):
+        await _close_session_state(session)
+        if key != _DEFAULT_SESSION_KEY:
+            _SESSIONS.pop(key, None)
+
+
 async def _ensure_browser():
+    """Create the calling session's browser/page if it does not exist yet.
+
+    The caller MUST already hold ``_get_session_lock()``: every browser-touching
+    tool wraps its whole body in that lock, and acquiring it again here would
+    deadlock (asyncio.Lock is not reentrant).
+    """
     import logging
     logger = logging.getLogger("shadow-web.mcp")
 
-    async with _get_session_lock():
-        # Recreate if page was closed (e.g. browser crash)
-        if "page" in _session:
-            try:
-                if _session["page"].is_closed():
-                    logger.warning("Page closed, recreating browser session")
-                    await _close_browser_resources()
-            except Exception:
-                logger.warning("Page check failed, recreating browser session")
+    session = _sess()
+    # Recreate if page was closed (e.g. browser crash)
+    if "page" in session:
+        try:
+            if session["page"].is_closed():
+                logger.warning("Page closed, recreating browser session")
                 await _close_browser_resources()
+        except Exception:
+            logger.warning("Page check failed, recreating browser session")
+            await _close_browser_resources()
 
-        if "playwright" not in _session:
-            requested = preferred_browser_engine("camoufox")
-            if requested not in ("camoufox", "chromium"):
-                requested = "camoufox"
-            browser = None
-            browser_type = requested
-            browser_fallback = False
+    if "playwright" not in session:
+        requested = preferred_browser_engine("camoufox")
+        if requested not in ("camoufox", "chromium"):
+            requested = "camoufox"
+        browser = None
+        browser_type = requested
+        browser_fallback = False
 
-            if requested == "camoufox":
-                try:
-                    from camoufox import AsyncCamoufox
+        if requested == "camoufox":
+            try:
+                from camoufox import AsyncCamoufox
 
-                    browser = await AsyncCamoufox(headless=True).start()
-                    browser_type = "camoufox"
-                    logger.info("Browser: camoufox (Firefox)")
-                except Exception as e:
-                    if not allow_chromium_fallback():
-                        raise RuntimeError(camoufox_unavailable_message(e)) from e
-                    logger.warning(
-                        "Camoufox unavailable (%s), falling back to Chromium "
-                        "(SHADOW_WEB_ALLOW_CHROMIUM_FALLBACK=1)",
-                        e,
-                    )
-                    from playwright.async_api import async_playwright
-
-                    pw = await async_playwright().start()
-                    browser = await pw.chromium.launch(headless=True)
-                    browser_type = "chromium"
-                    browser_fallback = True
-                    _session["playwright_driver"] = pw
-            else:
+                browser = await AsyncCamoufox(headless=True).start()
+                browser_type = "camoufox"
+                logger.info("Browser: camoufox (Firefox)")
+            except Exception as e:
+                if not allow_chromium_fallback():
+                    raise RuntimeError(camoufox_unavailable_message(e)) from e
+                logger.warning(
+                    "Camoufox unavailable (%s), falling back to Chromium "
+                    "(SHADOW_WEB_ALLOW_CHROMIUM_FALLBACK=1)",
+                    e,
+                )
                 from playwright.async_api import async_playwright
 
                 pw = await async_playwright().start()
                 browser = await pw.chromium.launch(headless=True)
                 browser_type = "chromium"
-                logger.info("Browser: chromium")
-                _session["playwright_driver"] = pw
+                browser_fallback = True
+                session["playwright_driver"] = pw
+        else:
+            from playwright.async_api import async_playwright
 
-            context = await browser.new_context(locale="en-US")
-            page = await context.new_page()
-            _session["playwright"] = browser
-            _session["browser"] = browser
-            _session["context"] = context
-            _session["page"] = page
-            _session["browser_type"] = browser_type
-            _session["requested_browser"] = requested
-            _session["browser_fallback"] = browser_fallback
+            pw = await async_playwright().start()
+            browser = await pw.chromium.launch(headless=True)
+            browser_type = "chromium"
+            logger.info("Browser: chromium")
+            session["playwright_driver"] = pw
+
+        context = await browser.new_context(locale="en-US")
+        page = await context.new_page()
+        session["playwright"] = browser
+        session["browser"] = browser
+        session["context"] = context
+        session["page"] = page
+        session["browser_type"] = browser_type
+        session["requested_browser"] = requested
+        session["browser_fallback"] = browser_fallback
 
 
 async def _run_shadow_query(shadow, query: str, fmt: Literal["json", "terse", "xml"] = "json") -> dict | str:
@@ -269,6 +376,7 @@ def _format_mcp_response(
     diff: bool = False
 ) -> dict:
     # Base response properties
+    session = _sess()
     res = {
         "url": shadow.last_url,
         "title": title,
@@ -278,11 +386,11 @@ def _format_mcp_response(
         "action_count": len(shadow.action_map),
         "page_class": getattr(shadow, "page_class", "Static"),
         "page_class_reason": getattr(shadow, "page_class_reason", ""),
-        "browser_type": _session.get("browser_type") or "unknown",
-        "requested_browser": _session.get("requested_browser")
-        or _session.get("browser_type")
+        "browser_type": session.get("browser_type") or "unknown",
+        "requested_browser": session.get("requested_browser")
+        or session.get("browser_type")
         or "unknown",
-        "browser_fallback": bool(_session.get("browser_fallback")),
+        "browser_fallback": bool(session.get("browser_fallback")),
     }
     
     # Include diff context if diff mode is requested
@@ -342,6 +450,10 @@ def create_mcp_server():
         ) from exc
 
     mcp = FastMCP("shadow-web")
+    # Lets _current_session_key() reach the request-scoped session from
+    # module-level helpers that have no closure over the app.
+    global _mcp_app
+    _mcp_app = mcp
 
     @mcp.tool()
     def compress_html(html: str) -> dict:
@@ -373,9 +485,10 @@ def create_mcp_server():
 
         format: json | terse | xml
         """
-        shadow = _get_shadow_page()
-        fmt = format if format in ("json", "terse", "xml") else "terse"
-        return await _run_shadow_query(shadow, query, fmt=fmt)  # type: ignore[arg-type]
+        async with _get_session_lock():
+            shadow = _get_shadow_page()
+            fmt = format if format in ("json", "terse", "xml") else "terse"
+            return await _run_shadow_query(shadow, query, fmt=fmt)  # type: ignore[arg-type]
 
     @mcp.tool()
     def shadow_grep_html(html: str, query: str, format: str = "terse") -> dict | str:
@@ -396,30 +509,49 @@ def create_mcp_server():
     @mcp.tool()
     async def query_page(query: str) -> dict:
         """Alias for shadow_query(format=json). Requires navigate first."""
-        shadow = _get_shadow_page()
-        return await _run_shadow_query(shadow, query, fmt="json")
+        async with _get_session_lock():
+            shadow = _get_shadow_page()
+            return await _run_shadow_query(shadow, query, fmt="json")
 
     @mcp.tool()
     async def navigate(url: str, capture_mode: str = "auto", detail: str = "terse") -> dict:
         """Open URL in Playwright and build grouped XML Action Map snapshot.
-        
+
+        Only http/https targets on the public internet are allowed (no file://,
+        loopback, link-local or cloud-metadata addresses); see
+        SHADOW_WEB_ALLOW_PRIVATE_URLS for the local-development opt-out.
+
         detail: minimal | terse | xml | full
         """
         from shadow_web.browser_use import AsyncShadowPage
 
-        await _ensure_browser()
-        page = _session["page"]
-        await page.goto(url, wait_until="domcontentloaded")
-        heal_url = os.environ.get("SHADOW_WEB_HEAL_URL")
-        mode = capture_mode if capture_mode in ("dom", "a11y", "dual", "auto") else "auto"
-        shadow = AsyncShadowPage(page, heal_api_url=heal_url, capture_mode=mode)
-        clean_html, xml_map = await shadow.refresh()
-        _session["shadow_page"] = shadow
-        _session["clean_html"] = clean_html
+        async with _get_session_lock():
+            validate_navigation_url(url)
+            await _ensure_browser()
+            session = _sess()
+            page = session["page"]
+            heal_url = os.environ.get("SHADOW_WEB_HEAL_URL")
+            mode = capture_mode if capture_mode in ("dom", "a11y", "dual", "auto") else "auto"
+            try:
+                await page.goto(url, wait_until="domcontentloaded")
+                # Chromium follows redirects on its own: re-check where we landed.
+                assert_navigation_landed(page.url)
+                shadow = AsyncShadowPage(page, heal_api_url=heal_url, capture_mode=mode)
+                clean_html, xml_map = await shadow.refresh()
+            except Exception:
+                # A failed navigate must not leave a stale page/action map behind:
+                # click(sid)/snapshot would then act on a document the caller never
+                # asked for, with sids that no longer match the DOM.
+                session.pop("shadow_page", None)
+                session.pop("clean_html", None)
+                session.pop("content_index_html", None)
+                raise
+            session["shadow_page"] = shadow
+            session["clean_html"] = clean_html
 
-        title = await page.title()
-        detail_mode = detail if detail in ("minimal", "terse", "xml", "full") else "terse"
-        return _format_mcp_response(shadow, clean_html, xml_map, detail=detail_mode, title=title)
+            title = await page.title()
+            detail_mode = detail if detail in ("minimal", "terse", "xml", "full") else "terse"
+            return _format_mcp_response(shadow, clean_html, xml_map, detail=detail_mode, title=title)
 
     @mcp.tool()
     async def web_search(query: str) -> dict:
@@ -427,42 +559,50 @@ def create_mcp_server():
         import urllib.parse
         from shadow_web.browser_use import AsyncShadowPage
 
-        await _ensure_browser()
-        page = _session["page"]
+        async with _get_session_lock():
+            session = _sess()
+            await _ensure_browser()
+            page = session["page"]
 
-        encoded_query = urllib.parse.quote_plus(query)
-        heal_url = os.environ.get("SHADOW_WEB_HEAL_URL")
-        tried_engines: list[str] = []
+            encoded_query = urllib.parse.quote_plus(query)
+            heal_url = os.environ.get("SHADOW_WEB_HEAL_URL")
+            tried_engines: list[str] = []
 
-        for engine_name, url_template, exclude_domains in _SEARCH_ENGINES:
-            tried_engines.append(engine_name)
-            url = url_template.format(query=encoded_query)
+            for engine_name, url_template, exclude_domains in _SEARCH_ENGINES:
+                tried_engines.append(engine_name)
+                url = url_template.format(query=encoded_query)
 
-            await page.goto(url, wait_until="domcontentloaded")
-            await page.wait_for_timeout(2000)
+                try:
+                    validate_navigation_url(url)
+                    await page.goto(url, wait_until="domcontentloaded")
+                    assert_navigation_landed(page.url)
+                except Exception as exc:  # noqa: BLE001 - try the next engine
+                    logger.warning("web_search: %s navigation refused (%s)", engine_name, exc)
+                    continue
+                await page.wait_for_timeout(2000)
 
-            shadow = AsyncShadowPage(page, heal_api_url=heal_url, capture_mode="auto")
-            await shadow.refresh()
-            results = _extract_search_results(shadow.action_map, exclude_domains)
-            if not results:
-                continue
+                shadow = AsyncShadowPage(page, heal_api_url=heal_url, capture_mode="auto")
+                await shadow.refresh()
+                results = _extract_search_results(shadow.action_map, exclude_domains)
+                if not results:
+                    continue
 
-            _session["shadow_page"] = shadow
+                session["shadow_page"] = shadow
+                return {
+                    "query": query,
+                    "engine": engine_name,
+                    "results": results[:10],
+                    "results_count": len(results),
+                }
+
             return {
                 "query": query,
-                "engine": engine_name,
-                "results": results[:10],
-                "results_count": len(results),
+                "engine": None,
+                "engines_tried": tried_engines,
+                "results": [],
+                "results_count": 0,
+                "error": "No organic search results captured. Search engines may be blocking headless access.",
             }
-
-        return {
-            "query": query,
-            "engine": None,
-            "engines_tried": tried_engines,
-            "results": [],
-            "results_count": 0,
-            "error": "No organic search results captured. Search engines may be blocking headless access.",
-        }
 
     @mcp.tool()
     async def snapshot(diff: bool = False, detail: str = "terse") -> dict:
@@ -470,12 +610,13 @@ def create_mcp_server():
         
         detail: minimal | terse | xml | full
         """
-        shadow = _get_shadow_page()
-        clean_html, xml_map = await shadow.refresh(diff=diff)
-        _session["clean_html"] = clean_html
-        title = await shadow.page.title()
-        detail_mode = detail if detail in ("minimal", "terse", "xml", "full") else "terse"
-        return _format_mcp_response(shadow, clean_html, xml_map, detail=detail_mode, title=title, diff=diff)
+        async with _get_session_lock():
+            shadow = _get_shadow_page()
+            clean_html, xml_map = await shadow.refresh(diff=diff)
+            _sess()["clean_html"] = clean_html
+            title = await shadow.page.title()
+            detail_mode = detail if detail in ("minimal", "terse", "xml", "full") else "terse"
+            return _format_mcp_response(shadow, clean_html, xml_map, detail=detail_mode, title=title, diff=diff)
 
     @mcp.tool()
     async def webmcp_list_tools() -> dict:
@@ -507,20 +648,23 @@ def create_mcp_server():
     @mcp.tool()
     async def click(sid: str) -> dict:
         """Click element by data-sid on the current page."""
-        shadow = _get_shadow_page()
-        await shadow.click(sid)
-        return {"ok": True, "sid": sid, "url": shadow.last_url}
+        async with _get_session_lock():
+            shadow = _get_shadow_page()
+            await shadow.click(sid)
+            return {"ok": True, "sid": sid, "url": shadow.last_url}
 
     @mcp.tool()
     async def fill(sid: str, value: str) -> dict:
         """Fill input by data-sid on the current page."""
-        shadow = _get_shadow_page()
-        await shadow.fill(sid, value)
-        return {"ok": True, "sid": sid, "url": shadow.last_url}
+        async with _get_session_lock():
+            shadow = _get_shadow_page()
+            await shadow.fill(sid, value)
+            return {"ok": True, "sid": sid, "url": shadow.last_url}
 
     @mcp.tool()
     def compress_html_to_xml(html: str, url: str = "", title: str = "") -> str:
         """Return grouped XML action map for raw HTML (no browser)."""
+        _bound_html(html)
         _, _, groups = process_html(html)
         return generate_grouped_xml_map(url or "about:blank", title or "Page", groups)
 
@@ -530,9 +674,11 @@ def create_mcp_server():
                 f"html too large: {len(html)} chars, max {_MAX_HTML_CHARS}"
             )
 
-    def _bound_rows(max_rows: int) -> int | None:
+    def _bound_rows(max_rows: int) -> int:
+        # max_rows <= 0 means "no caller limit" - it must still respect the
+        # process-wide hard cap, otherwise the documented cap is bypassable.
         if max_rows <= 0:
-            return None
+            return _MAX_ROWS
         return min(max_rows, _MAX_ROWS)
 
     @mcp.tool()
@@ -576,24 +722,28 @@ def create_mcp_server():
         max_chars: truncate output (default 50000). Set 0 for full HTML — may be huge.
         Requires navigate(url) or snapshot() first.
         """
-        if "clean_html" not in _session:
+        session = _sess()
+        if "clean_html" not in session:
             raise RuntimeError("No page loaded. Call navigate(url) or snapshot() first.")
-        html = _session["clean_html"]
+        html = session["clean_html"]
         if max_chars > 0 and len(html) > max_chars:
             return html[:max_chars] + f"\n<!-- truncated: {len(html)} chars total, returned {max_chars} -->"
         return html
 
     @mcp.tool()
-    def schema_session(max_rows: int = 50) -> dict:
+    async def schema_session(max_rows: int = 50) -> dict:
         """Extract structured data from the current browser session (tables, forms, lists).
 
         max_rows: cap rows per table (default 50). Set 0 for no limit.
         Requires navigate(url) or snapshot() first.
         """
-        if "clean_html" not in _session:
-            raise RuntimeError("No page loaded. Call navigate(url) or snapshot() first.")
         from shadow_web.schema_snap import parse_page
-        return parse_page(_session["clean_html"], max_rows=_bound_rows(max_rows))
+
+        async with _get_session_lock():
+            session = _sess()
+            if "clean_html" not in session:
+                raise RuntimeError("No page loaded. Call navigate(url) or snapshot() first.")
+            return parse_page(session["clean_html"], max_rows=_bound_rows(max_rows))
 
     @mcp.tool()
     def schema_json(html: str, table_index: int = 0, max_rows: int = 50) -> list[dict]:
@@ -616,20 +766,26 @@ def create_mcp_server():
         return export_table_csv(html, table_index=table_index, max_rows=_bound_rows(max_rows))
 
     @mcp.tool()
-    def schema_session_json(table_index: int = 0, max_rows: int = 50) -> list[dict]:
+    async def schema_session_json(table_index: int = 0, max_rows: int = 50) -> list[dict]:
         """Export table from current browser session as JSON records. Requires navigate/snapshot first."""
-        if "clean_html" not in _session:
-            raise RuntimeError("No page loaded. Call navigate(url) or snapshot() first.")
         from shadow_web.schema_snap import export_table_json
-        return export_table_json(_session["clean_html"], table_index=table_index, max_rows=_bound_rows(max_rows))
+
+        async with _get_session_lock():
+            session = _sess()
+            if "clean_html" not in session:
+                raise RuntimeError("No page loaded. Call navigate(url) or snapshot() first.")
+            return export_table_json(session["clean_html"], table_index=table_index, max_rows=_bound_rows(max_rows))
 
     @mcp.tool()
-    def schema_session_csv(table_index: int = 0, max_rows: int = 50) -> str:
+    async def schema_session_csv(table_index: int = 0, max_rows: int = 50) -> str:
         """Export table from current browser session as CSV. Requires navigate/snapshot first."""
-        if "clean_html" not in _session:
-            raise RuntimeError("No page loaded. Call navigate(url) or snapshot() first.")
         from shadow_web.schema_snap import export_table_csv
-        return export_table_csv(_session["clean_html"], table_index=table_index, max_rows=_bound_rows(max_rows))
+
+        async with _get_session_lock():
+            session = _sess()
+            if "clean_html" not in session:
+                raise RuntimeError("No page loaded. Call navigate(url) or snapshot() first.")
+            return export_table_csv(session["clean_html"], table_index=table_index, max_rows=_bound_rows(max_rows))
 
     @mcp.tool()
     async def form_fill_plan(
@@ -648,43 +804,47 @@ def create_mcp_server():
         from shadow_web.browser_use import AsyncShadowPage
         from shadow_web.form_fill import plan_from_session
 
-        try:
-            profile_dict = json.loads(profile)
-        except json.JSONDecodeError as exc:
-            raise ValueError(f"profile must be valid JSON: {exc}") from exc
+        async with _get_session_lock():
+            try:
+                profile_dict = json.loads(profile)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"profile must be valid JSON: {exc}") from exc
 
-        if not isinstance(profile_dict, dict):
-            raise ValueError("profile must be a JSON object")
+            if not isinstance(profile_dict, dict):
+                raise ValueError("profile must be a JSON object")
 
-        if url:
-            await _ensure_browser()
-            page = _session["page"]
-            await page.goto(url, wait_until="domcontentloaded")
-            heal_url = os.environ.get("SHADOW_WEB_HEAL_URL")
-            shadow = AsyncShadowPage(page, heal_api_url=heal_url, capture_mode="auto")
-            clean_html, _ = await shadow.refresh()
-            _session["shadow_page"] = shadow
-            _session["clean_html"] = clean_html
-        else:
-            shadow = _get_shadow_page()
-            if not shadow.clean_html:
-                await shadow.refresh()
-            clean_html = shadow.clean_html
+            if url:
+                validate_navigation_url(url)
+                session = _sess()
+                await _ensure_browser()
+                page = session["page"]
+                await page.goto(url, wait_until="domcontentloaded")
+                assert_navigation_landed(page.url)
+                heal_url = os.environ.get("SHADOW_WEB_HEAL_URL")
+                shadow = AsyncShadowPage(page, heal_api_url=heal_url, capture_mode="auto")
+                clean_html, _ = await shadow.refresh()
+                session["shadow_page"] = shadow
+                session["clean_html"] = clean_html
+            else:
+                shadow = _get_shadow_page()
+                if not shadow.clean_html:
+                    await shadow.refresh()
+                clean_html = shadow.clean_html
 
-        plan = plan_from_session(
-            url=shadow.last_url,
-            clean_html=clean_html,
-            action_map=shadow.action_map,
-            profile=profile_dict,
-            page_class=shadow.page_class,
-            page_class_reason=shadow.page_class_reason,
-            form_index=form_index,
-            auto_submit=auto_submit,
-        )
-        return {
-            "profile_validation": plan.profile_validation,
-            "plan": plan.to_dict(),
-        }
+            plan = plan_from_session(
+                url=shadow.last_url,
+                clean_html=clean_html,
+                action_map=shadow.action_map,
+                profile=profile_dict,
+                page_class=shadow.page_class,
+                page_class_reason=shadow.page_class_reason,
+                form_index=form_index,
+                auto_submit=auto_submit,
+            )
+            return {
+                "profile_validation": plan.profile_validation,
+                "plan": plan.to_dict(),
+            }
 
     @mcp.tool()
     async def form_fill_execute(
@@ -694,11 +854,15 @@ def create_mcp_server():
         multi_step: bool = False,
         max_steps: int = 3,
         validate: bool = True,
+        auto_submit: bool = False,
     ) -> dict:
         """Execute form fill plan. Use answers JSON for ask steps. Returns status + filled/handoffs/questions.
 
         status: completed | questions_pending | handoff | validation_error
         multi_step: wizard loop (requires profile JSON). Ignores plan when true.
+        auto_submit: default False. Submitting is a side effect on a live site, so
+        it must be requested explicitly. At most one submit per URL is performed,
+        and a plan with unanswered questions never submits.
         """
         from shadow_web.form_fill import (
             apply_question_answers,
@@ -707,56 +871,58 @@ def create_mcp_server():
             plan_from_dict,
         )
 
-        try:
-            answers_dict = json.loads(answers or "{}")
-        except json.JSONDecodeError as exc:
-            raise ValueError(f"answers must be valid JSON: {exc}") from exc
-
-        shadow = _get_shadow_page()
-
-        if multi_step:
-            if not profile:
-                raise ValueError("profile JSON required when multi_step=true")
+        async with _get_session_lock():
             try:
-                profile_dict = json.loads(profile)
+                answers_dict = json.loads(answers or "{}")
             except json.JSONDecodeError as exc:
-                raise ValueError(f"profile must be valid JSON: {exc}") from exc
-            return await execute_form_fill_plan_multi_step_async(
-                shadow,
-                profile_dict,
-                answers=answers_dict,
-                max_steps=max_steps,
-                validate=validate,
-            )
+                raise ValueError(f"answers must be valid JSON: {exc}") from exc
 
-        if not plan:
-            raise ValueError("plan JSON required when multi_step=false")
+            shadow = _get_shadow_page()
 
-        try:
-            plan_dict = json.loads(plan)
-        except json.JSONDecodeError as exc:
-            raise ValueError(f"plan must be valid JSON: {exc}") from exc
+            if multi_step:
+                if not profile:
+                    raise ValueError("profile JSON required when multi_step=true")
+                try:
+                    profile_dict = json.loads(profile)
+                except json.JSONDecodeError as exc:
+                    raise ValueError(f"profile must be valid JSON: {exc}") from exc
+                return await execute_form_fill_plan_multi_step_async(
+                    shadow,
+                    profile_dict,
+                    answers=answers_dict,
+                    max_steps=max_steps,
+                    validate=validate,
+                    auto_submit=auto_submit,
+                )
 
-        plan_obj = plan_from_dict(plan_dict.get("plan", plan_dict))
-        # Guard against executing a stale or foreign plan: the plan records the
-        # URL it was built for. If it names a different page than the current
-        # session, filling+submitting could target the wrong site (prompt
-        # injection on a visited page is the threat model).
-        plan_url = (plan_obj.url or "").strip()
-        current_url = (getattr(shadow, "last_url", "") or "").strip()
-        if plan_url and current_url and plan_url != current_url:
-            raise ValueError(
-                "Plan was built for a different page "
-                f"(plan url={plan_url!r}, current url={current_url!r}). "
-                "Refuse to execute: re-build the plan for the current page."
-            )
-        if answers_dict:
-            apply_question_answers(plan_obj, answers_dict)
+            if not plan:
+                raise ValueError("plan JSON required when multi_step=false")
 
-        return await execute_form_fill_plan_async(shadow, plan_obj, validate=validate)
+            try:
+                plan_dict = json.loads(plan)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"plan must be valid JSON: {exc}") from exc
+
+            plan_obj = plan_from_dict(plan_dict.get("plan", plan_dict))
+            # Guard against executing a stale or foreign plan: the plan records the
+            # URL it was built for. If it names a different page than the current
+            # session, filling+submitting could target the wrong site (prompt
+            # injection on a visited page is the threat model).
+            plan_url = (plan_obj.url or "").strip()
+            current_url = (getattr(shadow, "last_url", "") or "").strip()
+            if plan_url and current_url and plan_url != current_url:
+                raise ValueError(
+                    "Plan was built for a different page "
+                    f"(plan url={plan_url!r}, current url={current_url!r}). "
+                    "Refuse to execute: re-build the plan for the current page."
+                )
+            if answers_dict:
+                apply_question_answers(plan_obj, answers_dict)
+
+            return await execute_form_fill_plan_async(shadow, plan_obj, validate=validate)
 
     @mcp.tool()
-    def content_outline(max_tokens: int = 600, offset: int = 0) -> str:
+    async def content_outline(max_tokens: int = 600, offset: int = 0) -> str:
         """Build a terse content outline from the current browser session.
 
         Returns block IDs (p0, p1, …) with heading paths and estimated token
@@ -768,16 +934,17 @@ def create_mcp_server():
         """
         from shadow_web.content_index import outline_text
 
-        budget = max(1, min(int(max_tokens or 600), _MAX_OUTLINE_TOKENS))
-        return outline_text(
-            _get_content_index_blocks(),
-            max_tokens=budget,
-            offset=offset,
-            quality_data=_get_content_index_quality(),
-        )
+        async with _get_session_lock():
+            budget = max(1, min(int(max_tokens or 600), _MAX_OUTLINE_TOKENS))
+            return outline_text(
+                _get_content_index_blocks(),
+                max_tokens=budget,
+                offset=offset,
+                quality_data=_get_content_index_quality(),
+            )
 
     @mcp.tool()
-    def content_blocks(ids: str, max_tokens: int = 2000) -> dict:
+    async def content_blocks(ids: str, max_tokens: int = 2000) -> dict:
         """Fetch content blocks from the current page by comma-separated IDs.
 
         Requires content_outline() first. Example IDs: "p1,p3,p5".
@@ -785,13 +952,14 @@ def create_mcp_server():
         """
         from shadow_web.content_index import fetch
 
-        block_ids = [i.strip() for i in ids.split(",") if i.strip()][:_MAX_BLOCK_IDS]
-        budget = max(1, min(int(max_tokens or 2000), _MAX_BLOCK_TOKENS))
-        return fetch(
-            _get_content_index_blocks(),
-            block_ids,
-            max_tokens=budget,
-        )
+        async with _get_session_lock():
+            block_ids = [i.strip() for i in ids.split(",") if i.strip()][:_MAX_BLOCK_IDS]
+            budget = max(1, min(int(max_tokens or 2000), _MAX_BLOCK_TOKENS))
+            return fetch(
+                _get_content_index_blocks(),
+                block_ids,
+                max_tokens=budget,
+            )
 
     @mcp.tool()
     async def agent_run(
@@ -877,7 +1045,20 @@ def create_mcp_server():
         model_id = (model or "").strip() or os.environ.get(
             "SHADOW_WEB_LLM_MODEL", "deepseek-v4-flash"
         )
-        engine = (browser or "camoufox").strip().lower() or "camoufox"
+        raw_engine = (browser or "camoufox").strip().lower() or "camoufox"
+        try:
+            from shadow_web.agent.session import normalize_browser_engine
+
+            engine = normalize_browser_engine(raw_engine)
+        except (ImportError, ValueError) as exc:
+            return {
+                "ok": False,
+                "answer": None,
+                "error": f"invalid browser engine {raw_engine!r}: {exc}",
+                "stop_reason": "invalid",
+                "complete": False,
+                "truncated": False,
+            }
         session_name = (session or "").strip() or None
 
         def _run():
@@ -890,7 +1071,35 @@ def create_mcp_server():
                 session=session_name,
             )
 
-        result = await asyncio.to_thread(_run)
+        # Only one agent run at a time per process: each owns a full browser, so
+        # unbounded concurrency is a resource-exhaustion vector.
+        async with _get_agent_semaphore():
+            try:
+                result = await asyncio.wait_for(
+                    asyncio.to_thread(_run), timeout=_AGENT_RUN_TIMEOUT_SEC
+                )
+            except asyncio.TimeoutError:
+                return {
+                    "ok": False,
+                    "answer": None,
+                    "error": (
+                        f"agent run exceeded the wall-clock limit "
+                        f"({_AGENT_RUN_TIMEOUT_SEC:.0f}s)"
+                    ),
+                    "stop_reason": "timeout",
+                    "complete": False,
+                    "truncated": True,
+                }
+            except Exception as exc:  # noqa: BLE001 - the envelope is the contract
+                logger.warning("agent_run failed: %s", exc, exc_info=True)
+                return {
+                    "ok": False,
+                    "answer": None,
+                    "error": str(exc) or exc.__class__.__name__,
+                    "stop_reason": "error",
+                    "complete": False,
+                    "truncated": False,
+                }
         return result.to_dict()
 
     return mcp

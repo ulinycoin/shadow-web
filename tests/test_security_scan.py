@@ -13,6 +13,7 @@ from shadow_web.security_scan import (
     check_sri,
     extract_same_domain_links,
     normalize_header_map,
+    probe_cors,
     render_markdown_report,
     summarize_report,
 )
@@ -327,3 +328,131 @@ def test_cors_in_surface_skipped_when_no_url():
     )
     assert "CORS_ORIGIN_ECHO" not in {f["rule_id"] for f in result["findings"]}
     assert "CORS_WILDCARD_WITH_CREDENTIALS" not in {f["rule_id"] for f in result["findings"]}
+
+
+# ── False-verdict regressions: CORS origin choice, SRI first-party ───
+
+
+class _FakeHeadersResponse:
+    def __init__(self, headers):
+        self.headers = headers
+
+
+def _patch_options(monkeypatch, acao_template: str, captured: dict):
+    import requests
+
+    def fake_options(url, headers=None, timeout=None):
+        headers = headers or {}
+        captured.update(headers)
+        return _FakeHeadersResponse(
+            {"Access-Control-Allow-Origin": acao_template.format(origin=headers.get("Origin", ""))}
+        )
+
+    monkeypatch.setattr(requests, "options", fake_options)
+
+
+def test_probe_cors_sends_a_foreign_origin(monkeypatch):
+    captured: dict = {}
+    _patch_options(monkeypatch, "{origin}", captured)
+
+    probe_cors("https://shop.example.com/api")
+
+    assert captured["Origin"] != "https://shop.example.com"
+    assert "shop.example.com" not in captured["Origin"]
+
+
+def test_same_origin_echo_is_not_reported(monkeypatch):
+    """Reflecting the page's own Origin is normal, not a CORS misconfiguration."""
+    captured: dict = {}
+    _patch_options(monkeypatch, "https://shop.example.com", captured)
+
+    findings = probe_cors("https://shop.example.com/api")
+
+    assert not any(f.rule_id == "CORS_ORIGIN_ECHO" for f in findings)
+
+
+def test_explicit_same_origin_probe_cannot_raise_the_echo_finding(monkeypatch):
+    captured: dict = {}
+    _patch_options(monkeypatch, "{origin}", captured)
+
+    findings = probe_cors("https://shop.example.com/api", origin="https://shop.example.com")
+
+    assert not any(f.rule_id == "CORS_ORIGIN_ECHO" for f in findings)
+
+
+def test_foreign_origin_echo_is_reported(monkeypatch):
+    captured: dict = {}
+    _patch_options(monkeypatch, "{origin}", captured)
+
+    findings = probe_cors("https://shop.example.com/api")
+
+    echo = [f for f in findings if f.rule_id == "CORS_ORIGIN_ECHO"]
+    assert len(echo) == 1
+    assert echo[0].evidence["origin_sent"] == captured["Origin"]
+    assert echo[0].evidence["target_origin"] == "https://shop.example.com"
+
+
+def test_foreign_origin_echo_with_credentials_is_high(monkeypatch):
+    import requests
+
+    def fake_options(url, headers=None, timeout=None):
+        return _FakeHeadersResponse(
+            {
+                "Access-Control-Allow-Origin": (headers or {}).get("Origin", ""),
+                "Access-Control-Allow-Credentials": "true",
+            }
+        )
+
+    monkeypatch.setattr(requests, "options", fake_options)
+
+    findings = probe_cors("https://shop.example.com/api")
+
+    assert [f.severity for f in findings if f.rule_id == "CORS_ORIGIN_ECHO"] == ["high"]
+
+
+def test_sri_relative_first_party_asset_is_low_severity():
+    findings = check_sri('<script src="/app.js"></script>', "https://shop.example.com/")
+
+    sri = [f for f in findings if f.rule_id == "SRI_MISSING"]
+    assert len(sri) == 1
+    assert sri[0].severity == "low"
+    assert sri[0].evidence["party"] == "first"
+    assert "first-party" in sri[0].title
+
+
+def test_sri_absolute_same_origin_asset_is_first_party():
+    findings = check_sri(
+        '<script src="https://shop.example.com/app.js"></script>',
+        "https://shop.example.com/pricing",
+    )
+
+    sri = [f for f in findings if f.rule_id == "SRI_MISSING"]
+    assert sri and sri[0].severity == "low"
+
+
+def test_sri_third_party_asset_stays_high():
+    findings = check_sri(
+        '<script src="https://cdn.other.com/app.js"></script>',
+        "https://shop.example.com/",
+    )
+
+    sri = [f for f in findings if f.rule_id == "SRI_MISSING"]
+    assert sri and sri[0].severity == "high"
+    assert sri[0].evidence["party"] == "third"
+
+
+def test_sri_protocol_relative_asset_is_third_party():
+    findings = check_sri(
+        '<script src="//cdn.other.com/app.js"></script>', "https://shop.example.com/"
+    )
+
+    sri = [f for f in findings if f.rule_id == "SRI_MISSING"]
+    assert sri and sri[0].severity == "high"
+
+
+def test_sri_without_page_url_keeps_absolute_assets_high():
+    """Backwards compatible: unknown page origin must not silence the finding."""
+    findings = check_sri('<script src="https://cdn.other.com/app.js"></script>')
+
+    sri = [f for f in findings if f.rule_id == "SRI_MISSING"]
+    assert sri and sri[0].severity == "high"

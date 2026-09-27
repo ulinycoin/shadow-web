@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from shadow_web.schema_snap import parse_page
+from shadow_web.url_guard import assert_navigation_landed, validate_navigation_url
 from shadow_web.wrapper import ShadowPage
 
 # Dense pages (catalogs, megamenus): keep observations MCP-terse sized.
@@ -16,6 +17,10 @@ DEFAULT_ACTION_LIMIT = 20
 DEFAULT_OUTLINE_TOKENS = 400
 DEFAULT_BLOCKS_TOKENS = 800
 MAX_CONTENT_BLOCK_IDS = 5
+# Page-controlled text is clipped again here: the compressor already bounds the
+# action map, but observations must stay bounded even for other producers.
+MAX_OBSERVED_LABEL_CHARS = 100
+MAX_OBSERVED_GROUP_CHARS = 60
 
 TOOL_SCHEMAS: List[Dict[str, Any]] = [
     {
@@ -244,7 +249,8 @@ def _action_terse(shadow: ShadowPage, limit: int = DEFAULT_ACTION_LIMIT) -> str:
         sid = action.get("id", "?")
         kind = action.get("type", "?")
         label = action.get("label") or action.get("placeholder") or action.get("text") or ""
-        group = action.get("group", "")
+        label = str(label)[:MAX_OBSERVED_LABEL_CHARS]
+        group = str(action.get("group", ""))[:MAX_OBSERVED_GROUP_CHARS]
         suffix = f" [{group}]" if group else ""
         lines.append(f"@{sid} {kind} {label}{suffix}".strip())
     if len(shadow.action_map) > limit:
@@ -470,7 +476,11 @@ class ToolRouter:
         url = str(args.get("url") or "").strip()
         if not url:
             raise ValueError("url is required")
+        # The URL may have been chosen by the model after reading an untrusted
+        # page, so it goes through the same policy as the thin MCP path.
+        validate_navigation_url(url)
         self.shadow.page.goto(url, wait_until="domcontentloaded")
+        assert_navigation_landed(self.shadow.page.url)
         self.shadow.refresh(diff=False)
         self._content_index_html = None
         self._reset_content_fetch_budget()

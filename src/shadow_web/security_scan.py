@@ -366,8 +366,40 @@ SRI_TAG_PATTERNS: list[tuple[str, str, str, str]] = [
 ]
 
 
-def check_sri(html: str) -> list[Finding]:
-    """Check script and link tags for missing integrity attribute."""
+def _is_first_party_resource(resource_url: str, page_url: str) -> bool:
+    """True when a subresource comes from the page's own origin.
+
+    Relative URLs are same-origin by definition.  For absolute or
+    protocol-relative URLs the host is compared with the page host; when the
+    page URL is unknown an absolute URL is treated as third-party so the
+    finding keeps its original severity.
+    """
+    if not resource_url:
+        return True
+    if resource_url.startswith("//"):
+        resource_host = urlparse("https:" + resource_url).netloc.lower()
+    else:
+        parsed = urlparse(resource_url)
+        if not parsed.scheme:
+            return True
+        resource_host = parsed.netloc.lower()
+    page_host = _netloc(page_url) if page_url else ""
+    if not page_host:
+        return False
+    return resource_host == page_host
+
+
+def check_sri(html: str, page_url: str = "") -> list[Finding]:
+    """Check script and link tags for missing integrity attribute.
+
+    Third-party subresources are the real SRI target: a compromise of a CDN or
+    font host is what SRI defends against.  A first-party asset served from the
+    page's own origin adds little (whoever controls that origin controls the
+    page anyway), so those findings are reported at ``low`` severity instead of
+    ``high`` - flagging them as high was a false-alarm source.  Pass ``page_url``
+    so absolute same-origin URLs can be recognised; relative URLs are always
+    first-party.
+    """
     findings: list[Finding] = []
     try:
         root = _html_parser.fromstring(html)
@@ -383,13 +415,28 @@ def check_sri(html: str) -> list[Finding]:
             if not url or url.startswith("data:") or url.startswith("#"):
                 continue
             if not el.get("integrity"):
+                first_party = _is_first_party_resource(url, page_url)
                 findings.append(
                     Finding(
-                        severity=sev,
+                        severity="low" if first_party else sev,
                         rule_id="SRI_MISSING",
-                        title=f"<{tag_name}> missing integrity attribute",
-                        detail=f"Subresource Integrity not set on {url[:120]}",
-                        evidence={"tag": tag_name, "url": url[:200]},
+                        title=(
+                            f"<{tag_name}> missing integrity attribute"
+                            + (" (first-party)" if first_party else " (third-party)")
+                        ),
+                        detail=(
+                            f"Subresource Integrity not set on {url[:120]}"
+                            + (
+                                " - same origin, lower risk"
+                                if first_party
+                                else " - third-party asset, SRI recommended"
+                            )
+                        ),
+                        evidence={
+                            "tag": tag_name,
+                            "url": url[:200],
+                            "party": "first" if first_party else "third",
+                        },
                     )
                 )
     return _dedupe_findings(findings)
@@ -446,6 +493,11 @@ def check_mixed_content(page_url: str, html: str) -> list[Finding]:
 
 # ── CORS preflight probe ────────────────────────────────────────────
 
+# Sent as the Origin when the caller does not supply one.  `.invalid` is
+# reserved by RFC 2606 and can never be a real site, so it is unambiguously a
+# foreign origin.
+PROBE_ORIGIN = "https://shadow-web-probe.invalid"
+
 
 def probe_cors(
     url: str,
@@ -455,15 +507,22 @@ def probe_cors(
 ) -> list[Finding]:
     """Send OPTIONS to check for permissive CORS.
 
-    Derives Origin from the probed URL's scheme+host by default, so the
-    request looks like a legitimate same-origin OPTIONS in server logs.
+    By default the probe sends a *foreign* Origin (see :data:`PROBE_ORIGIN`).
+    Earlier versions defaulted to the probed URL's own scheme+host, which made
+    every server that reflects the request's Origin look vulnerable: echoing a
+    same-origin Origin is normal browser behaviour, not a misconfiguration, and
+    it produced false high/medium verdicts.  A same-origin probe is now ignored
+    for the echo rule; pass ``origin=...`` only to probe a specific origin, and
+    note that passing the target's own origin cannot prove anything.
 
-    Returns findings if the server echoes the Origin back in ACAO or
-    allows wildcard CORS with credentials.
+    Findings: the foreign Origin is echoed back in ACAO, or wildcard CORS is
+    combined with credentials.
     """
     parsed = urlparse(url)
+    target_origin = f"{parsed.scheme}://{parsed.netloc}"
     if origin is None:
-        origin = f"{parsed.scheme}://{parsed.netloc}"
+        origin = PROBE_ORIGIN
+    same_origin_probe = origin.rstrip("/") == target_origin.rstrip("/")
 
     findings: list[Finding] = []
     import requests as _requests
@@ -481,16 +540,20 @@ def probe_cors(
     acac = (resp.headers.get("Access-Control-Allow-Credentials") or "").strip().lower()
     allow_methods = (resp.headers.get("Access-Control-Allow-Methods") or "").strip()
 
-    if acao == origin:
+    if acao == origin and not same_origin_probe:
         findings.append(
             Finding(
                 severity="high" if acac == "true" else "medium",
                 rule_id="CORS_ORIGIN_ECHO",
-                title="CORS reflects arbitrary origin via OPTIONS",
-                detail=f"Server echoes Origin header value back in ACAO (credentials={acac}).",
+                title="CORS reflects an arbitrary foreign origin via OPTIONS",
+                detail=(
+                    "Server echoes a foreign Origin header value back in ACAO "
+                    f"(credentials={acac})."
+                ),
                 evidence={
                     "url": url,
                     "origin_sent": origin,
+                    "target_origin": target_origin,
                     "acao_received": acao,
                     "acac_received": acac,
                     "allow_methods": allow_methods or "not sent",
@@ -883,7 +946,7 @@ def analyze_surface(
     )
 
     if clean_html:
-        findings.extend(check_sri(clean_html))
+        findings.extend(check_sri(clean_html, page_url))
         findings.extend(check_mixed_content(page_url, clean_html))
 
     if cors_probe_url:
