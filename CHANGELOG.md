@@ -4,6 +4,38 @@ All notable changes to this project are documented in this file.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- **ARIA grid plane in SchemaSnap**: `parse_tables`/`parse_page` now read div-based
+  grids (`role=table|grid` > `role=row` > `role=columnheader|cell|gridcell`) next to
+  real `<table>` elements — the markup most modern admin and back-office UIs ship,
+  which XPath `//table` never saw. Every table result carries `source`
+  (`"table"` / `"aria_grid"`); a grid nested in another grid (or in a `<table>`) is
+  not counted twice; `export_table_json`, `export_table_csv`, the MCP `schema_*`
+  tools and the session helpers inherit the new plane unchanged.
+
+### Fixed
+
+- **Click navigated, then the capture crashed**: `_perform_action` ended with a
+  `domcontentloaded` wait that the already-loaded old document satisfied
+  immediately, so the following `refresh()` could run its `evaluate()` while the new
+  document was committing and raise "Execution context was destroyed" — the click
+  had in fact succeeded. The post-click wait is now navigation-aware (it compares
+  against the pre-click URL and waits for the new document to load), and `refresh()`
+  in both the sync and async wrappers retries once when a navigation destroys the
+  context. Non-navigation failures still raise on the first attempt. Regression
+  tests: `tests/test_navigation_race.py`.
+- **Cell text spliced hidden subtrees together**: `text_content()` concatenated
+  `display:none` sort menus and tooltips into the value, turning a column header
+  into `IdAscendingDescending`. Cell text now skips hidden subtrees (`hidden`,
+  `aria-hidden="true"`, inline `display:none` / `visibility:hidden`) and joins
+  inline parts with a space (`CityBerlin` -> `City Berlin`). Applies to both planes.
+- **Zero-padded identifiers were coerced to numbers**: a column of ids like `0406`
+  or `007` inferred as `integer` and was exported as `406` / `7`. Zero-padded digit
+  runs now stay strings.
+
 ## [0.4.2] - 2026-09-27
 
 Security and trust release: everything below was found by an adversarial review of

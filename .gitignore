@@ -38,3 +38,7 @@ tests/test_lv_tender.py
 
 # Browser profile (machine-local)
 .camoufox/
+
+# Back-office demo: session state holds a live portal cookie; pulls are data
+.backoffice-state.json
+reports/backoffice/

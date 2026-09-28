@@ -3,8 +3,13 @@
 Turns HTML tables, forms, and lists into structured JSON-friendly dicts
 (columns, types, fields, validation attrs). Pure lxml, no browser, no API keys.
 
+Tables come from two planes, both tagged with `source`:
+  - "table"     — real <table> elements (incl. nested-table row isolation)
+  - "aria_grid" — div-based grids used by modern admin UIs:
+                  role=table/grid > role=row > role=columnheader/cell/gridcell
+
 Core functions:
-  - parse_tables(html, max_rows=None) -> [{columns, rows, types, total_rows, ...}]
+  - parse_tables(html, max_rows=None) -> [{columns, rows, types, total_rows, source, ...}]
   - parse_forms(html)                 -> [{action, method, fields: [...]}]
   - parse_lists(html)               -> [{items, total, type}]
   - parse_page(html, max_rows=None)   -> {tables, forms, lists}
@@ -54,6 +59,40 @@ def _text_or_empty(el) -> str:
     if el is None:
         return ""
     return _clean(el.text_content())
+
+
+# Inline markers of a hidden subtree. Admin UIs routinely park menus, tooltips
+# and sort dropdowns inside a header/body cell with display:none, and
+# text_content() would otherwise splice that hidden text into the value
+# ("Id" + "Ascending" + "Descending" -> "IdAscendingDescending").
+_HIDDEN_STYLE_RE = re.compile(r"display\s*:\s*none|visibility\s*:\s*hidden", re.I)
+
+
+def _is_hidden(el) -> bool:
+    if el.get("hidden") is not None:
+        return True
+    if (el.get("aria-hidden") or "").lower() == "true":
+        return True
+    return bool(_HIDDEN_STYLE_RE.search(el.get("style") or ""))
+
+
+def _visible_text(el) -> str:
+    """Cell text with hidden subtrees dropped and parts joined by a space."""
+    if el is None:
+        return ""
+    parts: List[str] = []
+
+    def walk(node) -> None:
+        if node.text:
+            parts.append(node.text)
+        for child in node.iterchildren():
+            if isinstance(child.tag, str) and not _is_hidden(child):
+                walk(child)
+            if child.tail:
+                parts.append(child.tail)
+
+    walk(el)
+    return _clean(" ".join(parts))
 
 
 def _li_item_text(li_el) -> str:
@@ -113,6 +152,11 @@ def _infer_column_type(values: List[str]) -> str:
 
         # Try numeric
         cleaned = val.replace(",", "").replace("$", "").replace("\u20ac", "").replace("\u00a3", "").replace("%", "").strip()
+        # Zero-padded digit runs are identifiers, not numbers: employee/SKU/order
+        # ids like "0406" or "007" must not be coerced to 406 / 7 downstream.
+        if re.fullmatch(r"0\d+", cleaned):
+            all_int = False
+            continue
         try:
             float(cleaned)
             numeric += 1
@@ -169,44 +213,12 @@ def _own_table_rows(table_el) -> List[Any]:
     return rows
 
 
-def _extract_table(table_el) -> Dict[str, Any]:
-    """Parse a single <table> element into column schema + rows."""
+def _finalize_table(columns: List[str], rows: List[List[str]], source: str) -> Dict[str, Any]:
+    """Shared shape for every extraction plane: normalize columns, infer types.
 
-    own_rows = _own_table_rows(table_el)
-
-    # -- Extract headers: first own <tr> containing <th> (thead or tbody) --
-    columns: List[str] = []
-    header_tr = None
-    for tr in own_rows:
-        th_cells = tr.xpath("./th")
-        if th_cells:
-            header_tr = tr
-            columns = [_text_or_empty(cell) for cell in th_cells]
-            break
-
-    # Legacy fallback: a leading <tr> outside <tbody> names the columns
-    if header_tr is None and own_rows:
-        first_tr = own_rows[0]
-        parent = first_tr.getparent()
-        if parent is not None and parent.tag not in ("tbody", "tfoot"):
-            columns = [_text_or_empty(cell) for cell in first_tr.xpath("./td")]
-
-    # -- Extract rows (the header row and any <thead> row are never data) --
-    thead = table_el.find("./thead")
-    excluded_rows = set(thead.iter("tr")) if thead is not None else set()
-    if header_tr is not None:
-        excluded_rows.add(header_tr)
-
-    rows: List[List[str]] = []
-    for tr in own_rows:
-        if tr in excluded_rows:
-            continue
-        row = []
-        for cell in tr.xpath("./td | ./th"):
-            row.append(_text_or_empty(cell))
-        if row:
-            rows.append(row)
-
+    `source` records which plane produced the table ("table" or "aria_grid") so a
+    value can be traced back to how it was read.
+    """
     # -- Normalize column count (max across ALL rows, not just first) --
     max_row_len = max(len(row) for row in rows) if rows else 0
     max_cols = max(max_row_len, len(columns))
@@ -233,11 +245,178 @@ def _extract_table(table_el) -> Dict[str, Any]:
         "rows": rows,
         "total_rows": len(rows),
         "column_count": len(columns),
+        "source": source,
     }
+
+
+def _extract_table(table_el) -> Dict[str, Any]:
+    """Parse a single <table> element into column schema + rows."""
+
+    own_rows = _own_table_rows(table_el)
+
+    # -- Extract headers: first own <tr> containing <th> (thead or tbody) --
+    columns: List[str] = []
+    header_tr = None
+    for tr in own_rows:
+        th_cells = tr.xpath("./th")
+        if th_cells:
+            header_tr = tr
+            columns = [_visible_text(cell) for cell in th_cells]
+            break
+
+    # Legacy fallback: a leading <tr> outside <tbody> names the columns
+    if header_tr is None and own_rows:
+        first_tr = own_rows[0]
+        parent = first_tr.getparent()
+        if parent is not None and parent.tag not in ("tbody", "tfoot"):
+            columns = [_visible_text(cell) for cell in first_tr.xpath("./td")]
+
+    # -- Extract rows (the header row and any <thead> row are never data) --
+    thead = table_el.find("./thead")
+    excluded_rows = set(thead.iter("tr")) if thead is not None else set()
+    if header_tr is not None:
+        excluded_rows.add(header_tr)
+
+    rows: List[List[str]] = []
+    for tr in own_rows:
+        if tr in excluded_rows:
+            continue
+        row = []
+        for cell in tr.xpath("./td | ./th"):
+            row.append(_visible_text(cell))
+        if row:
+            rows.append(row)
+
+    return _finalize_table(columns, rows, source="table")
+
+
+# -- ARIA grid extraction -------------------------------------------------------
+#
+# Modern admin/back-office UIs (Vue, React, Angular) ship div-based grids marked
+# up with ARIA roles instead of <table>: role=table/grid wrapping role=row
+# children whose role=columnheader / role=cell (or gridcell / rowheader) children
+# hold the data. XPath '//table' sees none of it, so every consumer used to have
+# to bring its own extractor.
+
+_ARIA_GRID_ROLES = frozenset({"table", "grid"})
+_ARIA_ROW_ROLES = frozenset({"row"})
+_ARIA_HEADER_ROLES = frozenset({"columnheader"})
+_ARIA_CELL_ROLES = frozenset({"cell", "gridcell", "rowheader"})
+
+
+def _is_aria_grid(el) -> bool:
+    return el.get("role") in _ARIA_GRID_ROLES
+
+
+def _aria_grid_ancestor(el):
+    """Nearest ancestor with an ARIA grid role, or None."""
+    for ancestor in el.iterancestors():
+        if _is_aria_grid(ancestor):
+            return ancestor
+    return None
+
+
+def _inside_table(el) -> bool:
+    return any(ancestor.tag == "table" for ancestor in el.iterancestors())
+
+
+def _belongs_to(el, root) -> bool:
+    """True when `el` belongs to `root` and not to a nested grid/table/row."""
+    for ancestor in el.iterancestors():
+        if ancestor is root:
+            return True
+        if _is_aria_grid(ancestor) or ancestor.tag == "table":
+            return False
+        if ancestor.get("role") in _ARIA_ROW_ROLES:
+            return False
+    return False
+
+
+def _aria_row_cells(row_el) -> List[Any]:
+    cells = []
+    for cell in row_el.iter():
+        if cell is row_el:
+            continue
+        role = cell.get("role")
+        if not (
+            role in _ARIA_CELL_ROLES
+            or role in _ARIA_HEADER_ROLES
+            or cell.tag in ("td", "th")
+        ):
+            continue
+        if not _belongs_to(cell, row_el):
+            continue
+        cells.append(cell)
+    return cells
+
+
+def _extract_aria_grid(grid_el) -> Dict[str, Any]:
+    """Parse one ARIA grid into the same shape as a <table>.
+
+    Header cells are taken from the first row that carries role=columnheader (or
+    a real <th>). When a grid has no header row the columns are named col_N
+    rather than silently promoting the first data row to a header.
+    """
+    row_els = [
+        el
+        for el in grid_el.iter()
+        if el is not grid_el and el.get("role") in _ARIA_ROW_ROLES and _belongs_to(el, grid_el)
+    ]
+
+    columns: List[str] = []
+    header_row = None
+    for row_el in row_els:
+        cells = _aria_row_cells(row_el)
+        if any(c.get("role") in _ARIA_HEADER_ROLES or c.tag == "th" for c in cells):
+            header_row = row_el
+            columns = [_visible_text(cell) for cell in cells]
+            break
+
+    rows: List[List[str]] = []
+    for row_el in row_els:
+        if row_el is header_row:
+            continue
+        cells = _aria_row_cells(row_el)
+        if not cells:
+            continue
+        row = [_visible_text(cell) for cell in cells]
+        if any(value for value in row):
+            rows.append(row)
+
+    return _finalize_table(columns, rows, source="aria_grid")
+
+
+def _iter_table_roots(tree) -> List[Any]:
+    """Table-like roots in document order: every <table> plus ARIA grids.
+
+    An ARIA grid nested inside another grid (or inside a <table>) is skipped:
+    its rows belong to the outer container and would otherwise be reported twice.
+    Nested <table> elements are still yielded, matching the previous behaviour
+    where `_own_table_rows` keeps their rows out of the outer table.
+    """
+    roots = []
+    for el in tree.xpath("//table | //*[@role='table' or @role='grid']"):
+        if el.tag == "table":
+            roots.append(el)
+            continue
+        if _inside_table(el) or _aria_grid_ancestor(el) is not None:
+            continue
+        roots.append(el)
+    return roots
+
+
+def _extract_table_root(el) -> Dict[str, Any]:
+    if el.tag == "table":
+        return _extract_table(el)
+    return _extract_aria_grid(el)
 
 
 def parse_tables(html: str, max_rows: Optional[int] = None) -> List[Dict[str, Any]]:
     """Extract all tables from HTML as structured data.
+
+    Covers both planes: real <table> elements and div-based ARIA grids
+    (role=table/grid + role=row/columnheader/cell) that modern admin UIs ship.
+    Each result carries `source` ("table" or "aria_grid") naming the plane.
 
     Args:
         html: Raw or compressed HTML.
@@ -245,12 +424,12 @@ def parse_tables(html: str, max_rows: Optional[int] = None) -> List[Dict[str, An
             adds rows_truncated=True and rows_returned.
 
     Returns a list of table objects, each with:
-      - columns, types, rows, total_rows, column_count
+      - columns, types, rows, total_rows, column_count, source
     """
     tree = _parse_html(html)
     if tree is None:
         return []
-    return [_apply_max_rows(_extract_table(t), max_rows) for t in tree.xpath("//table")]
+    return [_apply_max_rows(_extract_table_root(t), max_rows) for t in _iter_table_roots(tree)]
 
 
 # -- Form parsing ---------------------------------------------------------------
@@ -501,7 +680,7 @@ def parse_page(html: str, max_rows: Optional[int] = None) -> Dict[str, Any]:
     if tree is None:
         return {"tables": [], "forms": [], "lists": []}
     return {
-        "tables": [_apply_max_rows(_extract_table(t), max_rows) for t in tree.xpath("//table")],
+        "tables": [_apply_max_rows(_extract_table_root(t), max_rows) for t in _iter_table_roots(tree)],
         "forms": [_extract_form(f) for f in tree.xpath("//form")],
         "lists": _parse_lists_from_tree(tree),
     }

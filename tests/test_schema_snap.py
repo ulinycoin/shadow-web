@@ -191,7 +191,7 @@ class TestParseTables:
         </tr></tbody></table>"""
         outer, inner = parse_tables(html)
         assert outer["total_rows"] == 1
-        assert outer["rows"] == [["Outer", "CityBerlin"]]
+        assert outer["rows"] == [["Outer", "City Berlin"]]
         assert ["City", "Berlin"] not in outer["rows"]
         assert inner["total_rows"] == 1
         assert inner["rows"] == [["City", "Berlin"]]
@@ -423,3 +423,203 @@ class TestExport:
         import pytest
         with pytest.raises(ValueError, match="No tables"):
             export_table_json("<html><body></body></html>")
+
+
+# ── Test: ARIA grids (div-based admin UI grids) ──────────────────────────────
+
+ARIA_GRID = """
+<div role="table" aria-label="Employees">
+  <div role="rowgroup">
+    <div role="row">
+      <div role="columnheader">Id</div>
+      <div role="columnheader">Name</div>
+      <div role="columnheader">Status</div>
+    </div>
+  </div>
+  <div role="rowgroup">
+    <div role="row">
+      <div role="cell">0406</div>
+      <div role="cell">Petraitis</div>
+      <div role="cell">Active</div>
+    </div>
+    <div role="row">
+      <div role="cell">0295</div>
+      <div role="cell">Aaliyah</div>
+      <div role="cell">Pending</div>
+    </div>
+  </div>
+</div>
+"""
+
+ARIA_GRID_NO_HEADER = """
+<div role="grid">
+  <div role="row">
+    <div role="gridcell">a1</div><div role="gridcell">a2</div>
+  </div>
+  <div role="row">
+    <div role="gridcell">b1</div><div role="gridcell">b2</div>
+  </div>
+</div>
+"""
+
+
+class TestAriaGrids:
+    def test_extracts_columns_and_rows(self):
+        table = parse_tables(ARIA_GRID)[0]
+        assert table["columns"] == ["Id", "Name", "Status"]
+        assert table["rows"] == [["0406", "Petraitis", "Active"], ["0295", "Aaliyah", "Pending"]]
+        assert table["total_rows"] == 2
+        assert table["column_count"] == 3
+        assert table["source"] == "aria_grid"
+
+    def test_regular_table_is_tagged_with_its_own_plane(self):
+        assert parse_tables(SIMPLE_TABLE)[0]["source"] == "table"
+
+    def test_grid_without_header_gets_generated_names(self):
+        table = parse_tables(ARIA_GRID_NO_HEADER)[0]
+        assert table["columns"] == ["col_1", "col_2"]
+        assert table["rows"] == [["a1", "a2"], ["b1", "b2"]]
+
+    def test_infers_column_types(self):
+        html = """
+        <div role="table">
+          <div role="row"><div role="columnheader">Qty</div><div role="columnheader">Price</div></div>
+          <div role="row"><div role="cell">12</div><div role="cell">$9.99</div></div>
+          <div role="row"><div role="cell">3</div><div role="cell">$19.99</div></div>
+        </div>
+        """
+        table = parse_tables(html)[0]
+        assert table["types"] == ["integer", "currency"]
+
+    def test_nested_grid_rows_are_not_double_counted(self):
+        html = """
+        <div role="grid">
+          <div role="row"><div role="columnheader">Outer</div></div>
+          <div role="row"><div role="cell">outer-1</div></div>
+          <div role="row">
+            <div role="cell">
+              <div role="grid">
+                <div role="row"><div role="gridcell">inner-1</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        """
+        tables = parse_tables(html)
+        assert len(tables) == 1, "a grid nested in a grid belongs to the outer one"
+        # The nested grid's text stays inside the outer cell (same as the <table>
+        # plane); the guarantee is that no second table object is produced.
+        assert [r[0] for r in tables[0]["rows"]] == ["outer-1", "inner-1"]
+
+    def test_table_role_on_real_table_is_counted_once(self):
+        html = '<table role="grid"><tr><th>A</th></tr><tr><td>1</td></tr></table>'
+        tables = parse_tables(html)
+        assert len(tables) == 1
+        assert tables[0]["source"] == "table"
+
+    def test_grid_inside_a_real_table_is_left_to_the_table_plane(self):
+        html = """
+        <table>
+          <tr><th>Outer</th></tr>
+          <tr><td>
+            <div role="grid"><div role="row"><div role="gridcell">inner</div></div></div>
+          </td></tr>
+        </table>
+        """
+        tables = parse_tables(html)
+        assert [t["source"] for t in tables] == ["table"]
+
+    def test_parse_page_includes_aria_grids(self):
+        page = parse_page(ARIA_GRID)
+        assert len(page["tables"]) == 1
+        assert page["tables"][0]["source"] == "aria_grid"
+
+    def test_max_rows_applies_to_grids(self):
+        table = parse_tables(ARIA_GRID, max_rows=1)[0]
+        assert table["total_rows"] == 2
+        assert table["rows_returned"] == 1
+        assert table["rows_truncated"] is True
+
+    def test_export_json_and_csv_work_on_grids(self):
+        records = export_table_json(ARIA_GRID)
+        assert records[0] == {"Id": "0406", "Name": "Petraitis", "Status": "Active"}
+        csv_out = export_table_csv(ARIA_GRID)
+        assert csv_out.splitlines()[0] == "Id,Name,Status"
+        assert "0295,Aaliyah,Pending" in csv_out
+
+    def test_empty_grid_yields_no_rows(self):
+        table = parse_tables('<div role="table"></div>')[0]
+        assert table["rows"] == []
+        assert table["total_rows"] == 0
+
+    def test_plain_divs_are_not_treated_as_tables(self):
+        assert parse_tables("<div><div>just</div><div>layout</div></div>") == []
+
+
+# ── Test: identifier fidelity (zero-padded ids are not numbers) ──────────────
+
+
+class TestIdentifierFidelity:
+    def test_zero_padded_ids_stay_strings(self):
+        html = "<table><tr><th>Id</th></tr><tr><td>0406</td></tr><tr><td>0295</td></tr></table>"
+        table = parse_tables(html)[0]
+        assert table["types"] == ["string"]
+        assert [r[0] for r in table["rows"]] == ["0406", "0295"]
+        assert export_table_json(html)[0]["Id"] == "0406"
+
+    def test_real_numbers_still_numeric(self):
+        html = "<table><tr><th>Qty</th></tr><tr><td>12</td></tr><tr><td>0</td></tr><tr><td>3</td></tr></table>"
+        table = parse_tables(html)[0]
+        assert table["types"] == ["integer"]
+
+    def test_decimals_below_one_still_numeric(self):
+        html = "<table><tr><th>Rate</th></tr><tr><td>0.25</td></tr><tr><td>0.5</td></tr></table>"
+        table = parse_tables(html)[0]
+        assert table["types"] == ["number"]
+
+
+# ── Test: hidden subtrees inside cells (sort menus, tooltips) ────────────────
+
+HEADER_WITH_HIDDEN_MENU = """
+<div role="table">
+  <div role="row">
+    <div role="columnheader">Id<div role="dropdown" style="display: none;">
+      <ul role="menu"><li>Ascending</li><li>Descending</li></ul>
+    </div></div>
+    <div role="columnheader">Name<span hidden>sort</span></div>
+  </div>
+  <div role="row"><div role="cell">0406</div><div role="cell">Petraitis</div></div>
+</div>
+"""
+
+
+class TestHiddenContent:
+    def test_hidden_sort_menu_is_not_spliced_into_the_header(self):
+        table = parse_tables(HEADER_WITH_HIDDEN_MENU)[0]
+        assert table["columns"] == ["Id", "Name"]
+
+    def test_hidden_attribute_excludes_text(self):
+        table = parse_tables(HEADER_WITH_HIDDEN_MENU)[0]
+        assert "sort" not in " ".join(table["columns"])
+
+    def test_aria_hidden_is_excluded(self):
+        html = """
+        <div role="table">
+          <div role="row"><div role="columnheader">Price</div></div>
+          <div role="row"><div role="cell">$10<span aria-hidden="true">per unit</span></div></div>
+        </div>
+        """
+        assert parse_tables(html)[0]["rows"] == [["$10"]]
+
+    def test_hidden_text_excluded_in_plain_tables_too(self):
+        html = """
+        <table>
+          <tr><th>City</th></tr>
+          <tr><td>Berlin<div style="display:none">internal note</div></td></tr>
+        </table>
+        """
+        assert parse_tables(html)[0]["rows"] == [["Berlin"]]
+
+    def test_inline_parts_are_joined_with_a_space(self):
+        html = "<table><tr><th>Name</th></tr><tr><td><b>Ada</b>Lovelace</td></tr></table>"
+        assert parse_tables(html)[0]["rows"] == [["Ada Lovelace"]]
