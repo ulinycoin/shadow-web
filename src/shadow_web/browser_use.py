@@ -26,7 +26,7 @@ from shadow_web.diff import PageDiff, PageSnapshot, build_snapshot, compute_page
 
 logger = logging.getLogger(__name__)
 
-from shadow_web.utils import _parse_eval_res
+from shadow_web.utils import _parse_eval_res, NAVIGATION_SETTLE_MS, is_transient_navigation_error
 
 
 class AsyncShadowPage:
@@ -80,7 +80,34 @@ class AsyncShadowPage:
         self.capture_readiness: Optional[CaptureReadyResult] = None
 
     async def refresh(self, diff: bool = False) -> Tuple[str, str]:
-        """Captures flattened DOM asynchronously, processes HTML and builds Action Map."""
+        """Captures flattened DOM asynchronously, processes HTML and builds Action Map.
+
+        Retries once when a navigation destroys the JS execution context: a click
+        can commit a navigation between the post-click wait and the capture, and
+        that observation is retryable even though the action is not. See the sync
+        wrapper for the same guard.
+        """
+        try:
+            return await self._refresh_once(diff=diff)
+        except Exception as exc:
+            if not is_transient_navigation_error(exc):
+                raise
+            logger.debug("[Shadow Web Async] refresh lost the execution context, retrying: %s", exc)
+            await self._settle_after_navigation()
+            return await self._refresh_once(diff=diff)
+
+    async def _settle_after_navigation(self, timeout_ms: int = 5000) -> None:
+        """Best-effort wait for a navigation that just destroyed the context."""
+        for step in (
+            lambda: self.page.wait_for_load_state("load", timeout=timeout_ms),
+            lambda: self.page.wait_for_timeout(NAVIGATION_SETTLE_MS),
+        ):
+            try:
+                await step()
+            except Exception as exc:
+                logger.debug("[Shadow Web Async] navigation settle step skipped: %s", exc)
+
+    async def _refresh_once(self, diff: bool = False) -> Tuple[str, str]:
         current_url = self.page.url
         if self._baseline and self._baseline.url != current_url:
             self._baseline = None
@@ -246,7 +273,25 @@ class AsyncShadowPage:
             )
 
     async def _wait_after_click(self, timeout_ms: int) -> None:
-        """Best-effort post-click wait. Failures are non-fatal."""
+        """Best-effort post-click wait. Failures are non-fatal.
+
+        Navigation-aware: waiting for ``domcontentloaded`` alone returns
+        immediately for the document that is already loaded, so the following
+        refresh() would race the incoming one. ``self.last_url`` is the pre-click
+        URL recorded by the last capture.
+        """
+        before = self.last_url
+        try:
+            await self.page.wait_for_timeout(NAVIGATION_SETTLE_MS)
+        except Exception as exc:
+            logger.debug("[Shadow Web Async] post-click settle skipped: %s", exc)
+
+        try:
+            if before and self.page.url != before:
+                await self.page.wait_for_load_state("load", timeout=timeout_ms)
+        except Exception as exc:
+            logger.debug("[Shadow Web Async] post-navigation load wait skipped: %s", exc)
+
         try:
             await self.page.wait_for_load_state("domcontentloaded", timeout=timeout_ms)
         except Exception as exc:

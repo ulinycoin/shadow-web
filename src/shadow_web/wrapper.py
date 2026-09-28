@@ -17,6 +17,7 @@ from .webmcp import (
 )
 from .diff import PageDiff, PageSnapshot, build_snapshot, compute_page_diff, diff_terse, generate_diff_xml
 from .verified_heal import verify_selector_on_page
+from .utils import NAVIGATION_SETTLE_MS, is_transient_navigation_error
 
 logger = logging.getLogger(__name__)
 
@@ -74,10 +75,37 @@ class ShadowPage:
     def refresh(self, diff: bool = False) -> Tuple[str, str]:
         """Captures flattened DOM (read-only), builds clean HTML and Action Map.
 
+        Retries once when a navigation destroys the JS execution context. A click
+        can commit a navigation between the post-click wait and the capture, and
+        Playwright then raises "Execution context was destroyed" mid-evaluate.
+        The action already happened; only the observation is retryable, so the
+        retry belongs here rather than in every caller that clicks.
+
         Args:
             diff: When True and baseline exists for same URL, return delta XML
                   with skeleton + breadcrumbs instead of full Action Map.
         """
+        try:
+            return self._refresh_once(diff=diff)
+        except Exception as exc:
+            if not is_transient_navigation_error(exc):
+                raise
+            logger.debug("[Shadow Web] refresh lost the execution context, retrying: %s", exc)
+            self._settle_after_navigation()
+            return self._refresh_once(diff=diff)
+
+    def _settle_after_navigation(self, timeout_ms: int = 5000) -> None:
+        """Best-effort wait for a navigation that just destroyed the context."""
+        for step in (
+            lambda: self.page.wait_for_load_state("load", timeout=timeout_ms),
+            lambda: self.page.wait_for_timeout(NAVIGATION_SETTLE_MS),
+        ):
+            try:
+                step()
+            except Exception as exc:
+                logger.debug("[Shadow Web] navigation settle step skipped: %s", exc)
+
+    def _refresh_once(self, diff: bool = False) -> Tuple[str, str]:
         current_url = self.page.url
         if self._baseline and self._baseline.url != current_url:
             self._baseline = None
@@ -256,7 +284,28 @@ class ShadowPage:
             )
 
     def _wait_after_click(self, timeout_ms: int) -> None:
-        """Best-effort post-click wait. Failures are non-fatal (no heal/re-click)."""
+        """Best-effort post-click wait. Failures are non-fatal (no heal/re-click).
+
+        The wait is navigation-aware. Previously it waited for
+        ``domcontentloaded`` on the document that was ALREADY loaded, so the
+        call returned immediately and the following refresh() raced the incoming
+        document. Now we give the navigation a moment to start, and when the URL
+        actually moved we wait for the new document to load.
+
+        ``self.last_url`` is set by the last capture, so it is the pre-click URL.
+        """
+        before = self.last_url
+        try:
+            self.page.wait_for_timeout(NAVIGATION_SETTLE_MS)
+        except Exception as exc:
+            logger.debug("[Shadow Web] post-click settle skipped: %s", exc)
+
+        try:
+            if before and self.page.url != before:
+                self.page.wait_for_load_state("load", timeout=timeout_ms)
+        except Exception as exc:
+            logger.debug("[Shadow Web] post-navigation load wait skipped: %s", exc)
+
         try:
             self.page.wait_for_load_state("domcontentloaded", timeout=timeout_ms)
         except Exception as exc:
