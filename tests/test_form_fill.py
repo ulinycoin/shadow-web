@@ -70,6 +70,58 @@ def test_classify_safe_kinds():
     assert classify_field_kind({"type": "file", "label": "Upload"}) == "file"
 
 
+def test_classify_ignores_aliases_inside_longer_words():
+    """`name` must not match `username`, `tel` must not match `hotel`."""
+    assert classify_field_kind({"type": "text", "name": "username"}) == "unknown"
+    assert classify_field_kind({"type": "text", "label": "Hotel"}) == "unknown"
+    assert classify_field_kind({"type": "text", "label": "Buyer protection"}) == "unknown"
+
+
+def test_classify_empty_label_is_unknown_not_longest_alias():
+    """An unlabelled field used to match the longest alias ("business email")."""
+    assert classify_field_kind({"type": "text"}) == "unknown"
+    assert classify_field_kind({"type": "text", "label": "   "}) == "unknown"
+    assert classify_field_kind({"type": "text", "label": "", "placeholder": ""}) == "unknown"
+
+
+def test_classify_still_matches_whole_word_aliases():
+    assert classify_field_kind({"type": "text", "label": "Business email"}) == "email"
+    assert classify_field_kind({"type": "text", "name": "e-mail"}) == "email"
+    assert classify_field_kind({"type": "text", "label": "Your full name"}) == "name"
+    assert classify_field_kind({"type": "text", "label": "First name"}) == "first_name"
+    assert classify_field_kind({"type": "text", "label": "Phone number"}) == "phone"
+
+
+USERNAME_SIGNUP_FORM = """
+<form action="/register" method="post">
+  <input type="text" name="username" placeholder="Pick a handle">
+  <input type="text" name="hotel" placeholder="Hotel you stayed at">
+  <input type="text" name="email" placeholder="Email">
+  <button type="submit">Register</button>
+</form>
+"""
+
+
+def test_username_and_hotel_fields_never_receive_profile_pii():
+    """Regression: substring aliasing sent the full name into `username`."""
+    clean, forms, actions = _session(USERNAME_SIGNUP_FORM)
+    plan = build_form_fill_plan(
+        url="https://app.example.com/register",
+        forms=forms,
+        action_map=actions,
+        profile={"email": "ada@example.com", "name": "Ada Lovelace", "phone": "+15550100"},
+        auto_submit=False,
+    )
+    filled = {
+        (s.field or {}).get("name"): s.value
+        for s in plan.steps
+        if s.action in ("auto_fill", "fill")
+    }
+    assert "Ada Lovelace" not in {filled.get("username"), filled.get("hotel")}
+    assert "+15550100" not in {filled.get("hotel")}
+    assert filled.get("email") == "ada@example.com"
+
+
 def test_link_form_to_actions_assigns_sids():
     clean, forms, actions = _session(LOGIN_FORM)
     linked = link_form_to_actions(forms, actions)

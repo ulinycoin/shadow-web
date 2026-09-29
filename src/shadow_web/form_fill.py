@@ -183,6 +183,32 @@ def _action_label_blob(action: dict[str, Any]) -> str:
     return _norm(" ".join(p for p in (action.get("label"), action.get("placeholder")) if p))
 
 
+def _alias_pattern(alias: str) -> re.Pattern[str]:
+    """Whole-word alias matcher for a ``_norm()``-ed label blob.
+
+    Substring matching in either direction is unsafe for this job:
+    ``"name" in "username"`` made a username field look like a name field and
+    ``"tel" in "hotel"`` made a hotel field look like a phone field, so profile
+    PII could be auto-filled into unrelated - or attacker-labelled - inputs.
+    """
+    return re.compile(r"(?<![a-z0-9])" + re.escape(_norm(alias)) + r"(?![a-z0-9])")
+
+
+# Longest alias first so "company name" beats bare "name".  Precomputed once
+# instead of rebuilt and re-sorted for every field on every form.
+_RANKED_ALIAS_PATTERNS: tuple[tuple[FieldKind, re.Pattern[str]], ...] = tuple(
+    sorted(
+        (
+            (kind, _alias_pattern(alias))
+            for kind, aliases in _PROFILE_ALIASES.items()
+            for alias in aliases
+        ),
+        key=lambda item: len(item[1].pattern),
+        reverse=True,
+    )
+)
+
+
 def _similarity(a: str, b: str) -> float:
     if not a or not b:
         return 0.0
@@ -218,19 +244,18 @@ def classify_field_kind(field: dict[str, Any]) -> FieldKind:
     if _OAUTH_LABEL.search(blob):
         return "oauth"
 
-    # Longer aliases first so "company name" beats bare "name".
-    ranked: list[tuple[FieldKind, str]] = []
-    for kind, aliases in _PROFILE_ALIASES.items():
-        for alias in aliases:
-            ranked.append((kind, alias))  # type: ignore[arg-type]
-    ranked.sort(key=lambda item: len(item[1]), reverse=True)
+    if not blob:
+        # Nothing to go on: label, name and placeholder are all empty.  A bare
+        # substring test used to match here for free ("" is "in" every alias),
+        # returning the longest alias - "business email" - for a field we know
+        # nothing about, and auto-filling it with profile PII.  "unknown" hands
+        # the field to the human instead.
+        return "unknown"
 
-    for kind, alias in ranked:
-        if alias in blob or blob in alias:
+    for kind, pattern in _RANKED_ALIAS_PATTERNS:
+        if pattern.search(blob):
             return kind
 
-    if ftype == "email":
-        return "email"
     return "unknown"
 
 
