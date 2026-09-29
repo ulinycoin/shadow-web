@@ -610,3 +610,110 @@ def test_llm_failure_still_produces_a_serialisable_result():
 
     assert payload["stop_reason"] == "llm_error"
     assert json.dumps(payload)  # must stay JSON-serialisable for the CLI/MCP
+
+
+# ---------------------------------------------------------------------------
+# Cooperative deadline: a thread cannot be killed, so the loop must be able to
+# stop itself.  Without this, mcp.agent_run released its concurrency slot while
+# the browser kept working.
+# ---------------------------------------------------------------------------
+
+
+def _noop_router():
+    router = ToolRouter(FakeShadow())  # type: ignore[arg-type]
+    dispatched: List[str] = []
+
+    def _dispatch(name: str, arguments: Dict[str, Any]) -> ToolResult:
+        dispatched.append(name)
+        return ToolResult(name=name, ok=True, content=json.dumps({"ok": True}))
+
+    router.dispatch = _dispatch  # type: ignore[method-assign]
+    return router, dispatched
+
+
+def test_should_stop_halts_before_the_first_llm_call():
+    llm = ScriptedLLM([])  # any call would blow up
+    router, dispatched = _noop_router()
+
+    result = AgentLoop(
+        llm=llm, tools=router, max_steps=5, should_stop=lambda: True
+    ).run("go")
+
+    assert result.stop_reason == "timeout"
+    assert result.ok is False
+    assert result.complete is False
+    assert result.truncated is True
+    assert result.error and "deadline" in result.error
+    assert result.next_hint
+    assert llm.calls == 0
+    assert dispatched == []
+
+
+def test_should_stop_is_checked_between_tool_calls():
+    checks = {"n": 0}
+
+    def _should_stop() -> bool:
+        checks["n"] += 1
+        return checks["n"] > 1
+
+    llm = ScriptedLLM(
+        [
+            ModelResponse(
+                content=None,
+                tool_calls=[_tool_call("snapshot", {}, "t1")],
+                usage={"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+            )
+        ]
+    )
+    router, dispatched = _noop_router()
+
+    result = AgentLoop(llm=llm, tools=router, max_steps=5, should_stop=_should_stop).run("go")
+
+    assert result.stop_reason == "timeout"
+    assert llm.calls == 1
+    assert dispatched == [], "no tool may run after the deadline"
+
+
+def test_a_broken_should_stop_hook_does_not_break_the_run():
+    def _boom() -> bool:
+        raise RuntimeError("hook bug")
+
+    llm = ScriptedLLM(
+        [
+            ModelResponse(
+                content=None,
+                tool_calls=[_tool_call("done", {"finalAnswer": "ok"}, "t1")],
+                usage={},
+            )
+        ]
+    )
+    router = ToolRouter(FakeShadow())  # type: ignore[arg-type]
+    router.dispatch = lambda name, args: ToolResult(  # type: ignore[method-assign]
+        name="done",
+        ok=True,
+        content=json.dumps({"finalAnswer": "ok"}),
+        terminal=True,
+        final_answer="ok",
+        data={"complete": True},
+    )
+
+    result = AgentLoop(llm=llm, tools=router, should_stop=_boom).run("go")
+
+    assert result.ok is True
+    assert result.stop_reason == "done"
+
+
+def test_run_agent_task_forwards_should_stop():
+    llm = ScriptedLLM([])
+    router, _dispatched = _noop_router()
+
+    result = run_agent_task(
+        "go",
+        llm=llm,
+        tools=router,
+        should_stop=lambda: True,
+        max_steps=3,
+    )
+
+    assert result.stop_reason == "timeout"
+    assert llm.calls == 0

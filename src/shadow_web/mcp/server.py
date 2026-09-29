@@ -107,6 +107,10 @@ _MCP_MAX_SESSIONS = _env_int("SHADOW_WEB_MCP_MAX_SESSIONS", 8)
 # Each thick agent run owns a whole browser, so concurrency is bounded and the
 # run has a wall-clock ceiling (the LLM client also has its own HTTP timeout).
 _AGENT_RUN_TIMEOUT_SEC = float(_env_int("SHADOW_WEB_AGENT_TIMEOUT", 600))
+# A timed-out agent run cannot be killed from the outside (threads are not
+# preemptible), so after the deadline the worker is asked to unwind and given
+# this long to close its browser before the concurrency slot is released.
+_AGENT_CANCEL_GRACE_SEC = float(_env_int("SHADOW_WEB_AGENT_CANCEL_GRACE", 15))
 _AGENT_CONCURRENCY = _env_int("SHADOW_WEB_AGENT_CONCURRENCY", 1)
 _agent_semaphore: Any = None
 
@@ -1150,6 +1154,15 @@ def create_mcp_server():
             }
         session_name = (session or "").strip() or None
 
+        import threading
+        import time as _time
+
+        deadline = _time.monotonic() + _AGENT_RUN_TIMEOUT_SEC
+        cancelled = threading.Event()
+
+        def _should_stop() -> bool:
+            return cancelled.is_set() or _time.monotonic() >= deadline
+
         def _run():
             return run_agent_task(
                 goal_text,
@@ -1158,16 +1171,36 @@ def create_mcp_server():
                 max_tokens=token_budget,
                 browser_engine=engine,
                 session=session_name,
+                should_stop=_should_stop,
             )
 
         # Only one agent run at a time per process: each owns a full browser, so
         # unbounded concurrency is a resource-exhaustion vector.
         async with _get_agent_semaphore():
+            # A thread cannot be cancelled, so `asyncio.wait_for(to_thread(...))`
+            # used to release this semaphore while the browser kept working and
+            # the real concurrency exceeded the cap.  Hold the future instead:
+            # ask the loop to unwind via `should_stop`, then keep the slot until
+            # the worker has actually exited (bounded by the grace period).
+            future = asyncio.get_running_loop().run_in_executor(None, _run)
             try:
                 result = await asyncio.wait_for(
-                    asyncio.to_thread(_run), timeout=_AGENT_RUN_TIMEOUT_SEC
+                    asyncio.shield(future), timeout=_AGENT_RUN_TIMEOUT_SEC
                 )
             except asyncio.TimeoutError:
+                cancelled.set()
+                try:
+                    await asyncio.wait_for(
+                        asyncio.shield(future), timeout=_AGENT_CANCEL_GRACE_SEC
+                    )
+                except asyncio.TimeoutError:
+                    logger.warning(
+                        "agent run still busy %.0fs after the deadline; releasing "
+                        "the slot with the worker still unwinding",
+                        _AGENT_CANCEL_GRACE_SEC,
+                    )
+                except Exception:  # noqa: BLE001 - the envelope is the contract
+                    logger.warning("agent run failed while unwinding", exc_info=True)
                 return {
                     "ok": False,
                     "answer": None,

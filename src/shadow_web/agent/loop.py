@@ -6,7 +6,7 @@ import json
 import logging
 import os
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Protocol
+from typing import Any, Callable, Dict, List, Optional, Protocol
 
 from .jev import JevSelector, observation_from
 from .models import ChatMessage, ModelResponse, OpenAICompatibleAdapter
@@ -27,6 +27,10 @@ HINT_BUDGET = (
 )
 HINT_NO_PROGRESS = (
     "Agent repeated the same observation. Narrow the goal or switch to thin MCP tools."
+)
+HINT_TIMEOUT = (
+    "Wall-clock deadline hit. Narrow the goal, or raise "
+    "SHADOW_WEB_AGENT_TIMEOUT / the caller's timeout."
 )
 HINT_PARTIAL = (
     "Answer is a task-sized slice, not the full dataset. "
@@ -112,6 +116,28 @@ def _result(
     )
 
 
+def _timeout_result(
+    steps: int,
+    usage: Dict[str, int],
+    url: str,
+    transcript: Optional[List[Dict[str, Any]]],
+) -> AgentResult:
+    """Envelope for a run that the caller's deadline stopped between steps."""
+    return _result(
+        ok=False,
+        answer=None,
+        steps=steps,
+        usage=usage,
+        url=url,
+        stop_reason="timeout",
+        complete=False,
+        truncated=True,
+        error="Agent run exceeded its wall-clock deadline",
+        transcript=transcript,
+        next_hint=HINT_TIMEOUT,
+    )
+
+
 @dataclass
 class AgentLoop:
     """Core tool-calling loop. Browser/LLM injected for testability."""
@@ -127,6 +153,20 @@ class AgentLoop:
     selector: Optional[JevSelector] = None
     max_selector_steps: int = 2
     selector_stats: Dict[str, Any] = field(default_factory=dict)
+    # Cooperative cancellation hook.  A Python thread cannot be killed from the
+    # outside, so the only way a wall-clock timeout can actually stop a run is
+    # for the loop to ask between steps whether it should give up.  Consulted
+    # before every LLM call and before every tool dispatch.
+    should_stop: Optional[Callable[[], bool]] = None
+
+    def _stopped(self) -> bool:
+        if self.should_stop is None:
+            return False
+        try:
+            return bool(self.should_stop())
+        except Exception as exc:  # noqa: BLE001 - a broken hook must not kill a run
+            logger.warning("should_stop hook raised, continuing: %s", exc)
+            return False
 
     def run(self, task: str) -> AgentResult:
         """Run the loop, recording selector telemetry in the result evidence.
@@ -232,6 +272,8 @@ class AgentLoop:
 
         for _ in range(self.max_steps):
             steps += 1
+            if self._stopped():
+                return _timeout_result(steps, usage_totals, url(), transcript)
             response: Optional[ModelResponse] = None
             if self.selector is not None and last_observation:
                 response = self._selector_response(task, last_observation, url(), steps)
@@ -296,6 +338,10 @@ class AgentLoop:
             results_collected: list[tuple[dict[str, Any], ToolResult]] = []
 
             for tc in response.tool_calls:
+                if self._stopped():
+                    # A multi-tool response must not keep acting after the
+                    # deadline: check between dispatches, not only between turns.
+                    return _timeout_result(steps, usage_totals, url(), transcript)
                 fn = tc.get("function") or {}
                 name = fn.get("name") or ""
                 try:
@@ -444,12 +490,17 @@ def run_agent_task(
     tools: Optional[ToolRouter] = None,
     browser: Optional[BrowserSession] = None,
     selector: Optional[JevSelector] = None,
+    should_stop: Optional[Callable[[], bool]] = None,
 ) -> AgentResult:
     """
     Run a browser task to completion and return one result envelope.
 
     Owns browser lifecycle unless ``browser`` / ``tools`` are injected (tests).
     Default browser engine is Camoufox (falls back to Chromium if unavailable).
+
+    ``should_stop`` is polled by the loop between steps and between tool
+    dispatches, so a caller waiting on a wall-clock deadline can make the run
+    unwind (and close its browser) instead of leaking a live thread.
     """
     owns_browser = browser is None and tools is None
     session_obj = browser
@@ -487,6 +538,7 @@ def run_agent_task(
             max_tokens=max_tokens,
             selector=selected,
             max_selector_steps=max_selector_steps,
+            should_stop=should_stop,
         )
         result = loop.run(task)
         if session_obj is not None:
