@@ -456,3 +456,88 @@ def test_sri_without_page_url_keeps_absolute_assets_high():
 
     sri = [f for f in findings if f.rule_id == "SRI_MISSING"]
     assert sri and sri[0].severity == "high"
+
+
+# ── Pipeline regressions: the scan must see the served DOM ───────────
+#
+# check_sri/check_mixed_content/parse_forms used to receive the compressor's
+# clean_html, where <script>/<link>/<meta> are deleted and integrity/rel/id/
+# required/pattern are stripped.  Rules that inspect exactly those elements
+# could therefore never fire in the real pipeline, while the unit tests above
+# stayed green because they feed raw HTML straight into the rules.  These
+# tests drive process_html first, like the scanner does.
+
+PIPELINE_HTML = """\
+<html><head>
+<script src="https://cdn.other.com/app.js"></script>
+<link rel="stylesheet" href="http://fonts.other.com/theme.css">
+</head><body>
+<form action="https://app.example.com/subscribe" method="post">
+  <label for="email-field">Work email</label>
+  <input id="email-field" name="email" type="email" required pattern=".+@.+">
+  <input name="company" type="text" disabled>
+  <button type="submit">Join</button>
+</form>
+<img src="http://static.other.com/pic.jpg">
+</body></html>
+"""
+
+
+def test_scan_on_clean_html_alone_is_flagged_not_silently_empty():
+    from shadow_web.compressor import process_html
+
+    clean, _actions, _groups = process_html(PIPELINE_HTML)
+    result = analyze_surface("https://app.example.com/", clean_html=clean, action_map=[])
+
+    rules = {f["rule_id"] for f in result["findings"]}
+    # The sanitized input genuinely cannot answer these questions...
+    assert "SRI_MISSING" not in rules
+    assert "MIXED_ACTIVE_STYLESHEET" not in rules
+    # ...so the result must say so instead of looking like a clean page.
+    assert "SCAN_ON_SANITIZED_HTML" in rules
+
+
+def test_raw_html_restores_sri_and_mixed_content_in_pipeline():
+    from shadow_web.compressor import process_html
+
+    clean, _actions, _groups = process_html(PIPELINE_HTML)
+    result = analyze_surface(
+        "https://app.example.com/",
+        clean_html=clean,
+        raw_html=PIPELINE_HTML,
+        action_map=[],
+    )
+
+    rules = {f["rule_id"] for f in result["findings"]}
+    assert "SRI_MISSING" in rules
+    assert "MIXED_ACTIVE_STYLESHEET" in rules
+    assert "SCAN_ON_SANITIZED_HTML" not in rules
+
+
+def test_raw_html_restores_form_required_and_label_association():
+    from shadow_web.compressor import process_html
+    from shadow_web.schema_snap import parse_forms as _parse_forms
+
+    clean, _actions, _groups = process_html(PIPELINE_HTML)
+
+    sanitized = analyze_surface("https://app.example.com/", clean_html=clean, action_map=[])
+    raw = analyze_surface(
+        "https://app.example.com/",
+        clean_html=clean,
+        raw_html=PIPELINE_HTML,
+        action_map=[],
+    )
+    assert sanitized["form_count"] == raw["form_count"] == 1
+
+    # `required` (and the label[for] -> input[id] association) survive only on
+    # the raw DOM: KEEP_ATTRS drops both id and required.
+    clean_email = next(
+        f for f in _parse_forms(clean)[0]["fields"] if f.get("name") == "email"
+    )
+    raw_email = next(
+        f for f in _parse_forms(PIPELINE_HTML)[0]["fields"] if f.get("name") == "email"
+    )
+
+    assert not clean_email.get("required")
+    assert raw_email.get("required") is True
+    assert raw_email.get("label") == "Work email"

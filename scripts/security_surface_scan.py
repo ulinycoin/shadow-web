@@ -50,6 +50,10 @@ async def scan_page(
 
             shadow = AsyncShadowPage(page, capture_mode=capture_mode)
             clean_html, _ = await shadow.refresh()
+            # SRI / mixed-content / form analysis need the DOM as served: the
+            # compressor strips <script>/<link>/<meta> and non-whitelisted
+            # attributes, which silently disables those rules.
+            raw_html = await page.content()
 
             stats = getattr(shadow, "capture_stats", {}) or {}
 
@@ -74,6 +78,7 @@ async def scan_page(
                 action_count=len(shadow.action_map),
                 action_map=shadow.action_map,
                 clean_html=clean_html,
+                raw_html=raw_html,
                 capture_stats=stats,
                 http_headers=http_headers,
                 http_probe_status=http_probe_status,

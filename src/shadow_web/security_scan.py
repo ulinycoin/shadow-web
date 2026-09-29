@@ -910,6 +910,7 @@ def analyze_surface(
     action_count: int = 0,
     action_map: list[dict[str, Any]] | None = None,
     clean_html: str = "",
+    raw_html: str = "",
     capture_stats: dict[str, Any] | None = None,
     http_headers: dict[str, str] | None = None,
     http_probe_status: Optional[int] = None,
@@ -917,8 +918,21 @@ def analyze_surface(
     cookies: list[dict[str, Any]] | None = None,
     cors_probe_url: str | None = None,
 ) -> dict[str, Any]:
-    """Run all security rules on a single scanned page."""
-    forms = parse_forms(clean_html) if clean_html else []
+    """Run all security rules on a single scanned page.
+
+    ``raw_html`` is the DOM as the server sent it (``page.content()`` /
+    HTTP fetch); ``clean_html`` is the compressor's output.  SRI, mixed
+    content and form analysis run on ``raw_html`` when it is supplied:
+    ``shadow_web.compressor`` deletes ``<script>/<link>/<meta>`` and keeps
+    only a whitelist of attributes, so ``integrity``, ``rel``, ``id``,
+    ``required``, ``pattern`` and ``disabled`` are absent from ``clean_html``
+    and those rules can never fire on it.  Passing only ``clean_html`` still
+    works for unit-level use, but adds an ``SCAN_ON_SANITIZED_HTML`` finding
+    so a caller cannot mistake the sanitized-input false negatives for a
+    clean result.
+    """
+    scan_html = raw_html or clean_html
+    forms = parse_forms(scan_html) if scan_html else []
     actions = action_map or []
 
     findings: list[Finding] = []
@@ -945,9 +959,26 @@ def analyze_surface(
         )
     )
 
-    if clean_html:
-        findings.extend(check_sri(clean_html, page_url))
-        findings.extend(check_mixed_content(page_url, clean_html))
+    if scan_html:
+        findings.extend(check_sri(scan_html, page_url))
+        findings.extend(check_mixed_content(page_url, scan_html))
+
+    if clean_html and not raw_html:
+        findings.append(
+            Finding(
+                severity="info",
+                rule_id="SCAN_ON_SANITIZED_HTML",
+                title="Subresource checks ran on compressed HTML",
+                detail=(
+                    "No raw_html was supplied, so SRI and mixed-content rules "
+                    "ran on compressor output, which has <script>/<link>/<meta> "
+                    "removed and integrity/rel/id/required stripped. Treat "
+                    "SRI_MISSING, MIXED_* and form-field findings as "
+                    "incomplete: pass raw_html=page.content() for a real scan."
+                ),
+                evidence={"raw_html_supplied": False},
+            )
+        )
 
     if cors_probe_url:
         findings.extend(probe_cors(cors_probe_url))
