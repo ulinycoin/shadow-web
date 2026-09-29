@@ -165,3 +165,41 @@ def test_navigate_refuses_a_metadata_address(monkeypatch):
             )
         )
     assert "not allowed" in str(excinfo.value).lower()
+
+
+# ---------------------------------------------------------------------------
+# Release version: the hot cache says pyproject == server.py == lhm.plugin.json,
+# but nothing enforced it, and 0.4.3 was very nearly shipped with the FastAPI app
+# still advertising 0.4.2 while the manifest and package said 0.4.3.
+# ---------------------------------------------------------------------------
+
+
+def test_version_is_synced_across_package_manifest_and_server():
+    from shadow_web import __version__
+
+    pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    match = re.search(r'^version = "([^"]+)"', pyproject, re.M)
+    assert match, "pyproject.toml has no version"
+    pyproject_version = match.group(1)
+
+    manifest_version = json.loads(
+        (ROOT / "lhm.plugin.json").read_text(encoding="utf-8")
+    )["version"]
+
+    server_source = (ROOT / "src/shadow_web/server.py").read_text(encoding="utf-8")
+    server_match = re.search(r'version="([^"]+)"', server_source)
+    assert server_match, "server.py FastAPI app has no version"
+    server_version = server_match.group(1)
+
+    assert pyproject_version == manifest_version == server_version == __version__, (
+        "release version drift: "
+        f"pyproject={pyproject_version} manifest={manifest_version} "
+        f"server={server_version} package={__version__}"
+    )
+
+
+def test_readme_states_the_current_version():
+    from shadow_web import __version__
+
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    assert f"**v{__version__}**" in readme, "README banner does not state the current version"

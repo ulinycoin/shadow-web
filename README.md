@@ -13,7 +13,7 @@
 **Compress web pages 4–6× before your LLM sees them — then extract structured data.**  
 Open-source Python SDK + MCP + standalone `shadow-web exec` agent: flattens Shadow DOM, builds a typed Action Map, indexes rendered text on demand, heals broken selectors, and turns tables/forms/lists into clean JSON — Camoufox by default, no cloud required.
 
-> **v0.4.1** — `pip install "shadow-web[agent]"` → `shadow-web exec "…"` (observe→act→verify, SchemaSnap, single-call finish).
+> **v0.4.3** — `pip install "shadow-web[agent]"` → `shadow-web exec "…"` (observe→act→verify, SchemaSnap, single-call finish). 0.4.2 — security/trust-релиз: URL-политика `url_guard`, opt-in отправка форм, per-session MCP. 0.4.3 — верифицированное ревью: сканер безопасности наконец видит `script`/`link`/`integrity` (`raw_html`), классификация полей больше не тащит PII в чужие поля, MCP-сессии не переиспользуют ключи, таймаут агента реально останавливает работу.
 
 ```python
 from shadow_web.compressor import process_html
@@ -201,11 +201,15 @@ from shadow_web.security_scan import analyze_surface, render_markdown_report
 
 result = analyze_surface(
     "https://app.example.com/login",
-    clean_html=html,
+    raw_html=await page.content(),  # SRI / mixed content / form fields need the served DOM
+    clean_html=clean_html,          # compressor output: labels, action map, tokens
     action_map=actions,
     page_class="Static",
 )
 # findings: FORM_PASSWORD_GET, HEADER_MISSING_CSP, COOKIE_MISSING_HTTPONLY, ...
+# Passing only clean_html still works, but adds SCAN_ON_SANITIZED_HTML: the
+# compressor strips <script>/<link>/<meta> and integrity/rel/id/required, so
+# SRI_MISSING / MIXED_* / form-field findings would be false negatives.
 ```
 
 Example output: [examples/security_scan/localpdf-full-report.md](examples/security_scan/localpdf-full-report.md) (20 pages, 0 critical/high on public marketing layer). Header-only sample: [localpdf-headers-only.json](examples/security_scan/localpdf-headers-only.json).

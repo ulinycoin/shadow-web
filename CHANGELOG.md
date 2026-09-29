@@ -6,8 +6,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-09-29
+
+Verification release: a second adversarial pass (Sonnet 5.5 over all of `src/`) was
+turned into a code-verified list, and every confirmed finding is fixed with a test
+that failed before the fix. The unverified remainder is parked in `ROADMAP.md`.
+
 ### Added
 
+- **`raw_html` scan input + `SCAN_ON_SANITIZED_HTML`**: `analyze_surface(..., raw_html=…)`
+  runs SRI, mixed-content and form analysis on the DOM as served. Callers that pass
+  only `clean_html` still work but get an explicit `info` finding, so a sanitized
+  input can no longer masquerade as a clean result.
+- **`SHADOW_WEB_MCP_MAX_SESSIONS`** (default 8) caps live MCP sessions; idle sessions
+  past the cap have their browsers reclaimed.
+- **`SHADOW_WEB_AGENT_CANCEL_GRACE`** (default 15s) bounds how long a timed-out
+  `agent_run` keeps its concurrency slot while the worker unwinds.
 - **ARIA grid plane in SchemaSnap**: `parse_tables`/`parse_page` now read div-based
   grids (`role=table|grid` > `role=row` > `role=columnheader|cell|gridcell`) next to
   real `<table>` elements — the markup most modern admin and back-office UIs ship,
@@ -18,6 +32,37 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **SRI and mixed-content could never fire in the scanner**: `analyze_surface` fed
+  the compressor's `clean_html` to `check_sri()`/`check_mixed_content()`, but that
+  HTML has `<script>/<link>/<meta>` deleted and `integrity`/`rel` dropped by
+  `KEEP_ATTRS` — the rules inspected exactly the elements that were already gone.
+  The unit tests stayed green only because they hand raw HTML straight to the rules.
+  `scripts/security_surface_scan.py` now passes `raw_html=await page.content()`;
+  regression tests drive `process_html` first (`tests/test_security_scan.py`).
+- **Form analysis ran on truncated HTML**: `parse_forms(clean_html)` never saw `id`,
+  `required`, `pattern` or `disabled` (none are in `KEEP_ATTRS`), so the
+  `label[for] → input[id]` association was broken and required-field detection always
+  returned false — a systematic skew of `analyze_forms`, not an edge case.
+- **Profile PII could be auto-filled into the wrong field**: `classify_field_kind`
+  matched aliases as bare substrings in both directions (`"name" in "username"`,
+  `"tel" in "hotel"`) and an empty label blob matched every alias, returning the
+  longest one (`"business email"`) for a field it knew nothing about. Matching is now
+  whole-word (`_RANKED_ALIAS_PATTERNS`, precomputed once) and an empty blob returns
+  `unknown`, which routes the field to the human instead of filling it.
+- **MCP session keys could be recycled**: `_SESSIONS` was keyed by
+  `str(id(session))`, and CPython reuses the address of a collected object, so a
+  client that disconnected could hand its registry entry — browser and captured page
+  included — to the next client. Keys are now monotonic (`_SESSION_IDENTITIES`, with
+  the session object held so its `id()` cannot be recycled at all), the registry is
+  bounded by `SHADOW_WEB_MCP_MAX_SESSIONS`, and a FastMCP lifespan finally calls
+  `_close_all_sessions()` on shutdown — that function had no production caller, so
+  every disconnected client left a full browser running.
+- **A timed-out `agent_run` kept working**: `asyncio.wait_for(asyncio.to_thread(...))`
+  cannot cancel a thread, so the timeout released the agent semaphore while the
+  browser was still busy and real concurrency exceeded the cap. The loop now takes a
+  `should_stop` hook (polled between steps and between tool dispatches) and the slot
+  is held until the worker has exited, bounded by `SHADOW_WEB_AGENT_CANCEL_GRACE`.
+  Regression tests: `tests/test_agent_run_timeout.py`, `tests/test_agent_loop.py`.
 - **Click navigated, then the capture crashed**: `_perform_action` ended with a
   `domcontentloaded` wait that the already-loaded old document satisfied
   immediately, so the following `refresh()` could run its `evaluate()` while the new
@@ -329,6 +374,8 @@ are marked.
 
 - Initial release: DOM compression, Action Map, shadow_grep, self-healing, Playwright wrapper, FastAPI `/v1/compress` and `/v1/heal`.
 
+[0.4.3]: https://github.com/ulinycoin/shadow-web/compare/v0.4.2...v0.4.3
+[0.4.2]: https://github.com/ulinycoin/shadow-web/compare/v0.4.1...v0.4.2
 [0.4.0]: https://github.com/ulinycoin/shadow-web/compare/v0.3.6...v0.4.0
 [0.3.6]: https://github.com/ulinycoin/shadow-web/compare/v0.3.5...v0.3.6
 [0.3.5]: https://github.com/ulinycoin/shadow-web/compare/v0.3.4...v0.3.5

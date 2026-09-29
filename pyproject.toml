@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "shadow-web"
-version = "0.4.2"
+version = "0.4.3"
 description = "Local-first Python SDK for AI agents: DOM compression, Action Map, SchemaSnap, self-healing selectors, MCP, and shadow-web exec agent loop"
 readme = "README.md"
 license = "MIT"

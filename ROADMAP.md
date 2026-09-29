@@ -1,7 +1,7 @@
 # Shadow Web — Roadmap
 
-> Version: 0.4.2 → 1.0.0
-> Last updated: 2026-09-27
+> Version: 0.4.3 → 1.0.0
+> Last updated: 2026-09-29
 > Status: open-source engine (PyPI + GitHub, MIT) + **primary bet: managed product-change monitoring concierge for DTC/e-commerce**
 
 ## The Bet (decided 2026-08-15)
@@ -20,12 +20,12 @@ Why this direction wins:
 **Resource allocation until the Phase A gate:**
 
 - ~70% — Product Change Intelligence pipeline: fix trust-layer bugs, evidence packs, scheduled scans, alerting
-- ~20% — engine reliability debt that blocks paid use (URL policy, MCP session isolation, LLM error handling, hard caps) — **mostly cleared in 0.4.2, see below**
+- ~20% — engine reliability debt that blocks paid use (URL policy, MCP session isolation, LLM error handling, hard caps) — **mostly cleared in 0.4.2, verified again in 0.4.3**
 - ~10% — distribution: landing page, outreach, LocalPDF dogfood case study
 
 ### Kill list — closed / frozen (2026-08-15)
 
-1. **Security scanner as a product line** — closed. OSS feature only; **done in 0.4.2**: the CORS same-origin false verdict (the probe now sends a foreign origin) and the SRI first-party false alarm (first-party assets are `low`, third-party stay `high`). **No further investment.**
+1. **Security scanner as a product line** — closed. OSS feature only; **done in 0.4.2**: the CORS same-origin false verdict (the probe now sends a foreign origin) and the SRI first-party false alarm (first-party assets are `low`, third-party stay `high`). **0.4.3** made the rules actually reachable — they were reading the compressor's sanitized HTML, so `SRI_MISSING`/`MIXED_*` could never fire in the pipeline; the scan now takes `raw_html`. **Still no further investment**: the unclosed scanner gaps at the bottom of this file are quality debt, not a product.
 2. **Token compression as a product / API** — closed. It is an engineering KPI (~1.6x on mixed set, overhead on tiny pages), not a buyer outcome.
 3. **Hosted browser cloud / execution API** — closed until ≥3 paying accounts (Phase C trigger).
 4. **Anti-bot bypass / stealth claims** — closed. Camoufox is the default engine, not a Cloudflare/CAPTCHA guarantee.
@@ -33,7 +33,7 @@ Why this direction wins:
 6. **LocalPDF weekly scan** — dogfood / case study only, no productization; its diff infra feeds the change-report engine.
 7. **Maintenance mode (keep working, no new features):** `security_scan.py` growth, `webmcp.py`, a11y supplement, browser-use integration, exec-agent breadth, `benchmarks/`.
 
-## Current State (v0.4.2)
+## Current State (v0.4.3)
 
 ### Automation Core (production-ready)
 - ✅ Playwright/Camoufox browser execution: navigate/click/fill/snapshot, Shadow DOM flattening, a11y supplement, diff snapshots, web search (Brave/Yahoo)
@@ -46,7 +46,7 @@ Why this direction wins:
 - ✅ Standalone `shadow-web exec` agent loop (OpenAI-compatible, bounded, single-call finish, bounded LLM client)
 - ✅ MCP server (stdio): 27 tools incl. thick `agent_run` (always returns its envelope), thin navigate/schema/content tools with hard caps, **per-session browser state**
 - ✅ Security surface scanner: 8 modules (forms, links, headers, cookies, SRI, mixed content, CORS, page meta) — not a pentest tool
-- ✅ **480+ tests passing**, CI (GitHub Actions), PyPI + Claude Code plugin marketplace + LobeHub manifest (tool list now generated from the code and guarded by `tests/test_tool_surface.py`)
+- ✅ **547 tests passing**, CI (GitHub Actions), PyPI + Claude Code plugin marketplace + LobeHub manifest (tool list now generated from the code and guarded by `tests/test_tool_surface.py`)
 
 ### Fixed in 0.4.2 (adversarial review, 2026-09-27)
 
@@ -58,6 +58,29 @@ Full detail in `CHANGELOG.md`. Blockers first:
 - `content_index._PRICE_RE` was quadratic and froze the whole process (the GIL is not released during a match) on a hostile page
 - navigation had no URL validation: `file:///etc/passwd`, cloud metadata and loopback were reachable from an LLM-chosen URL
 - a `.env` in the current working directory could redirect the LLM endpoint and supply its own API key
+
+### Fixed in 0.4.3 (verified review of `src/`, 2026-09-29)
+
+A second adversarial pass (Sonnet 5.5 over all 32 `src/` files) died on its output
+budget; its reasoning was salvaged, every claim re-checked against the code, and only
+the five confirmed findings were fixed. Full detail in `CHANGELOG.md`:
+
+- **the security scanner's SRI and mixed-content rules could never fire**: they were
+  handed `clean_html`, where `<script>/<link>/<meta>` and `integrity`/`rel` no longer
+  exist. `analyze_surface` now takes `raw_html`; a `SCAN_ON_SANITIZED_HTML` finding
+  marks the degraded mode instead of returning a silent all-clear.
+- **`analyze_forms` read truncated HTML**: `id`/`required`/`pattern`/`disabled` are
+  not in `KEEP_ATTRS`, so `label[for] → input[id]` was broken and no field was ever
+  `required` — a systematic skew, not an edge case.
+- **`classify_field_kind` could send profile PII to the wrong field**: bare substring
+  matching (`"name" in "username"`, `"tel" in "hotel"`) plus an empty blob matching
+  every alias. Now whole-word, and an empty blob is `unknown` (human, not auto-fill).
+- **MCP session keys were recyclable** (`str(id(session))`): a new client could
+  inherit a dead client's browser. Monotonic keys, a bounded registry, and a FastMCP
+  lifespan that finally calls the previously-dead `_close_all_sessions()`.
+- **a timed-out `agent_run` kept working**: the timeout released the concurrency slot
+  while its thread/browser ran on. Cooperative `should_stop` in the loop + the slot
+  held until the worker exits.
 
 ### Distribution
 - ✅ PyPI: `pip install shadow-web`, `uvx shadow-web-mcp`
@@ -120,14 +143,14 @@ Full detail in `CHANGELOG.md`. Blockers first:
 Страница статуса после адверсариального ревью 2026-09-27. ✅ = сделано в 0.4.2.
 
 1. ✅ **URL scheme/host guard in `navigate`** (`url_guard.py`, все 4 точки goto + re-check после редиректа) — SSRF / `file://` / `169.254.169.254` закрыты; анти-инъекционные правила в системном промпте добавлены (как смягчение, не как граница)
-2. ✅ **MCP session isolation** — состояние браузера ключуется по id MCP-сессии, у каждой сессии свой лок (глобальный лок просто выстроил бы всех клиентов в очередь)
+2. ✅ **MCP session isolation** — состояние браузера ключуется по MCP-сессии, у каждой сессии свой лок (глобальный лок просто выстроил бы всех клиентов в очередь). **0.4.3**: ключ больше не `str(id(session))` (адрес переиспользуется после GC — новый клиент мог получить браузер мёртвого), реестр ограничен `SHADOW_WEB_MCP_MAX_SESSIONS`, а `_close_all_sessions()` наконец вызывается на shutdown через lifespan
 3. ✅ **`llm.chat` bounds + error handling** — таймаут/ретраи/`max_tokens` в клиенте; `agent_run` всегда возвращает конверт (`stop_reason="error"|"timeout"|"invalid"`), семафор и wall-clock лимит
 4. ✅ **Thin-MCP hard caps** — `max_rows=0` больше не обходит `_MAX_ROWS`, `compress_html_to_xml` получил лимит входа, мусорные значения env не ломают импорт
 5. ✅ **`agent_run` parallelism semaphore** (`SHADOW_WEB_AGENT_CONCURRENCY`)
 6. ⏳ **HealCache cross-instance race** (`heal_local.py`) — ключ теперь учитывает query/fragment и не смешивает origin'ы, запись атомарна, но многопроцессная потеря записей (last-writer-wins) остаётся
 7. ✅ **form_fill guardrails** — `auto_submit=False` везде, не более одной отправки на URL, неотвеченные вопросы блокируют submit, ниже-пороговые совпадения не заполняются
 8. ✅ **verified_heal fails-open fix** — `_tag_matches` возвращает False на исключении, порог 0.8, containment-приём убран. ⏳ осталось: матчинг по тексту самого элемента, а не потомков; не кэшировать `:has-text` селекторы для evaluate-пути
-9. ✅ **security_scan credibility** — CORS-проба шлёт foreign origin, SRI для first-party понижен до `low`. ⏳ осталось: CSP только для document-ответов, пустой домен cookie, `_dedupe_findings` схлопывает разные `FORM_WEAK_PASSWORD`
+9. ✅ **security_scan credibility** — CORS-проба шлёт foreign origin, SRI для first-party понижен до `low`. **0.4.3**: правила SRI/mixed-content стали достижимыми (скан получает `raw_html`, а не сжатый HTML, из которого вырезаны `script`/`link`/`integrity`). ⏳ осталось: CSP только для document-ответов, пустой домен cookie, `_dedupe_findings` схлопывает разные `FORM_WEAK_PASSWORD`, пробы без `url_guard` (см. остатки ревью 2026-09-29, п. 9)
 10. ⏳ **De-duplicate sync/async** — один async-core + тонкий sync-адаптер (`wrapper.py` / `browser_use.py` ~90% копии)
 11. ✅ **Tool-surface test** — `tests/test_tool_surface.py` строит MCP-сервер и сверяет README + `lhm.plugin.json` с кодом (это и был первый `test_mcp_server.py`); ⏳ осталось: тесты на лимиты частоты (`server.py`)
 
@@ -143,6 +166,43 @@ Full detail in `CHANGELOG.md`. Blockers first:
 - **Разделяемый lxml-парсер** — шарится между потоками; измерено, что thread-local не ускоряет (узкое место GIL), но явное владение лучше.
 - **Нет lint/type-гейта в CI** (ruff/mypy/coverage отсутствуют как зависимости).
 - **Артефакты `reports/`** — ✅ `sample-report.md`/`.json` перегенерированы из реального кросс-ран diff'а (13 авг → 27 сен 2026, живой скан: 1 high — allbirds USD 89→120, 5 medium; self-diff'ы `baseline.json` vs `check.json` остались историческими, но `cmd_diff` их больше не воспроизводит). В `benchmarks/results/` по-прежнему лежит вручную исправленный `…_corrected.json`.
+
+### Остаточные риски после верифицированного ревью 2026-09-29 (в 0.4.3 не закрыты)
+
+Пункты ниже **перепроверены по коду** (не «мнение модели»): у каждого есть файл:строка. Это очередь на 0.4.4+, не блокеры 0.4.3.
+
+**Высокие**
+
+1. **`verify_selector_in_html` исполняет клиентский HTML на сервере** — `verified_heal.py:154,159` (`playwright.chromium.launch` + `page.set_content(wrapped)`) вызывается из `/v1/heal` (`server.py:306`) со скриптами страницы и полным сетевым доступом. Следствие: слепой SSRF/скан внутренних портов (возвращается только bool), не эксфильтрация; endpoint за API-ключом. Фикс: `route`-interception/offline-контекст, запрет навигации.
+2. **Навигация по клику и submit не проверяется `url_guard`** — прямой `goto` проверяется до запроса (`agent/tools.py:481`), но `click` (`agent/tools.py:531`) и submit формы (`form_fill.py:861`) — нет; `assert_navigation_landed` срабатывает постфактум. Нужен request-interception, а не проверка результата.
+3. **Авто-дисмисс согласий кликает любой `role="dialog"`** — `capture_ready.py:96` считает consent-поверхностью любой диалог, `:153` кликает Accept/Allow/Agree/Continue. Модал «Delete account?» или OAuth-«Allow» может быть нажат раньше, чем агент его прочитает.
+4. **Heal по подстроке (не порог)** — `heal_local.py:191-192` возвращает 0.92 для «Log in» ⊂ «Log in with Google», `verified_heal.py:72` с порогом 0.8 это пропускает → необратимое действие по неверному элементу («Delete» → «Delete all»).
+5. **Повторный клик после исключения** — `browser_use.py:665-671`: Playwright может бросить таймаут уже после того, как клик сработал и запустил навигацию, а код кликает вылеченный селектор → двойное действие. (331027c закрыл соседнюю гонку наблюдения, не эту.)
+
+**Средние**
+
+6. **Локальные числа** — `schema_snap.py:697,702`: `'1.234,56 €'→1.23456`, `'12,50 €'→1250`, `'12,5'→125` + тип `integer`. (`_parse_amount` больше нет, поведение живёт в schema_snap.)
+7. **`web_search` оставляет `clean_html` от прошлой страницы** — `mcp/server.py:679` обновляет только `session["shadow_page"]`: `schema_session*` читает старую страницу, `content_outline` — новую.
+8. **Лимит размера запроса только по `Content-Length`** — `server.py:65-66`: chunked/без заголовка обходит 413 до буферизации тела (pydantic-лимит 2M символов срабатывает позже).
+9. **HTTP-пробы `security_scan` без `url_guard`** — `:335` (`requests.head`), `:350`, `:531` (`OPTIONS`); достижимо только из CLI-скрипта с операторским URL.
+10. **Редакция heal-контекста** — `heal_context.py:70-80` покрывает `textarea`/`value`/`data-*`, но не PII в текстовых узлах, `contenteditable`, `selected option` и текст inline `<script>`; fallback body-innerHTML редактится и режется до 4000 символов, но перечисленное проходит.
+11. **Соседний label без ассоциации** — `schema_snap.py:500-506` берёт первый `label`-сиблинг: в формах «label/input/label/input» лейблы разъезжаются. `label[for]` теперь достижим через `raw_html`, но form-fill по-прежнему парсит `clean_html`.
+12. **Регистр и типы input** — `schema_snap.py:531-533` + `_INPUT_TYPES:438-443`: `type="EMAIL"` и `button|reset|datetime` деградируют в `text` (запись произойдёт только если лейбл совпал с `SAFE_FIELD_KINDS`, иначе `ask`).
+13. **`colspan` в заголовках таблиц** — `schema_snap.py:261-264` не разворачивает объединённые ячейки → смещение колонок.
+14. **`node.click()` синтетический** — `dom_capture.py:192-195`, `browser_use.py:585`, `a11y_capture.py:484`: не проверяет видимость/disabled, disabled-элемент возвращает `ok:true`.
+15. **Прямая запись `.value` без native setter** — `dom_capture.py:201`, `browser_use.py:594`: React-трекер съедает синтетический `input`, `onChange` не срабатывает → заполнение молча не регистрируется.
+16. **Позиционные `sid`/`bind_id`** — `compressor.py:116`, `dom_capture.py:86`: вставка элемента в начале переиндексирует всё дальше → ложные appeared/disappeared в diff и устаревшие sid в agent-loop.
+17. **Классификация страниц по подстроке** — `a11y_capture.py:249-250`: любой небольшой текст с «captcha» → Anti-bot; `:269-270`: `login|signin|authorize` в URL (в т.ч. `/blog/how-to-login`) → Auth-gated, то есть формы логина — основной кейс form-fill — уходят в handoff.
+18. **Бюджет токенов проверяется до tool calls** — `agent/loop.py:246-257`: валидный `done(finalAnswer)` ровно на границе бюджета выбрасывается; история сообщений не обрезается (`:329`, рост ограничен `max_tokens`/`max_steps`).
+
+**Низкие / условные**
+
+19. **Полноширинные точки в хосте** — `url_guard.py:131-138` не нормализует U+FF0E; при `SHADOW_WEB_URL_DNS_CHECK=0` или ошибке резолва — fail-open (`:176-182`).
+20. **CDP-сессия не детачится** — `a11y_capture.py:365,373`: одна сессия на захват, освобождается только с закрытием страницы.
+21. **Sparse-shell ждёт 10 с** — `capture_ready.py:17,19,455`: на малолеткстовых страницах всегда выжидается дедлайн (один раз на URL); сама метка SparseShell условна (`is_sparse_shell`).
+22. **Jev отправляет лейблы/задачу/URL третьей стороне** — `jev.py:28,203-205` (`api.typesafe.ai`); только при явном `SHADOW_WEB_AGENT_JEV=1`.
+23. **Новый LLM-клиент на каждый `/v1/heal`** — `server.py:290`: пул соединений не переиспользуется.
+24. **Локальность по IP** — `server.py:113-114`: reverse-proxy с `127.0.0.1` выглядит локальным; тихий bypass убран (нужен явный флаг, в prod 503).
 
 ## Anti-Patterns (do not do)
 

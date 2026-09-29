@@ -31,7 +31,7 @@ load_dotenv_files()
 app = FastAPI(
     title="Shadow Web API",
     description="Stateless DOM compression and verified self-healing selector APIs for AI agents.",
-    version="0.4.2",
+    version="0.4.3",
 )
 
 def _env_int(name: str, default: int) -> int:
