@@ -42,3 +42,6 @@ tests/test_lv_tender.py
 # Back-office demo: session state holds a live portal cookie; pulls are data
 .backoffice-state.json
 reports/backoffice/
+
+# Outreach: prospect-specific bids and pricing (internal, repo is public)
+reports/outreach/
