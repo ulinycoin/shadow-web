@@ -41,6 +41,7 @@ def _isolate_mcp_globals():
     """Snapshot the module registries so no session state leaks between tests."""
     sessions = dict(mcp_server._SESSIONS)
     locks = dict(mcp_server._SESSION_LOCKS)
+    identities = dict(mcp_server._SESSION_IDENTITIES)
     app = mcp_server._mcp_app
     legacy = mcp_server._session
     yield
@@ -50,6 +51,8 @@ def _isolate_mcp_globals():
     mcp_server._SESSIONS[DEFAULT_KEY] = legacy
     mcp_server._SESSION_LOCKS.clear()
     mcp_server._SESSION_LOCKS.update(locks)
+    mcp_server._SESSION_IDENTITIES.clear()
+    mcp_server._SESSION_IDENTITIES.update(identities)
     mcp_server._mcp_app = app
 
 
@@ -181,6 +184,75 @@ def test_close_all_sessions_clears_every_registered_session(session_key):
     assert {k for k in mcp_server._SESSIONS if k != DEFAULT_KEY} == set()
 
 
+def test_close_all_sessions_forgets_identities_and_locks(session_key):
+    session_obj = object()
+    session_key["key"] = "session-a"
+    mcp_server._SESSION_IDENTITIES[id(session_obj)] = (session_obj, "session-a")
+    mcp_server._SESSION_LOCKS["session-a"] = asyncio.Lock()
+    mcp_server._sess()["clean_html"] = "<h1>A</h1>"
+
+    asyncio.run(mcp_server._close_all_sessions())
+
+    assert id(session_obj) not in mcp_server._SESSION_IDENTITIES
+    assert "session-a" not in mcp_server._SESSION_LOCKS
+
+
+def test_session_cap_evicts_the_oldest_idle_session(session_key, monkeypatch):
+    monkeypatch.setattr(mcp_server, "_MCP_MAX_SESSIONS", 2)
+    states = {}
+    for name in ("session-a", "session-b", "session-c"):
+        session_key["key"] = name
+        states[name] = mcp_server._sess()
+        states[name]["clean_html"] = f"<h1>{name}</h1>"
+        mcp_server._SESSION_LOCKS[name] = asyncio.Lock()
+
+    session_key["key"] = "session-d"
+    mcp_server._sess()["clean_html"] = "<h1>session-d</h1>"
+
+    asyncio.run(mcp_server._enforce_session_cap())
+
+    remaining = {k for k in mcp_server._SESSIONS if k != DEFAULT_KEY}
+    assert "session-a" not in remaining
+    assert "session-c" in remaining and "session-d" in remaining
+    assert "clean_html" not in states["session-a"]
+
+
+def test_session_cap_never_evicts_a_busy_session(session_key, monkeypatch):
+    monkeypatch.setattr(mcp_server, "_MCP_MAX_SESSIONS", 1)
+    for name in ("session-a", "session-b"):
+        session_key["key"] = name
+        mcp_server._sess()
+
+    busy = asyncio.Lock()
+    asyncio.run(busy.acquire())
+    mcp_server._SESSION_LOCKS["session-a"] = busy
+    mcp_server._SESSION_LOCKS["session-b"] = asyncio.Lock()
+
+    asyncio.run(mcp_server._enforce_session_cap())
+
+    # session-a is mid-call, so the idle session-b goes instead.
+    assert "session-a" in mcp_server._SESSIONS
+    assert "session-b" not in mcp_server._SESSIONS
+
+
+def test_create_mcp_server_registers_a_shutdown_lifespan(session_key):
+    """_close_all_sessions used to be dead code: no browser was ever reclaimed."""
+    mcp = mcp_server.create_mcp_server()
+    assert mcp.settings.lifespan is not None
+
+    session_key["key"] = "session-a"
+    state = mcp_server._sess()
+    state["clean_html"] = "<h1>A</h1>"
+
+    async def _run():
+        async with mcp.settings.lifespan(mcp):
+            assert "clean_html" in state
+        assert "clean_html" not in state
+
+    asyncio.run(_run())
+    assert "session-a" not in mcp_server._SESSIONS
+
+
 # ---------------------------------------------------------------------------
 # Session key derivation and its fallback path
 # ---------------------------------------------------------------------------
@@ -192,7 +264,6 @@ def test_key_is_derived_from_the_context_session(monkeypatch):
         mcp_server, "_mcp_app", _FakeApp(_FakeContext(first_session))
     )
     key = mcp_server._current_session_key()
-    assert key == str(id(first_session))
     assert key != DEFAULT_KEY
     assert mcp_server._current_session_key() == key
 
@@ -201,6 +272,36 @@ def test_key_is_derived_from_the_context_session(monkeypatch):
         mcp_server, "_mcp_app", _FakeApp(_FakeContext(second_session))
     )
     assert mcp_server._current_session_key() != key
+
+
+def test_session_key_is_not_the_session_id(monkeypatch):
+    """``id()`` is recycled after GC, so it must not be the registry key."""
+    session = object()
+    monkeypatch.setattr(mcp_server, "_mcp_app", _FakeApp(_FakeContext(session)))
+
+    key = mcp_server._current_session_key()
+
+    assert key != str(id(session))
+    assert mcp_server._SESSION_IDENTITIES[id(session)][1] == key
+
+
+def test_registry_pins_the_session_object(monkeypatch):
+    """Pinning the object keeps its id() out of circulation while registered."""
+    import gc
+    import weakref
+
+    class _Session:
+        """Weak-referenceable stand-in for mcp's ServerSession."""
+
+    session = _Session()
+    monkeypatch.setattr(mcp_server, "_mcp_app", _FakeApp(_FakeContext(session)))
+    mcp_server._current_session_key()
+
+    ref = weakref.ref(session)
+    del session
+    gc.collect()
+
+    assert ref() is not None, "a registered session must not be collectable"
 
 
 def test_key_falls_back_to_default_without_an_app(monkeypatch):

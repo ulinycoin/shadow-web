@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import itertools
 import json
 import logging
 import os
@@ -37,6 +38,21 @@ _DEFAULT_SESSION_KEY = "__default__"
 # fallback session. Module code must go through _sess() instead.
 _session: Dict[str, Any] = {}
 _SESSIONS[_DEFAULT_SESSION_KEY] = _session
+
+# Identity -> stable key for every MCP session object seen so far.
+#
+# The key used to be ``str(id(session))``, and CPython recycles ``id()`` once an
+# object is collected: a client that disconnected could hand its registry entry
+# - and therefore its browser and captured page - to the next client that
+# happened to allocate at the same address.  Keys are now handed out
+# monotonically and can never be reused.
+#
+# The session object is held STRONGLY in the tuple on purpose: while the entry
+# lives its ``id()`` cannot be recycled at all, and the ``is not session``
+# re-check below makes even that failure mode impossible.  ``_SESSION_IDENTITIES``
+# is bounded by ``SHADOW_WEB_MCP_MAX_SESSIONS`` (see ``_enforce_session_cap``).
+_SESSION_IDENTITIES: Dict[int, tuple[Any, str]] = {}
+_SESSION_KEY_SEQ = itertools.count(1)
 # Running FastMCP app, set by create_mcp_server(); None until then.
 _mcp_app: Any = None
 load_dotenv_files()
@@ -84,6 +100,9 @@ _MAX_ROWS = _env_int("SHADOW_WEB_MCP_MAX_ROWS", 5_000)
 _MAX_OUTLINE_TOKENS = _env_int("SHADOW_WEB_MCP_MAX_OUTLINE_TOKENS", 10_000)
 _MAX_BLOCK_TOKENS = _env_int("SHADOW_WEB_MCP_MAX_BLOCK_TOKENS", 50_000)
 _MAX_BLOCK_IDS = _env_int("SHADOW_WEB_MCP_MAX_BLOCK_IDS", 200)
+# Live MCP clients kept at once.  Each one owns a full browser, so an unbounded
+# registry is a resource-exhaustion vector.
+_MCP_MAX_SESSIONS = _env_int("SHADOW_WEB_MCP_MAX_SESSIONS", 8)
 
 # Each thick agent run owns a whole browser, so concurrency is bounded and the
 # run has a wall-clock ceiling (the LLM client also has its own HTTP timeout).
@@ -101,26 +120,39 @@ def _get_agent_semaphore():
     return _agent_semaphore
 
 
-def _current_session_key() -> str:
-    """Return a stable key identifying the calling MCP client session.
+def _current_session_object() -> Any:
+    """Return the request-scoped MCP session object, or None if unavailable.
 
-    When the running FastMCP app is known, the key is derived from the
-    request-scoped ServerSession object. On ANY failure - no request context,
-    stdio single-client transport, direct call from a test, or the mcp package
-    not being importable - fall back to the constant default key. This function
-    is deliberately import-safe and never raises.
+    Deliberately import-safe and never raising: a missing request context, a
+    stdio single-client transport, a direct call from a test, or the mcp package
+    not being importable must all degrade to the default session.
     """
     app = _mcp_app
     if app is None:
-        return _DEFAULT_SESSION_KEY
+        return None
     try:
         ctx = app.get_context()
-        session = getattr(ctx, "session", None)
+        return getattr(ctx, "session", None)
     except Exception:  # noqa: BLE001 - key derivation must never break a tool
-        return _DEFAULT_SESSION_KEY
+        return None
+
+
+def _current_session_key() -> str:
+    """Return a stable, never-recycled key identifying the calling MCP session.
+
+    See ``_SESSION_IDENTITIES``: ``id(session)`` alone is unsafe because CPython
+    reuses addresses of collected objects, which let a new client inherit a dead
+    client's browser and page state.
+    """
+    session = _current_session_object()
     if session is None:
         return _DEFAULT_SESSION_KEY
-    return str(id(session))
+    entry = _SESSION_IDENTITIES.get(id(session))
+    if entry is None or entry[0] is not session:
+        key = f"mcp-{next(_SESSION_KEY_SEQ)}"
+        _SESSION_IDENTITIES[id(session)] = (session, key)
+        return key
+    return entry[1]
 
 
 def _sess() -> Dict[str, Any]:
@@ -270,12 +302,48 @@ async def _close_browser_resources() -> None:
     await _close_session_state(_sess())
 
 
+async def _drop_session(key: str) -> None:
+    """Close one session's browser resources and forget it completely."""
+    session = _SESSIONS.pop(key, None)
+    if session is not None:
+        await _close_session_state(session)
+    _SESSION_LOCKS.pop(key, None)
+    for ident, (_obj, session_key) in list(_SESSION_IDENTITIES.items()):
+        if session_key == key:
+            del _SESSION_IDENTITIES[ident]
+
+
 async def _close_all_sessions() -> None:
     """Best-effort close of every registered session (process shutdown hook)."""
-    for key, session in list(_SESSIONS.items()):
-        await _close_session_state(session)
-        if key != _DEFAULT_SESSION_KEY:
-            _SESSIONS.pop(key, None)
+    for key in list(_SESSIONS):
+        if key == _DEFAULT_SESSION_KEY:
+            await _close_session_state(_SESSIONS[key])
+        else:
+            await _drop_session(key)
+
+
+async def _enforce_session_cap() -> None:
+    """Reclaim browsers from the oldest idle sessions past the cap.
+
+    A session that is currently inside its own lock is never evicted: closing a
+    page under an in-flight tool call is worse than the temporary overrun, so
+    the cap is retried on the next call instead.
+    """
+    cap = _MCP_MAX_SESSIONS
+    candidates = [key for key in _SESSIONS if key != _DEFAULT_SESSION_KEY]
+    while len(candidates) > cap:
+        victim = None
+        for key in candidates:
+            lock = _SESSION_LOCKS.get(key)
+            if lock is not None and lock.locked():
+                continue
+            victim = key
+            break
+        if victim is None:
+            return
+        candidates.remove(victim)
+        logger.info("Closing idle MCP session %s (cap %d)", victim, cap)
+        await _drop_session(victim)
 
 
 async def _ensure_browser():
@@ -289,6 +357,8 @@ async def _ensure_browser():
     logger = logging.getLogger("shadow-web.mcp")
 
     session = _sess()
+    # Reclaim browsers from sessions past the cap before opening another one.
+    await _enforce_session_cap()
     # Recreate if page was closed (e.g. browser crash)
     if "page" in session:
         try:
@@ -441,6 +511,25 @@ def _format_mcp_response(
     return res
 
 
+def _build_lifespan():
+    """FastMCP lifespan whose shutdown closes every session's browser.
+
+    ``_close_all_sessions`` existed but was never wired to anything, so each MCP
+    client that disconnected left a full browser process running for the life of
+    the server.
+    """
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def _lifespan(_app):
+        try:
+            yield {}
+        finally:
+            await _close_all_sessions()
+
+    return _lifespan
+
+
 def create_mcp_server():
     try:
         from mcp.server.fastmcp import FastMCP
@@ -449,7 +538,7 @@ def create_mcp_server():
             "MCP support requires the 'mcp' package. Install with: pip install shadow-web[mcp]"
         ) from exc
 
-    mcp = FastMCP("shadow-web")
+    mcp = FastMCP("shadow-web", lifespan=_build_lifespan())
     # Lets _current_session_key() reach the request-scoped session from
     # module-level helpers that have no closure over the app.
     global _mcp_app
