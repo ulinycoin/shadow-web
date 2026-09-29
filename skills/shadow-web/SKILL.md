@@ -3,9 +3,10 @@ name: shadow-web
 description: >-
   Browser automation for Cursor via Shadow Web MCP and shadow-web exec: detail levels
   (minimal/terse/xml/full), page classifier, shadow_grep, navigate/click/fill by data-sid,
-  SchemaSnap, diff snapshots, self-healing, Camoufox. Use when browsing the web, scraping,
-  running shadow-web exec, compressing HTML, or when the user mentions shadow-web,
-  shadow_grep, Action Map, data-sid, or page_class.
+  SchemaSnap, content_outline/blocks, agent_run, diff snapshots, self-healing, Camoufox,
+  navigation URL policy (url_guard), form fill (submit opt-in), price/stock change monitoring.
+  Use when browsing the web, scraping, running shadow-web exec, compressing HTML, or when the
+  user mentions shadow-web, shadow_grep, Action Map, data-sid, page_class, agent_run, url_guard.
 ---
 
 # Shadow Web MCP
@@ -24,6 +25,7 @@ Shadow Web — локальный MCP для веб-автоматизации. 
 2. **Browser honesty.** В ответе `navigate`/`snapshot` смотри `browser_type`, `browser_fallback`. Нужен Camoufox, а `browser_fallback=true` или `browser_type=chromium` без запроса → **стоп**, почини Camoufox (`camoufox fetch`, restart MCP). Тихий fallback выключен; опционально `SHADOW_WEB_ALLOW_CHROMIUM_FALLBACK=1`.
 3. **`page_class` = закон.** `Anti-bot` / `SparseShell` → максимум **один** recovery (consent / другой URL той же задачи), потом стоп + отчёт. Не долби тот же tool с теми же args.
 4. **Один фикс на ошибку.** Тот же fail ≥2 → эскалация человеку. Маршрут дальше только по сигналу страницы (`page_class`, `action_count`, `complete`/`next_hint`), не по нише сайта.
+5. **URL policy (`url_guard`, v0.4.2).** Агентная навигация — только `http`/`https` на публичных хостах. Отказ на `file://`, `localhost`, `10.x`, `169.254.169.254` и т.п. — это политика, не поломка сайта; для локального сервера/тестов нужен `SHADOW_WEB_ALLOW_PRIVATE_URLS=1` в окружении **этого** процесса (никогда в деплое).
 
 ---
 
@@ -109,8 +111,9 @@ snapshot(diff=true, detail="terse")
 | Только таблицы | `schema_table(html)` или `schema_csv(html)` |
 | Сырой HTML сессии | `get_page_html(max_chars=50000)` — осторожно с токенами |
 | Web search | `web_search` |
-| Form fill plan | `form_fill_plan(profile, url?)` |
-| Form fill execute | `form_fill_execute(plan, answers)` |
+| Form fill plan | `form_fill_plan(profile, url?, auto_submit=False, form_index)` — `auto_submit` по умолчанию **False** |
+| Form fill execute | `form_fill_execute(plan, answers, profile, multi_step, max_steps, validate, auto_submit=False)` — одна отправка на URL, неотвеченные `ask` блокируют submit |
+| Толстый агент (один JSON) | `agent_run(goal, max_steps, max_tokens, model, browser, session)` — свой браузер; конверт `stop_reason`/`complete`/`truncated`/`next_hint`; нужен `pip install "shadow-web[agent]"` + LLM-ключ в env процесса |
 | Chrome 145+ WebMCP | `webmcp_list_tools`, `webmcp_execute_tool` |
 
 ### `capture_mode` (при Shadow DOM / a11y)
@@ -138,20 +141,38 @@ id:1,3,5                 # конкретные sid
 
 `click`/`fill` → binding path → local heal (кэш `~/.shadow-web/heal_cache.json`) → LLM heal (`SHADOW_WEB_HEAL_URL` + `/v1/heal`).
 
+v0.4.2: ключ кэша включает query string и fragment (хилл на одном SPA-роуте не переиспользуется на другом; старые записи кэша инвалидированы), контекст страницы перед отправкой во внешний heal-endpoint редактится (значения `textarea`/`input value`/`data-*` секреты вырезаны), верификация селектора — порог 0.8 и fail-closed. `SHADOW_WEB_HEAL_SHARE_CONTEXT=0` — слать только stub-лейбл.
+
 ```bash
 python3 -m uvicorn server.main:app --host 127.0.0.1 --port 8000
 ```
 
-Нужны `DEEPSEEK_API_KEY` или `OPENAI_API_KEY` в `.env`.
+Нужны `DEEPSEEK_API_KEY` или `OPENAI_API_KEY` в `.env` (читается из корня репо / `--env-file`, но **не** из cwd — с 0.4.2).
+
+---
+
+## Версия и состояние (проверять на диске, не по этому файлу)
+
+| Факт | Значение |
+|------|----------|
+| Версия | `0.4.3` (`pyproject.toml` == `lhm.plugin.json` == `shadow_web.__version__`) |
+| Тесты | `547 passed, 2 skipped` (`.venv/bin/python3 -m pytest tests/ -q`) |
+| MCP | 27 tools; список генерится из кода, расхождение ловит `tests/test_tool_surface.py` |
+| Каналы | PyPI (`pip install shadow-web`, `uvx shadow-web-mcp`), LobeHub (`lhm.plugin.json`), `npx skills add ulinycoin/shadow-web` (этот файл). `.claude-plugin/` в репо нет |
+| Деньги | managed price/stock change monitor для DTC: `scripts/price_change_report.py scan|diff` → `reports/price_watch/` (гейты: PDP identity, trusted ≥70%, отказ self-diff). OSS — distribution, не выручка |
+| Не продукт | security scan, token compression API, hosted browser cloud, anti-bot гарантии (`ROADMAP.md` kill list) |
+
+Скрипты: `scripts/price_change_report.py` (scan/diff), `scripts/price_monitor_probe.py`, `scripts/localpdf_competitor_scan.py`, `scripts/security_surface_scan.py`, `scripts/demo_30s.sh`, `scripts/smoke_install.sh`.
 
 ---
 
 ## Ограничения
 
 - Первый `navigate`: cold start Camoufox/Chromium ~3–8 с. В ответе всегда есть `browser_type`.
-- Одна браузерная сессия — новый `navigate` заменяет контекст.
+- Одна браузерная сессия — новый `navigate` заменяет контекст (в MCP — per-session: у каждой MCP-сессии своё состояние и свой лок, v0.4.2).
 - `web_search` — Brave Search (+ Yahoo fallback), без API-ключей; headless с stealth UA.
 - Anti-bot / SparseShell в headless → стоп (см. preflight), не бесконечный retry.
+- **Camoufox живёт вне кэша:** `CAMOUFOX_INSTALL_DIR=~/Desktop/shadow-web/.camoufox` (инжектится в `~/.hermes/mcp-shadow-web-bridge.py`). Чистка диска стирает `~/Library/Caches/camoufox` вместе с браузером; после пересоздания `.venv` патч `camoufox/pkgman.py` (`INSTALL_DIR` из env) надо применить заново, затем `camoufox fetch`.
 
 ## Отладка
 
