@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "shadow-web"
-version = "0.4.3"
+version = "0.4.4"
 description = "Local-first Python SDK for AI agents: DOM compression, Action Map, SchemaSnap, self-healing selectors, MCP, and shadow-web exec agent loop"
 readme = "README.md"
 license = "MIT"
@@ -27,6 +27,11 @@ dependencies = [
     "requests>=2.31.0",
     "pydantic>=2.6.0",
     "aiohttp>=3.9.0",
+    # Extraction core (tables/forms/lists). shadow_web.schema_snap is a facade
+    # over it: one implementation, fixes land once. 0.1.9 is the first release
+    # with the alignment fixes this suite expects (no phantom empty tables,
+    # stacked multi-row headers, zero-padded ids kept as strings).
+    "schemasnap>=0.1.9",
 ]
 
 [project.optional-dependencies]

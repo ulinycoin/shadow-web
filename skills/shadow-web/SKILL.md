@@ -155,8 +155,9 @@ python3 -m uvicorn server.main:app --host 127.0.0.1 --port 8000
 
 | Факт | Значение |
 |------|----------|
-| Версия | `0.4.3` (`pyproject.toml` == `lhm.plugin.json` == `shadow_web.__version__`) |
-| Тесты | `547 passed, 2 skipped` (`.venv/bin/python3 -m pytest tests/ -q`) |
+| Версия | `0.4.4` (`pyproject.toml` == `lhm.plugin.json` == `shadow_web.__version__` == `server.py` app version == README-баннер, сверяет `tests/test_tool_surface.py`) |
+| Тесты | `553 passed, 2 skipped` (`.venv/bin/python3 -m pytest tests/ -q`, ~15 с) |
+| Зависимость ядра | `schemasnap>=0.1.9` (PyPI) — `schema_snap.py` здесь фасад на 64 строки, ядро в `~/Desktop/schemasnap`. Релизить ядро **до** shadow-web |
 | MCP | 27 tools; список генерится из кода, расхождение ловит `tests/test_tool_surface.py` |
 | Каналы | PyPI (`pip install shadow-web`, `uvx shadow-web-mcp`), LobeHub (`lhm.plugin.json`), `npx skills add ulinycoin/shadow-web` (этот файл). `.claude-plugin/` в репо нет |
 | Деньги | managed price/stock change monitor для DTC: `scripts/price_change_report.py scan|diff` → `reports/price_watch/` (гейты: PDP identity, trusted ≥70%, отказ self-diff). OSS — distribution, не выручка |

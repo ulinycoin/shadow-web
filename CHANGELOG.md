@@ -6,6 +6,47 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-10-11
+
+The extraction core moves out of the tree. `shadow_web.schema_snap` becomes a facade
+over the published `schemasnap` package, and running this suite against the shared
+core flushed out four correctness bugs that both copies had inherited — proof that
+the duplication was costing correctness, not just maintenance.
+
+### Changed
+
+- **Extraction core extracted into `schemasnap>=0.1.9`** — a new runtime dependency,
+  installed automatically by `pip install shadow-web` (no extra, no flag).
+  `src/shadow_web/schema_snap.py` went from a 773-line fork to a 64-line facade: it
+  re-exports `parse_tables`, `parse_forms`, `parse_lists`, `parse_page`,
+  `table_to_records`, `table_to_csv`, `export_table_json`, `export_table_csv` and
+  maps the core's `source` vocabulary back to the one callers already use
+  (`native` → `table`, `aria` → `aria_grid`). Names not re-exported (private helpers)
+  are proxied through module `__getattr__`. Every existing import path is untouched —
+  `shadow_web.schema_snap`, the package `__init__`, `form_fill`, `security_scan`,
+  `agent/tools` and the MCP server all keep working, and the 27 MCP tools are
+  unchanged.
+- **Wider virtual-table planes**: the core also detects Tailwind grid and
+  pseudo-table (`Box-row`) layouts, so tables can now appear where a page previously
+  yielded none. On Bootstrap-style layouts this can produce false positives — filter
+  on `source` when you need the old precision.
+
+### Fixed
+
+Fixes 1–5 live in `schemasnap` 0.1.9; they reached this release only because the
+shadow-web suite was pointed at the shared core.
+
+- `parse_tables("<!-- c -->")` and `parse_tables(None)` raised instead of returning
+  no tables.
+- **Zero-padded ids were silently rewritten**: `0406`/`007` were inferred as
+  `integer` and coerced, changing the value. They stay `string`.
+- ARIA grids with a single column were discarded by a `min_cols=2` rule → parsed.
+- An ARIA grid without `role=columnheader` swallowed its first data row into the
+  header → headers are generated as `col_1…col_N` and every data row is kept.
+- An empty `role=table` `<div>` (or empty `<table>`) surfaced as a phantom table
+  with zero columns and zero rows → no table is emitted
+  (`test_empty_grid_yields_no_rows` → `test_empty_grid_yields_no_table`).
+
 ## [0.4.3] - 2026-09-29
 
 Verification release: a second adversarial pass (Sonnet 5.5 over all of `src/`) was
@@ -374,6 +415,7 @@ are marked.
 
 - Initial release: DOM compression, Action Map, shadow_grep, self-healing, Playwright wrapper, FastAPI `/v1/compress` and `/v1/heal`.
 
+[0.4.4]: https://github.com/ulinycoin/shadow-web/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/ulinycoin/shadow-web/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/ulinycoin/shadow-web/compare/v0.4.1...v0.4.2
 [0.4.0]: https://github.com/ulinycoin/shadow-web/compare/v0.3.6...v0.4.0

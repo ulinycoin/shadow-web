@@ -13,7 +13,7 @@
 **Compress web pages 4–6× before your LLM sees them — then extract structured data.**  
 Open-source Python SDK + MCP + standalone `shadow-web exec` agent: flattens Shadow DOM, builds a typed Action Map, indexes rendered text on demand, heals broken selectors, and turns tables/forms/lists into clean JSON — Camoufox by default, no cloud required.
 
-> **v0.4.3** — `pip install "shadow-web[agent]"` → `shadow-web exec "…"` (observe→act→verify, SchemaSnap, single-call finish). 0.4.2 was the security/trust release (`url_guard` navigation policy, opt-in form submission, per-session MCP); 0.4.3 is the verified-review pass — the scanner finally reaches `script`/`link`/`integrity` (`raw_html`), field classification no longer routes profile values into the wrong field, MCP sessions cannot recycle keys, and an `agent_run` timeout actually stops the work.
+> **v0.4.4** — the extraction core moved out of the tree: tables/forms/lists are parsed by the standalone [`schemasnap`](https://pypi.org/project/schemasnap/) package (installed automatically by `pip install shadow-web`), and `shadow_web.schema_snap` is a 64-line facade over it — same imports, one implementation. Running this suite against the shared core surfaced four correctness bugs in it (phantom empty tables, a swallowed ARIA header row, dropped single-column grids, zero-padded ids rewritten as `integer`) — all fixed, all in 0.1.9. 0.4.3 was the verified-review pass — the scanner finally reaches `script`/`link`/`integrity` (`raw_html`), field classification no longer routes profile values into the wrong field, MCP sessions cannot recycle keys, and an `agent_run` timeout actually stops the work.
 
 ```python
 from shadow_web.compressor import process_html
@@ -396,7 +396,7 @@ shadow_web/
 ├── capture_ready.py   # Consent dismiss + readiness wait + scroll-until-content
 ├── dom_capture.py     # Shadow DOM / iframe flatten (in-browser, read-only)
 ├── grouping.py        # Semantic groups (forms, nav, modals)
-├── schema_snap.py     # Tables, forms, lists → JSON/CSV export
+├── schema_snap.py     # Tables, forms, lists → JSON/CSV (facade over the `schemasnap` package)
 ├── form_fill.py       # AgentOps form fill (auto_fill / ask / handoff)
 ├── security_scan.py   # Attack surface rules (forms, links, headers, cookies)
 ├── heal_local.py      # Local selector heal + ~/.shadow-web/heal_cache.json
@@ -625,6 +625,8 @@ selector verified in headless Chromium → cached to ~/.shadow-web/heal_cache.js
 ## SchemaSnap — token-aware data extraction
 
 SchemaSnap is the **data plane** complement to the Action Map **control plane**:
+
+The extraction core itself lives in the standalone [`schemasnap`](https://pypi.org/project/schemasnap/) package — it is a runtime dependency, installed automatically by `pip install shadow-web`. `shadow_web.schema_snap` (64 lines) re-exports it and maps its `source` vocabulary back (`native` → `table`, `aria` → `aria_grid`), so `parse_tables`/`parse_page`/`schema_*` behave exactly as before while fixes land in one place instead of two forks.
 
 | Layer | Question | Tools |
 |-------|----------|-------|

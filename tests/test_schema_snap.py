@@ -547,10 +547,11 @@ class TestAriaGrids:
         assert csv_out.splitlines()[0] == "Id,Name,Status"
         assert "0295,Aaliyah,Pending" in csv_out
 
-    def test_empty_grid_yields_no_rows(self):
-        table = parse_tables('<div role="table"></div>')[0]
-        assert table["rows"] == []
-        assert table["total_rows"] == 0
+    def test_empty_grid_yields_no_table(self):
+        # An empty role=table container is a loading placeholder, not a dataset.
+        # It used to surface as a phantom table with zero columns and zero rows,
+        # which is the same defect the <table> plane had (`<table></table>`).
+        assert parse_tables('<div role="table"></div>') == []
 
     def test_plain_divs_are_not_treated_as_tables(self):
         assert parse_tables("<div><div>just</div><div>layout</div></div>") == []

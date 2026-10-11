@@ -1,7 +1,7 @@
 # Shadow Web — Roadmap
 
-> Version: 0.4.3 → 1.0.0
-> Last updated: 2026-09-29
+> Version: 0.4.4 → 1.0.0
+> Last updated: 2026-10-11
 > Status: open-source engine (PyPI + GitHub, MIT) + **primary bet: managed product-change monitoring concierge for DTC/e-commerce**
 
 ## The Bet (decided 2026-08-15)
@@ -33,14 +33,14 @@ Why this direction wins:
 6. **LocalPDF weekly scan** — dogfood / case study only, no productization; its diff infra feeds the change-report engine.
 7. **Maintenance mode (keep working, no new features):** `security_scan.py` growth, `webmcp.py`, a11y supplement, browser-use integration, exec-agent breadth, `benchmarks/`.
 
-## Current State (v0.4.3)
+## Current State (v0.4.4)
 
 ### Automation Core (production-ready)
 - ✅ Playwright/Camoufox browser execution: navigate/click/fill/snapshot, Shadow DOM flattening, a11y supplement, diff snapshots, web search (Brave/Yahoo)
 - ✅ **Navigation URL policy** (`url_guard`): http/https on globally routable hosts only, obfuscated-IP and metadata-address forms blocked, post-redirect re-check
 - ✅ DOM compression: Action Map + data-sid, grouped XML, terse payloads with **bounded page-controlled fields**
 - ✅ Rendered Text Index: outline → selective content blocks with self-reported `coverage`/`mode`/`signals`/`depth_limited`. Note: "coverage" is computed by the indexer against its own notion of source text — it is an internal consistency metric (misleadingly worded as "100% coverage" before), not independent proof that no page text was dropped
-- ✅ SchemaSnap: tables/forms/lists → JSON/CSV, session-native; header rows are no longer exported as data and nested tables no longer merge upward
+- ✅ SchemaSnap: tables/forms/lists → JSON/CSV, session-native; header rows are no longer exported as data and nested tables no longer merge upward. **0.4.4**: core extracted into the published `schemasnap` package — `shadow_web.schema_snap` is a 64-line facade, fixes land once
 - ✅ Self-healing selectors: local fuzzy cache → LLM fallback with Playwright verification, atomic cache writes, **query/fragment-aware cache keys**, **page context redacted before leaving the process**
 - ✅ Form fill: JSON profile → plan → execute with ask/handoff; **submission is opt-in (`auto_submit=False` everywhere), at most one submit per URL, and pending questions block submit**
 - ✅ Standalone `shadow-web exec` agent loop (OpenAI-compatible, bounded, single-call finish, bounded LLM client)
