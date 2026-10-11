@@ -60,6 +60,19 @@ def test_readme_tool_count_matches_the_code():
     assert counts == {actual}, f"README claims {sorted(counts)} tools, code exposes {actual}"
 
 
+def test_mcp_dependency_is_capped_below_2():
+    """mcp 2.x renamed FastMCP to MCPServer; shadow_web.mcp.server imports the 1.x path.
+
+    Unpinned, a fresh `pip install "shadow-web[mcp]"` / `uvx shadow-web-mcp` (the
+    README's one-command path) resolves to mcp 2.x and dies on import.
+    """
+    text = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    specs = re.findall(r'"(mcp>=[^"]*)"', text)  # not the "mcp" keyword
+    assert specs, "no mcp requirement found in pyproject.toml"
+    for spec in specs:
+        assert "<2" in spec, f"{spec} is not capped below mcp 2.x (FastMCP -> MCPServer)"
+
+
 def test_readme_does_not_advertise_an_unreproducible_compression_ratio():
     """The old table claimed -99% by comparing against a retrieval budget."""
     readme = (ROOT / "README.md").read_text(encoding="utf-8")

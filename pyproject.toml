@@ -39,7 +39,8 @@ agent = [
     "openai>=1.14.0",
     "camoufox>=0.1.0",
 ]
-mcp = ["mcp>=1.2.0", "camoufox>=0.1.0"]
+# mcp 2.x renamed FastMCP -> MCPServer; shadow_web.mcp.server imports the 1.x path
+mcp = ["mcp>=1.2.0,<2", "camoufox>=0.1.0"]
 browser-use = ["browser-use>=0.1.0"]
 dev = [
     "build>=1.2.0",
@@ -51,14 +52,14 @@ dev = [
     "fastapi>=0.110.0",
     "uvicorn>=0.28.0",
     "openai>=1.14.0",
-    "mcp>=1.2.0",
+    "mcp>=1.2.0,<2",
     "httpx>=0.27.0",
 ]
 all = [
     "fastapi>=0.110.0",
     "uvicorn>=0.28.0",
     "openai>=1.14.0",
-    "mcp>=1.2.0",
+    "mcp>=1.2.0,<2",
     "camoufox>=0.1.0",
     "browser-use>=0.1.0",
     "build>=1.2.0",
