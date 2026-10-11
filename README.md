@@ -13,7 +13,7 @@
 **Compress web pages 4–6× before your LLM sees them — then extract structured data.**  
 Open-source Python SDK + MCP + standalone `shadow-web exec` agent: flattens Shadow DOM, builds a typed Action Map, indexes rendered text on demand, heals broken selectors, and turns tables/forms/lists into clean JSON — Camoufox by default, no cloud required.
 
-> **v0.4.3** — `pip install "shadow-web[agent]"` → `shadow-web exec "…"` (observe→act→verify, SchemaSnap, single-call finish). 0.4.2 — security/trust-релиз: URL-политика `url_guard`, opt-in отправка форм, per-session MCP. 0.4.3 — верифицированное ревью: сканер безопасности наконец видит `script`/`link`/`integrity` (`raw_html`), классификация полей больше не тащит PII в чужие поля, MCP-сессии не переиспользуют ключи, таймаут агента реально останавливает работу.
+> **v0.4.3** — `pip install "shadow-web[agent]"` → `shadow-web exec "…"` (observe→act→verify, SchemaSnap, single-call finish). 0.4.2 was the security/trust release (`url_guard` navigation policy, opt-in form submission, per-session MCP); 0.4.3 is the verified-review pass — the scanner finally reaches `script`/`link`/`integrity` (`raw_html`), field classification no longer routes profile values into the wrong field, MCP sessions cannot recycle keys, and an `agent_run` timeout actually stops the work.
 
 ```python
 from shadow_web.compressor import process_html
@@ -146,14 +146,18 @@ hard failure rather than a silent fallback.
 
 | Flag | Default | Notes |
 |------|---------|--------|
-| `--model` | `deepseek-chat` | Any OpenAI-compatible model id |
+| `--model` | `deepseek-v4-flash` | Any OpenAI-compatible model id (or `SHADOW_WEB_LLM_MODEL`) |
 | `--base-url` | auto from env | DeepSeek / OpenRouter inferred from API key |
+| `--api-key` | env | Else `DEEPSEEK_API_KEY` / `OPENAI_API_KEY` / `OPENROUTER_API_KEY` |
 | `--browser` | `camoufox` | `chromium` for CDP/a11y supplement path |
 | `--max-steps` | `20` | Model turns budget |
-| `--max-tokens` | `15000` | Cumulative LLM token budget (stops runaway catalog loops) |
+| `--max-tokens` | `15000` | Cumulative LLM token budget, `0` = unlimited (or `SHADOW_WEB_MAX_TOKENS`) |
 | `--session` | — | Persistent profile `~/.shadow-web/sessions/<name>` |
 | `--headed` | off | Show the browser window |
+| `--heal-url` | env | Optional self-heal API (`SHADOW_WEB_HEAL_URL`) |
 | `--transcript` | off | Include step list in JSON |
+| `--jev` | off | TypeSafe Jev pre-selects cheap steps (needs `TYPESAFE_API_KEY`); low confidence still goes to the model |
+| `--jev-threshold` | `0.6` | Confidence gate for Jev steps (`SHADOW_WEB_JEV_THRESHOLD`) |
 
 Dense pages (`action_count > 40`) auto-return **minimal** observations + a hint to use `shadow_query` / `schema_page` / `content_outline` then `done` — same terse pipeline as MCP, not site-specific. SPA catalogs with empty SchemaSnap should use **Rendered Text Index** (`content_outline` → `content_blocks`).
 
@@ -403,7 +407,7 @@ shadow_web/
 ├── verified_heal.py   # Playwright selector verification
 ├── wrapper.py         # ShadowPage (sync Playwright)
 ├── browser_use.py     # AsyncShadowPage (browser-use / async Playwright)
-├── mcp/server.py      # Cursor / Claude MCP tools (26)
+├── mcp/server.py      # Cursor / Claude MCP tools (27)
 └── server.py          # FastAPI (/health, /v1/compress, /v1/heal)
 
 scripts/
