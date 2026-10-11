@@ -45,3 +45,11 @@ reports/backoffice/
 
 # Outreach: prospect-specific bids and pricing (internal, repo is public)
 reports/outreach/
+reports/freelance/
+
+# Freelance/Upwork sourcing: internal pipeline + private market research
+scripts/freelance_gig_scan.py
+scripts/upwork_alert_extract.py
+scripts/upwork_alert_triage.py
+tests/test_upwork_alert_triage.py
+reports/research-2026/
