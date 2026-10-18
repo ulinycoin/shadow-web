@@ -3,23 +3,35 @@
 
 Reuses the extraction pipeline from price_monitor_probe.py (probe_one) and
 adds the change-report layer:
-  identity (canonical PDP URL) → normalized price/stock/promo/confidence
-  → snapshot JSON → diff vs previous snapshot → markdown report.
+  identity (canonical PDP URL) → normalized price/stock/promo
+  → evidence (plane, raw, path, capture, name match) → snapshot JSON
+  → diff vs previous snapshot → markdown report.
 
-Quality gates (scan mode, exit 2 on fail):
-  HTTP/title not 404, still a /products/ URL, success ≥80%,
-  identity 10/10 PDPs, trusted ≥70% (JSON-LD or og:price with ISO currency).
+Metrics:
+  strict `_is_trusted` = success + confidence + structured plane + ISO-4217
+  currency + name match + verified price AND stock + stored evidence.
+  `_is_trusted_legacy` is the pre-W1 definition, kept only to read old snapshots.
 
-Diff mode re-checks trusted_70/no_404_leak on both snapshots and refuses a
-self-diff (identical `scanned_at`) — exit 2, no report written.
+Gates (scan mode, exit 2 on fail): success ≥80%, PDP identity 10/10,
+`trusted_80_strict`, `evidence_100`, `no_name_mismatch`, `no_false_verified`,
+`no_404_leak`; a 30-row set also evaluates `acceptance_30` (0 false `verified`,
+≥27/30 verifiable). `trusted_70` (legacy) is informational.
+
+Diff mode re-checks `trusted_80_strict` / `evidence_100` / `no_name_mismatch` /
+`no_404_leak` on both snapshots and refuses a self-diff (identical `scanned_at`)
+— exit 2, no report written.
 
 Usage:
-  .venv/bin/python3 scripts/price_change_report.py scan --json reports/price_watch/baseline.json
-  .venv/bin/python3 scripts/price_change_report.py scan --json reports/price_watch/check.json
+  .venv/bin/python3 scripts/price_change_report.py scan --json reports/price_watch/w1.json
+  .venv/bin/python3 scripts/price_change_report.py scan --targets reports/price_watch/acceptance-30.json \\
+      --json reports/price_watch/acceptance.json
   .venv/bin/python3 scripts/price_change_report.py diff \\
-      --previous reports/price_watch/baseline.json \\
-      --current  reports/price_watch/check.json \\
-      --out      reports/price_watch/sample-report.md
+      --previous reports/price_watch/w1.json \\
+      --current  reports/price_watch/w2.json \\
+      --out      reports/price_watch/report.md
+  .venv/bin/python3 scripts/price_change_report.py accuracy \\
+      --snapshot reports/price_watch/acceptance.json \\
+      --out      reports/price_watch/accuracy.json
 """
 
 from __future__ import annotations
@@ -34,7 +46,12 @@ from urllib.parse import urlsplit, urlunsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from price_monitor_probe import _NOT_FOUND_RE, _parse_amount, probe_one  # noqa: E402
+from price_monitor_probe import (  # noqa: E402
+    _NOT_FOUND_RE,
+    _currency_from_text,
+    _parse_amount,
+    probe_one,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SNAPSHOT = ROOT / "reports" / "price_watch" / "snapshot.json"
@@ -111,6 +128,27 @@ def _iso_currency(value: object) -> str | None:
 
 
 def _is_trusted(snap: dict) -> bool:
+    """Strict W2 metric: "the product's price, from a structured plane, matched".
+
+    This is the number a client may see. It is deliberately narrower than the
+    legacy gate: a regex price, an implicit currency, an unconfirmed product
+    name or unknown stock all disqualify the row.
+    """
+    evidence = snap.get("price_evidence") or {}
+    return (
+        bool(snap.get("success"))
+        and snap.get("confidence") in ("high", "medium")
+        and snap.get("price_plane") in STRUCTURED_PLANES
+        and bool(_iso_currency(snap.get("currency")))
+        and snap.get("name_match") in ("match", "partial")
+        and snap.get("price_status") == "verified"
+        and snap.get("stock_status") == "verified"
+        and evidence.get("raw") is not None
+    )
+
+
+def _is_trusted_legacy(snap: dict) -> bool:
+    """Pre-W2 definition, kept only to read old snapshots without rewriting them."""
     return (
         bool(snap.get("success"))
         and snap.get("confidence") in ("high", "medium")
@@ -244,8 +282,266 @@ def _jev_price_pick(title: str, url: str, prices: list) -> dict | None:
     }
 
 
+STRUCTURED_PLANES = frozenset({"jsonld", "og_meta", "schema"})
+_PLANE_ORDER = ("jsonld", "og_meta", "schema")
+# The shipping-threshold / chrome filter belongs to the regex plane only: a real
+# $1.00 or $100.00 SKU from JSON-LD / og / schema must still be priced.
+_REGEX_NOISE_MAX = 1.0
+_REGEX_THRESHOLD_NOISE = 100.0
+_NAME_STOPWORDS = {
+    "the", "and", "for", "with", "of", "a", "an", "to", "in", "on", "at", "by",
+    "from", "your", "our", "new", "sale", "shop", "buy", "online",
+}
+
+
+def _candidate_value(raw: object) -> float | None:
+    try:
+        value = _parse_amount(str(raw))
+    except (TypeError, ValueError):
+        return None
+    if not value or value <= 0:
+        return None
+    return round(float(value), 2)
+
+
+def _candidates_from_result(result: dict) -> list[dict]:
+    """Price candidates from the probe, with a compatibility path for old shapes.
+
+    The probe (W1) already returns `price_candidates`; tests and pre-W1
+    snapshots pass `jsonld_sample` / `meta_offer` / `schema_sample` / `prices`,
+    which are synthesized into the same structure so there is one selection path.
+    """
+    provided = result.get("price_candidates")
+    if isinstance(provided, list) and provided:
+        out: list[dict] = []
+        for cand in provided:
+            if not isinstance(cand, dict):
+                continue
+            value = cand.get("value")
+            if value is None:
+                value = _candidate_value(cand.get("raw"))
+            else:
+                try:
+                    value = round(float(value), 2)
+                except (TypeError, ValueError):
+                    value = None
+            if not value or value <= 0:
+                continue
+            out.append(
+                {
+                    **cand,
+                    "plane": str(cand.get("plane") or "regex"),
+                    "value": value,
+                    "path": str(cand.get("path") or ""),
+                    "currency": cand.get("currency"),
+                }
+            )
+        return out
+
+    out = []
+    jsonld = result.get("jsonld_sample")
+    if isinstance(jsonld, dict):
+        value = _candidate_value(jsonld.get("price"))
+        if value:
+            out.append(
+                {
+                    "plane": "jsonld",
+                    "raw": str(jsonld.get("price")),
+                    "currency": jsonld.get("currency"),
+                    "path": "Product.offers.price",
+                    "value": value,
+                    "snippet": None,
+                }
+            )
+    meta = result.get("meta_offer")
+    if isinstance(meta, dict):
+        value = _candidate_value(meta.get("price"))
+        if value:
+            out.append(
+                {
+                    "plane": "og_meta",
+                    "raw": str(meta.get("price")),
+                    "currency": meta.get("currency"),
+                    "path": meta.get("path") or "product:price:amount",
+                    "value": value,
+                    "snippet": None,
+                }
+            )
+    schema = result.get("schema_sample")
+    if isinstance(schema, dict):
+        for key, raw in schema.items():
+            if not _PRICE_KEY_RE.search(str(key)):
+                continue
+            value = _candidate_value(raw)
+            if value:
+                out.append(
+                    {
+                        "plane": "schema",
+                        "raw": str(raw),
+                        "currency": None,
+                        "path": f"table:{key}",
+                        "value": value,
+                        "snippet": None,
+                    }
+                )
+                break
+    for i, raw in enumerate(result.get("prices") or []):
+        value = _candidate_value(raw)
+        if value:
+            out.append(
+                {
+                    "plane": "regex",
+                    "raw": str(raw),
+                    "currency": None,
+                    "path": f"regex#{i}",
+                    "value": value,
+                    "snippet": None,
+                }
+            )
+    return out
+
+
+def _select_price(candidates: list[dict]) -> tuple[dict | None, list[dict]]:
+    """Pick the winning candidate and keep why the others lost.
+
+    Structured planes win by priority (JSON-LD → og → schema). The regex plane
+    keeps its median-of-candidates rule, which is what makes a page with both a
+    $14 shipping line and a $120 product price pick the product price.
+    """
+    if not candidates:
+        return None, []
+
+    def agreement(cand: dict) -> int:
+        """How many other planes corroborate this exact amount."""
+        value = cand.get("value")
+        if value is None:
+            return 0
+        return sum(
+            1
+            for other in candidates
+            if other is not cand
+            and other.get("plane") != cand.get("plane")
+            and other.get("value") is not None
+            and abs(float(other["value"]) - float(value)) <= 0.005
+        )
+
+    for plane in _PLANE_ORDER:
+        bucket = [c for c in candidates if c.get("plane") == plane and c.get("value")]
+        if not bucket:
+            continue
+        # A PDP can emit several Product nodes (recommendations, bundles). The
+        # first one is not necessarily the product: prefer the amount another
+        # plane corroborates; ties keep page order.
+        winner = max(bucket, key=agreement)
+        rejected = []
+        for other in candidates:
+            if other is winner:
+                continue
+            if other.get("plane") == plane and agreement(other) == 0:
+                reason = "disagrees_with_cross_plane"
+            else:
+                reason = "lower_priority_plane"
+            rejected.append({**other, "reason": other.get("reason") or reason})
+        return winner, rejected
+
+    regex = [c for c in candidates if c.get("plane") == "regex" and c.get("value")]
+    kept: list[dict] = []
+    dropped: list[dict] = []
+    for cand in regex:
+        if cand["value"] > _REGEX_NOISE_MAX and cand["value"] != _REGEX_THRESHOLD_NOISE:
+            kept.append(cand)
+        else:
+            dropped.append({**cand, "reason": "regex_noise_filter"})
+    if not kept:
+        return None, dropped
+
+    median = sorted(c["value"] for c in kept)[len(kept) // 2]
+    eligible = sorted(
+        (c for c in kept if c["value"] <= max(median * 10, 500)), key=lambda c: c["value"]
+    )
+    winner = eligible[len(eligible) // 2]
+    rejected = dropped + [
+        {**cand, "reason": "not_selected_by_median"} for cand in kept if cand is not winner
+    ]
+    return winner, rejected
+
+
+def _apply_price(snap: dict, cand: dict) -> bool:
+    value = cand.get("value")
+    if not value:
+        return False
+    iso = _iso_currency(cand.get("currency"))
+    raw = str(cand.get("raw") or "").strip()
+    snap["price_norm"] = round(float(value), 2)
+    snap["price_raw"] = f"{iso or cand.get('currency') or ''} {raw}".strip()
+    snap["currency"] = iso
+    snap["price_plane"] = cand.get("plane")
+    if cand.get("plane") in ("jsonld", "og_meta") and iso:
+        snap["confidence"] = "high"
+    elif cand.get("plane") == "schema" and iso:
+        snap["confidence"] = "medium"
+    elif cand.get("plane") == "regex":
+        # A regex price stays low even when the amount names its currency: the
+        # value is still a guess about which number on the page is the product.
+        snap["confidence"] = "low"
+    else:
+        snap["confidence"] = "medium" if iso else "low"
+    return True
+
+
+def _name_tokens(text: object) -> list[str]:
+    words = re.findall(r"[a-z0-9]+", str(text or "").lower())
+    return [w for w in words if len(w) > 1 and w not in _NAME_STOPWORDS]
+
+
+def name_match_of(product_name: object, title: object, url: object) -> dict:
+    """Token overlap between the product name and the page title + slug.
+
+    Deliberately conservative: called only on the winning price's page, and an
+    unknown name is `unknown` (review), never `match`.
+    """
+    name_tokens = list(dict.fromkeys(_name_tokens(product_name)))
+    if not name_tokens:
+        return {
+            "name_match": "unknown",
+            "score": None,
+            "matched": [],
+            "missing": [],
+            "reason": "no product name captured",
+        }
+    page_tokens = set(_name_tokens(title))
+    slug = urlsplit(url or "").path.rstrip("/").rsplit("/", 1)[-1]
+    page_tokens |= set(_name_tokens(slug.replace("-", " ").replace("_", " ")))
+    matched = [t for t in name_tokens if t in page_tokens]
+    score = len(matched) / len(name_tokens)
+    if score >= 0.6:
+        verdict = "match"
+    elif score >= 0.3:
+        verdict = "partial"
+    else:
+        verdict = "mismatch"
+    # A one-token name ("Toast", "Flat") appears in far too many places to prove
+    # identity; it can be corroborated, never confirmed.
+    single_token = len(name_tokens) == 1
+    if single_token and verdict == "match":
+        verdict = "partial"
+    return {
+        "name_match": verdict,
+        "score": round(score, 2),
+        "matched": matched[:8],
+        "missing": [t for t in name_tokens if t not in page_tokens][:8],
+        "single_token": single_token,
+    }
+
+
 def normalize_result(result: dict) -> dict:
-    """Collapse probe result → comparable ProductSnapshot."""
+    """Collapse probe result → comparable ProductSnapshot with auditable evidence.
+
+    W1 contract: a priced row carries `price_plane`, `price_evidence` (plane,
+    raw value, path, currency, snippet), `name_match`, per-field statuses and a
+    `capture` block. A row without that evidence can still be compared, but it
+    can never produce a `high` change.
+    """
     snap = {
         "id": result.get("id"),
         "kind": result.get("kind"),
@@ -264,12 +560,19 @@ def normalize_result(result: dict) -> dict:
         "confidence": "none",
         "needs_review": False,
         "planes": result.get("planes") or [],
+        "product_name": None,
+        "name_match": "unknown",
+        "price_plane": None,
+        "price_evidence": {},
+        "price_candidates": [],
+        "price_status": "unknown",
+        "stock_status": "unknown",
+        "capture": result.get("capture") or {},
     }
 
     jsonld = result.get("jsonld_sample") if isinstance(result.get("jsonld_sample"), dict) else None
     schema = result.get("schema_sample") if isinstance(result.get("schema_sample"), dict) else None
     meta = result.get("meta_offer") if isinstance(result.get("meta_offer"), dict) else None
-    prices = result.get("prices") or []
     final_url = result.get("url") or ""
     snap["url"] = final_url
     snap["identity"] = identity_of(final_url)
@@ -284,63 +587,51 @@ def normalize_result(result: dict) -> dict:
         or (meta or {}).get("sku")
     )
 
-    def _apply_price(amount_raw, currency_raw, plane: str) -> bool:
-        amt = _parse_amount(str(amount_raw))
-        # Structured planes (jsonld / og / schema) are authoritative: a real
-        # $1.00 or $100.00 SKU must be priced. The shipping-threshold noise
-        # filter belongs to the regex candidate plane only (see below).
-        if not amt:
-            return False
-        iso = _iso_currency(currency_raw)
-        snap["price_norm"] = round(amt, 2)
-        snap["price_raw"] = f"{iso or currency_raw or ''} {amount_raw}".strip()
-        snap["currency"] = iso
-        if plane == "jsonld" and iso:
-            snap["confidence"] = "high"
-        elif plane == "og_meta" and iso:
-            snap["confidence"] = "high"
-        elif plane == "schema" and iso:
-            snap["confidence"] = "medium"
-        else:
-            snap["confidence"] = "medium" if iso else "low"
-        return True
+    # Product identity (evidence, not decoration): JSON-LD name → probe capture.
+    name_blob = result.get("product_name")
+    if isinstance(name_blob, dict):
+        snap["product_name"] = name_blob.get("name") or None
+        snap["product_name_source"] = name_blob.get("source") or "unknown"
+    elif isinstance(name_blob, str) and name_blob.strip():
+        snap["product_name"] = name_blob.strip()
+        snap["product_name_source"] = "probe"
+    elif jsonld and jsonld.get("name"):
+        snap["product_name"] = str(jsonld["name"]).strip()[:140]
+        snap["product_name_source"] = "jsonld"
 
-    # Price priority: JSON-LD → og/product meta → schema table → regex
-    if jsonld and jsonld.get("price") not in (None, "", 0, "0", "0.00"):
-        _apply_price(jsonld.get("price"), jsonld.get("currency"), "jsonld")
-    if snap["price_norm"] is None and meta and meta.get("price") not in (None, "", 0, "0", "0.00"):
-        _apply_price(meta.get("price"), meta.get("currency"), "og_meta")
-    if snap["price_norm"] is None and schema:
-        for k, v in schema.items():
-            if _PRICE_KEY_RE.search(str(k)):
-                if _apply_price(v, None, "schema"):
-                    snap["price_raw"] = f"{k}: {v}"[:80]
-                    break
-    if snap["price_norm"] is None:
-        # Regex plane: take median of candidates with outlier cutoff instead of first hit.
-        cands: list[float] = []
-        for p in prices:
-            amt = _parse_amount(p)
-            if amt and amt > 1.0 and amt != 100.0:
-                cands.append(amt)
-        if cands:
-            med = sorted(cands)[len(cands) // 2]
-            kept = [c for c in cands if c <= max(med * 10, 500)]
-            if kept:
-                chosen = sorted(kept)[len(kept) // 2]
-                snap["price_norm"] = round(chosen, 2)
-                snap["price_raw"] = prices[cands.index(next(c for c in cands if c == chosen))]
-                snap["confidence"] = "low"
-        # One Jev call, regex plane only. Rows priced by JSON-LD / og / schema
-        # never reach this branch, so already-correct lines are not rewritten.
-        # Currency, variant and needs_review rules stay untouched below.
-        if snap["confidence"] == "low":
-            pick = _jev_price_pick(snap.get("title") or "", snap.get("url") or "", prices)
+    candidates = _candidates_from_result(result)
+    winner, rejected = _select_price(candidates)
+    if winner is not None:
+        _apply_price(snap, winner)
+        snap["price_evidence"] = {
+            "plane": winner.get("plane"),
+            "raw": winner.get("raw"),
+            "currency_raw": winner.get("currency"),
+            "path": winner.get("path") or "",
+            "value": winner.get("value"),
+            "snippet": winner.get("snippet"),
+            "name_match": "unknown",  # filled once the name check below runs
+        }
+        snap["price_candidates"] = [winner, *rejected][:4]
+        # Regex-plane rows may still get one bounded LLM pick (opt-in only).
+        if snap["price_plane"] == "regex" and snap["confidence"] == "low":
+            pick = _jev_price_pick(snap.get("title") or "", snap.get("url") or "", result.get("prices") or [])
             if pick is not None:
                 snap["price_norm"] = pick["amount"]
                 snap["price_raw"] = pick["raw"]
                 snap["confidence"] = "medium"
                 snap["price_plane"] = "jev_regex"
+                snap["price_evidence"].update(
+                    {
+                        "plane": "jev_regex",
+                        "raw": pick["raw"],
+                        "value": pick["amount"],
+                        "path": "jev_regex",
+                        # The JPick may name its own currency; do not inherit the
+                        # rejected regex candidate's.
+                        "currency_raw": _currency_from_text(pick["raw"]),
+                    }
+                )
                 snap["jev_price"] = pick
             elif _JEV_PRICE_LAST:
                 # Honest refusal stays visible for the reviewer.
@@ -376,6 +667,42 @@ def normalize_result(result: dict) -> dict:
         snap["success"] = False
         snap["fail_reason"] = "identity_not_pdp"
 
+    # Product-name cross-check: does the page we priced actually sell that product?
+    match = name_match_of(snap.get("product_name"), title, final_url)
+    snap["name_match"] = match["name_match"]
+    snap["name_match_score"] = match["score"]
+    snap["name_match_detail"] = {k: v for k, v in match.items() if k != "name_match"}
+    if snap["price_evidence"]:
+        snap["price_evidence"]["name_match"] = snap["name_match"]
+    if snap["name_match"] == "mismatch" and snap["confidence"] == "high":
+        # Never let a wrong-product row read as high confidence; medium keeps it
+        # visible in reports while the gates stop counting it as trusted (W2).
+        snap["confidence"] = "medium"
+        snap["confidence_capped"] = "name_mismatch"
+
+    # Per-field status: `verified` needs a structured plane, an explicit ISO
+    # currency and a name that is at least partially matched. Everything else is
+    # honestly `review` — never silently promoted.
+    if snap["price_norm"] is None:
+        snap["price_status"] = "unknown"
+    elif (
+        snap["success"]  # an identity-failed page (redirect to home) cannot verify a price
+        and snap["price_plane"] in STRUCTURED_PLANES
+        and _iso_currency(snap.get("currency"))
+        and snap["name_match"] in ("match", "partial")
+    ):
+        snap["price_status"] = "verified"
+    else:
+        snap["price_status"] = "review"
+    snap["stock_status"] = "verified" if snap.get("stock") not in (None, "unknown") else "unknown"
+    snap["stock_evidence"] = {
+        "state": snap.get("stock"),
+        "source": "jsonld"
+        if (jsonld or {}).get("availability")
+        else ("dom" if snap.get("stock") not in (None, "unknown") else None),
+        "hits": (result.get("stock_hits") or [])[:4],
+    }
+
     # Needs review: success claimed but only weak evidence, or no price at all.
     if snap["success"] and snap["confidence"] == "low":
         snap["needs_review"] = True
@@ -397,9 +724,37 @@ def normalize_result(result: dict) -> dict:
         # nothing actually confirmed stock.
         snap["needs_review"] = True
         snap["needs_review_reason"] = snap.get("needs_review_reason") or "no stock signal"
+    if snap["success"] and snap["name_match"] == "unknown":
+        snap["needs_review"] = True
+        snap["needs_review_reason"] = snap.get("needs_review_reason") or (
+            "product name not captured — identity unconfirmed"
+        )
+    if snap["success"] and snap["name_match"] == "mismatch":
+        snap["needs_review"] = True
+        snap["needs_review_reason"] = snap.get("needs_review_reason") or (
+            "product name does not match page title/slug — wrong product risk"
+        )
+    if snap["success"] and snap["price_status"] == "review":
+        # One invariant: a priced row that is not `verified` is a review row.
+        snap["needs_review"] = True
+        snap["needs_review_reason"] = snap.get("needs_review_reason") or (
+            "price not verified: plane/currency/name unconfirmed"
+        )
     if not snap["success"]:
         snap["needs_review"] = True
-        snap["needs_review_reason"] = snap["fail_reason"] or "scan failed"
+        snap["needs_review_reason"] = snap.get("needs_review_reason") or snap["fail_reason"] or "scan failed"
+
+    snap["evidence"] = {
+        "price": {
+            "plane": snap.get("price_plane"),
+            "raw": (snap.get("price_evidence") or {}).get("raw"),
+            "currency": _iso_currency(snap.get("currency")) or (snap.get("price_evidence") or {}).get("currency_raw"),
+            "path": (snap.get("price_evidence") or {}).get("path"),
+            "name_match": snap.get("name_match"),
+            "status": snap.get("price_status"),
+        },
+        "capture": snap.get("capture") or {},
+    }
     return snap
 
 
@@ -440,8 +795,14 @@ def load_snapshot(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+# Bumped when the snapshot row shape changes: 1 = pre-W1 (no evidence),
+# 2 = W1+ (price_plane / price_evidence / name_match / capture / statuses).
+SNAPSHOT_SCHEMA_VERSION = 2
+
+
 def write_snapshot(path: Path, products: list[dict]) -> dict:
     snap = {
+        "schema_version": SNAPSHOT_SCHEMA_VERSION,
         "scanned_at": datetime.now(timezone.utc).isoformat(),
         "n": len(products),
         "products": products,
@@ -455,6 +816,52 @@ def _mark_review(row: dict, reason: str) -> None:
     """Sticky review flag: the first reason wins, but the flag always sticks."""
     row["needs_review"] = True
     row["needs_review_reason"] = row.get("needs_review_reason") or reason
+
+
+def _row_claim_ok(row: dict) -> bool:
+    """A claim is auditable only with a stored plane/value and a capture block."""
+    evidence = row.get("price_evidence") or {}
+    capture = row.get("capture") or {}
+    return bool(
+        evidence.get("plane")
+        and evidence.get("raw") is not None
+        and capture.get("captured_at")
+        and capture.get("html_sha256")
+    )
+
+
+def _claim_issues(prev_row: dict, curr_row: dict, *, price: bool = True, stock: bool = True) -> list[str]:
+    """Why a two-sided claim is not `high`. Empty list = fully evidenced."""
+    issues: list[str] = []
+    for label, row in (("previous", prev_row), ("current", curr_row)):
+        if not _row_claim_ok(row):
+            issues.append(f"{label} row has no price evidence/capture")
+        if price and row.get("price_status") != "verified":
+            issues.append(f"{label} price {row.get('price_status') or 'unknown'}")
+        if stock and row.get("stock_status") != "verified":
+            issues.append(f"{label} stock {row.get('stock_status') or 'unknown'}")
+        if row.get("name_match") not in ("match", "partial"):
+            issues.append(f"{label} name {row.get('name_match') or 'unknown'}")
+    return issues
+
+
+def _with_evidence(change: dict, prev_row: dict, curr_row: dict) -> dict:
+    """Carry both sides' evidence into the change so it is auditable standalone."""
+    change["from_evidence"] = prev_row.get("price_evidence") or {}
+    change["to_evidence"] = curr_row.get("price_evidence") or {}
+    change["from_capture"] = prev_row.get("capture") or {}
+    change["to_capture"] = curr_row.get("capture") or {}
+    change["from_status"] = {
+        "price": prev_row.get("price_status"),
+        "stock": prev_row.get("stock_status"),
+        "name": prev_row.get("name_match"),
+    }
+    change["to_status"] = {
+        "price": curr_row.get("price_status"),
+        "stock": curr_row.get("stock_status"),
+        "name": curr_row.get("name_match"),
+    }
+    return change
 
 
 def diff_snapshots(prev: dict, curr: dict) -> list[dict]:
@@ -508,10 +915,26 @@ def diff_snapshots(prev: dict, curr: dict) -> list[dict]:
         pn, cn = p.get("price_norm"), c.get("price_norm")
         if comparable and pn is not None and cn is not None and abs(pn - cn) > 0.005:
             low_conf = p.get("confidence") == "low" or c.get("confidence") == "low"
+            issues = _claim_issues(p, c)
+            if low_conf:
+                issues.insert(0, "low-confidence price")
             changes.append(
-                {**entry, "type": "price", "severity": "medium" if low_conf else "high",
-                 "from": f"{p.get('price_raw')}", "to": f"{c.get('price_raw')}",
-                 **({"note": "low-confidence price, verify manually"} if low_conf else {})}
+                _with_evidence(
+                    {
+                        **entry,
+                        "type": "price",
+                        "severity": "medium" if issues else "high",
+                        "from": f"{p.get('price_raw')}",
+                        "to": f"{c.get('price_raw')}",
+                        **(
+                            {"note": "severity capped — " + "; ".join(issues[:3]) + "; verify manually"}
+                            if issues
+                            else {}
+                        ),
+                    },
+                    p,
+                    c,
+                )
             )
         elif comparable and (pn is None) != (cn is None):
             if cn is None and c.get("from_price") is not None:
@@ -519,16 +942,46 @@ def diff_snapshots(prev: dict, curr: dict) -> list[dict]:
                 # aggregate "from $X": that is not a sell-out or a lost price.
                 _mark_review(c, "aggregate 'from' price only — not a product price")
                 changes.append(
-                    {**entry, "type": "price_unverified", "severity": "medium",
-                     "from": p.get("price_raw") or "none",
-                     "to": f"from {c.get('from_price')} (aggregate range, not a product price)",
-                     "note": "AggregateOffer.lowPrice is not the product price — no alert"}
+                    _with_evidence(
+                        {
+                            **entry,
+                            "type": "price_unverified",
+                            "severity": "medium",
+                            "from": p.get("price_raw") or "none",
+                            "to": f"from {c.get('from_price')} (aggregate range, not a product price)",
+                            "note": "AggregateOffer.lowPrice is not the product price — no alert",
+                        },
+                        p,
+                        c,
+                    )
                 )
             else:
+                # A vanished price can only be high when the previous side is
+                # fully evidenced: the current side has no price to cross-check.
+                lost_issues = [
+                    issue for issue in _claim_issues(p, c, stock=False) if issue.startswith("previous")
+                ]
+                appeared_issues = [
+                    issue for issue in _claim_issues(p, c) if issue.startswith("current")
+                ]
+                issues = lost_issues if cn is None else appeared_issues
                 changes.append(
-                    {**entry, "type": "price_lost" if cn is None else "price_appeared",
-                     "severity": "high" if cn is None else "medium",
-                     "from": p.get("price_raw") or "none", "to": c.get("price_raw") or "none"}
+                    _with_evidence(
+                        {
+                            **entry,
+                            "type": "price_lost" if cn is None else "price_appeared",
+                            "severity": ("high" if cn is None else "medium") if not issues else "medium",
+                            "from": p.get("price_raw") or "none",
+                            "to": c.get("price_raw") or "none",
+                            **(
+                                {"note": "severity capped — " + "; ".join(issues[:3])}
+                                if issues and cn is None
+                                else {}
+                            ),
+                        },
+                        p,
+                        c,
+                    )
                 )
         # stock change. `unknown` is deliberately excluded from the normal
         # comparison, but losing the signal on a row we had as in_stock is an
@@ -537,13 +990,38 @@ def diff_snapshots(prev: dict, curr: dict) -> list[dict]:
         if ps != cs:
             if ps == "in_stock" and cs == "unknown":
                 changes.append(
-                    {**entry, "type": "stock_signal_lost", "severity": "medium",
-                     "from": ps, "to": cs,
-                     "note": "stock signal lost — sell-out not confirmed, verify manually"}
+                    _with_evidence(
+                        {
+                            **entry,
+                            "type": "stock_signal_lost",
+                            "severity": "medium",
+                            "from": ps,
+                            "to": cs,
+                            "note": "stock signal lost — sell-out not confirmed, verify manually",
+                        },
+                        p,
+                        c,
+                    )
                 )
             elif ps != "unknown" and cs != "unknown":
+                issues = _claim_issues(p, c)
                 changes.append(
-                    {**entry, "type": "stock", "severity": "high", "from": ps, "to": cs}
+                    _with_evidence(
+                        {
+                            **entry,
+                            "type": "stock",
+                            "severity": "medium" if issues else "high",
+                            "from": ps,
+                            "to": cs,
+                            **(
+                                {"note": "severity capped — " + "; ".join(issues[:3])}
+                                if issues
+                                else {}
+                            ),
+                        },
+                        p,
+                        c,
+                    )
                 )
         # promo change
         if p.get("promo") != c.get("promo"):
@@ -591,12 +1069,70 @@ def diff_snapshots(prev: dict, curr: dict) -> list[dict]:
     return changes
 
 
+def _false_verified(products: list[dict]) -> list[dict]:
+    """A `verified` row that violates its own invariants is a bug, not a review.
+
+    Wrong plane, implicit currency or a mismatched name must never coexist with
+    `price_status == "verified"`; this gate catches a regression in that logic
+    instead of trusting the label.
+    """
+    return [
+        p
+        for p in products
+        if p.get("price_status") == "verified"
+        and (
+            p.get("price_plane") not in STRUCTURED_PLANES
+            or not _iso_currency(p.get("currency"))
+            or p.get("name_match") not in ("match", "partial")
+            or not p.get("success")
+        )
+    ]
+
+
+def _evidence_100(products: list[dict]) -> bool:
+    """Every row we present as high/medium confidence carries its evidence."""
+    claimed = [p for p in products if p.get("confidence") in ("high", "medium")]
+    return all(
+        (p.get("price_evidence") or {}).get("raw") is not None
+        and (p.get("capture") or {}).get("captured_at")
+        and (p.get("capture") or {}).get("html_sha256")
+        for p in claimed
+    )
+
+
+def acceptance_summary(products: list[dict]) -> dict:
+    """W2 30-PDP gate: 0 false `verified`, ≥27/30 with a verifiable price."""
+    priced = [p for p in products if p.get("price_norm") is not None]
+    verifiable = [
+        p
+        for p in priced
+        if p.get("price_status") != "unknown" and p.get("name_match") != "mismatch"
+    ]
+    false_verified = _false_verified(products)
+    return {
+        "n": len(products),
+        "priced": len(priced),
+        "verifiable": len(verifiable),
+        # Machine-verified is stricter than "verifiable": it also needs the
+        # structured plane, the name match and a verified stock signal.
+        "price_verified": sum(1 for p in priced if p.get("price_status") == "verified"),
+        "false_verified": len(false_verified),
+        "false_verified_ids": [p.get("id") for p in false_verified],
+        "passes": len(products) >= 30 and not false_verified and len(verifiable) >= 27,
+    }
+
+
 def evaluate_gates(products: list[dict]) -> dict[str, bool]:
-    """Phase A quality gates. Trusted = success + JSON-LD/og price + ISO currency."""
+    """Quality gates. `trusted_70` is legacy; `trusted_80_strict` is the W2 metric.
+
+    `acceptance_30` is only evaluated on a 30-row set: the gate belongs to the
+    pilot acceptance run, not to a 10-URL regression scan.
+    """
     n = max(1, len(products))
     success_n = sum(1 for p in products if p.get("success"))
     pdp_n = sum(1 for p in products if "/products/" in (p.get("identity") or "").lower())
-    trusted_n = sum(1 for p in products if _is_trusted(p))
+    trusted_strict_n = sum(1 for p in products if _is_trusted(p))
+    trusted_legacy_n = sum(1 for p in products if _is_trusted_legacy(p))
     leaked_404 = any(
         p.get("success")
         and (
@@ -606,11 +1142,226 @@ def evaluate_gates(products: list[dict]) -> dict[str, bool]:
         )
         for p in products
     )
-    return {
+    mismatch_n = sum(1 for p in products if p.get("name_match") == "mismatch")
+    gates = {
         "success_80": success_n / n >= 0.80,
         "identity_100": pdp_n == len(products),
-        "trusted_70": trusted_n / n >= 0.70,
+        "trusted_70": trusted_legacy_n / n >= 0.70,
+        "trusted_80_strict": trusted_strict_n / n >= 0.80,
+        "evidence_100": _evidence_100(products),
+        "no_name_mismatch": mismatch_n == 0,
+        "no_false_verified": not _false_verified(products),
         "no_404_leak": not leaked_404,
+    }
+    if len(products) >= 30:
+        gates["acceptance_30"] = acceptance_summary(products)["passes"]
+    return gates
+
+
+def _fmt_evidence(ev: dict | None) -> str:
+    """One-line, human-auditable description of a stored price plane."""
+    if not ev:
+        return "no evidence"
+    bits: list[str] = []
+    if ev.get("plane"):
+        bits.append(f"plane `{ev.get('plane')}`")
+    if ev.get("path"):
+        bits.append(f"path `{ev.get('path')}`")
+    if ev.get("raw") is not None:
+        bits.append(f"raw `{ev.get('raw')}`")
+    if ev.get("currency_raw"):
+        bits.append(f"ccy `{ev.get('currency_raw')}`")
+    if ev.get("name_match"):
+        bits.append(f"name `{ev.get('name_match')}`")
+    return " · ".join(bits) or "no evidence"
+
+
+def _fmt_capture(cap: dict | None) -> str:
+    if not cap or not cap.get("captured_at"):
+        return "no capture block"
+    sha = str(cap.get("html_sha256") or "")
+    bits = [f"captured `{str(cap.get('captured_at'))[:19]}Z`" if str(cap.get("captured_at")).endswith("+00:00") else f"captured `{cap.get('captured_at')}`"]
+    if sha:
+        bits.append(f"sha256 `{sha[:12]}…`")
+    if cap.get("screenshot"):
+        bits.append(f"screenshot `{cap.get('screenshot')}`")
+    elif cap.get("screenshot_skipped"):
+        bits.append(f"screenshot skipped ({cap.get('screenshot_skipped')})")
+    if cap.get("final_url"):
+        bits.append(f"final `{str(cap.get('final_url'))[:90]}`")
+    return " · ".join(bits)
+
+
+# Change types that make a claim about a price/stock value and therefore need
+# two-sided evidence. Assortment/health types (new_target, scan_lost, …) do not.
+_EVIDENCE_CLAIM_TYPES = frozenset({"price", "price_lost", "price_appeared", "stock"})
+
+
+def _change_is_evidenced(change: dict) -> bool:
+    """Two-sided evidence: both snapshots must carry the plane/value.
+
+    `price_lost` / `price_appeared` are one-sided by nature — the missing side
+    has no price to evidence — so only the present side is required.
+    """
+    to_ev = change.get("to_evidence") or {}
+    from_ev = change.get("from_evidence") or {}
+    if change.get("type") == "price_lost":
+        return from_ev.get("raw") is not None
+    if change.get("type") == "price_appeared":
+        return to_ev.get("raw") is not None
+    return to_ev.get("raw") is not None and from_ev.get("raw") is not None
+
+
+def _evidence_cell(change: dict) -> str:
+    if change.get("type") not in _EVIDENCE_CLAIM_TYPES:
+        return "n/a"
+    return "ok" if _change_is_evidenced(change) else "UNVERIFIED"
+
+
+def accuracy_report(products: list[dict], *, snapshot: str = "") -> dict:
+    """Per-row reason codes behind the strict metric (FAMILY_PLAN §4 W2).
+
+    The report never prints a bare percentage: it states the definition, the
+    denominator and every reason code, so a client can see *why* a row is not
+    trusted instead of trusting a headline.
+    """
+    counts: dict[str, int] = {}
+    rows: list[dict] = []
+    for p in products:
+        codes: list[str] = []
+        if not p.get("success"):
+            codes.append("scan_failed")
+        if p.get("price_norm") is None:
+            codes.append("no_price")
+        else:
+            plane = p.get("price_plane")
+            codes.append(
+                {"jsonld": "jsonld_ok", "og_meta": "og_ok", "schema": "schema_ok"}.get(plane, "regex_only")
+            )
+            if not _iso_currency(p.get("currency")):
+                codes.append("no_currency")
+            if (p.get("price_evidence") or {}).get("raw") is None:
+                codes.append("no_evidence")
+        name = p.get("name_match")
+        if name == "mismatch":
+            codes.append("name_mismatch")
+        elif name in (None, "unknown"):
+            codes.append("name_unknown")
+        if p.get("stock") in (None, "unknown"):
+            codes.append("stock_unknown")
+        elif p.get("stock_status") != "verified":
+            codes.append("no_stock")
+        for code in codes:
+            counts[code] = counts.get(code, 0) + 1
+        if _is_trusted(p):
+            verdict = "trusted"
+        elif not p.get("success"):
+            verdict = "failed"
+        elif p.get("price_norm") is None:
+            verdict = "no_price"
+        else:
+            verdict = "priced_review"
+        rows.append(
+            {
+                "id": p.get("id"),
+                "url": p.get("url"),
+                "price": p.get("price_raw"),
+                "plane": p.get("price_plane"),
+                "name_match": name,
+                "price_status": p.get("price_status"),
+                "stock_status": p.get("stock_status"),
+                "verdict": verdict,
+                "reason_codes": codes,
+            }
+        )
+    n = max(1, len(products))
+    strict_n = sum(1 for p in products if _is_trusted(p))
+    legacy_n = sum(1 for p in products if _is_trusted_legacy(p))
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "snapshot": snapshot,
+        "definition": (
+            "trusted = success AND confidence in {high,medium} AND price_plane in "
+            "{jsonld,og_meta,schema} AND ISO-4217 currency AND name_match in {match,partial} "
+            "AND price_status=verified AND stock_status=verified AND price_evidence present"
+        ),
+        "n": len(products),
+        "trusted_strict": strict_n,
+        "trusted_legacy": legacy_n,
+        "trusted_strict_rate": round(strict_n / n, 3),
+        "reason_counts": dict(sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))),
+        # The acceptance gate belongs to a 30-row pilot set; a 10-URL regression
+        # scan must not be rendered as if it were the pilot gate.
+        "acceptance": acceptance_summary(products) if len(products) >= 30 else None,
+        "rows": rows,
+    }
+
+
+def render_accuracy_markdown(report: dict) -> str:
+    acc = report.get("acceptance") or None
+    lines = [
+        "# Price Watch — Accuracy Report (strict metric)",
+        "",
+        f"**Snapshot:** `{report.get('snapshot')}` · **Rows:** {report.get('n')} · "
+        f"**Generated:** `{report.get('generated_at')}`",
+        "",
+        f"**Trusted strict:** {report.get('trusted_strict')}/{report.get('n')} "
+        f"({report.get('trusted_strict_rate', 0) * 100:.1f}%) · "
+        f"**Trusted legacy:** {report.get('trusted_legacy')}/{report.get('n')} (comparison only)",
+        "",
+        f"> Definition: {report.get('definition')}",
+        "",
+    ]
+    if acc:
+        lines += [
+            "## Acceptance set (30-PDP pilot gate)",
+            "",
+            f"- Rows: {acc.get('n')} · priced: {acc.get('priced')} · verifiable: {acc.get('verifiable')} · "
+            f"machine-verified: {acc.get('price_verified', '—')}",
+            f"- False `verified`: {acc.get('false_verified')}"
+            + (f" ({', '.join(acc.get('false_verified_ids') or [])})" if acc.get("false_verified_ids") else ""),
+            f"- Gate (0 false `verified`, ≥27/30): **{'PASS' if acc.get('passes') else 'FAIL'}**",
+            "",
+        ]
+    if report.get("reason_counts"):
+        lines += ["## Reason codes", "", "| Code | Rows |", "|---|---|"]
+        lines += [f"| `{code}` | {count} |" for code, count in report["reason_counts"].items()]
+        lines.append("")
+    lines += [
+        "## Rows",
+        "",
+        "| Store | Price | Plane | Name | Price/Stock status | Verdict | Codes |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    for row in report.get("rows") or []:
+        lines.append(
+            f"| {row.get('id')} | {row.get('price') or '—'} | {row.get('plane') or '—'} | "
+            f"{row.get('name_match') or '—'} | {row.get('price_status')}/{row.get('stock_status')} | "
+            f"{row.get('verdict')} | {', '.join(row.get('reason_codes') or []) or '—'} |"
+        )
+    lines += [
+        "",
+        "_No percentage in this report is a marketing claim: the denominator is the scanned set and "
+        "the definition above is the only one quoted._",
+        "",
+    ]
+    return "\n".join(lines)
+
+
+def evidence_coverage(products: list[dict]) -> dict:
+    """W1 acceptance measure: do priced rows actually carry their evidence?"""
+    priced = [p for p in products if p.get("price_norm") is not None]
+    with_price_ev = [p for p in priced if (p.get("price_evidence") or {}).get("raw") is not None]
+    with_capture = [p for p in products if (p.get("capture") or {}).get("captured_at")]
+    verified = [p for p in products if p.get("price_status") == "verified"]
+    return {
+        "rows": len(products),
+        "priced": len(priced),
+        "price_evidence": len(with_price_ev),
+        "capture": len(with_capture),
+        "price_verified": len(verified),
+        "price_evidence_pct": round(100 * len(with_price_ev) / max(1, len(priced)), 1),
+        "capture_pct": round(100 * len(with_capture) / max(1, len(products)), 1),
     }
 
 
@@ -621,50 +1372,79 @@ def render_markdown(prev: dict, curr: dict, changes: list[dict]) -> str:
     changed_ids = {c.get("id") for c in changes}
     unchanged = [p for p in products if p.get("id") not in changed_ids]
     needs_review = [p for p in products if p.get("needs_review")]
+    claims = [c for c in changes if c.get("type") in _EVIDENCE_CLAIM_TYPES]
+    evidenced_n = sum(1 for c in claims if _change_is_evidenced(c))
 
     lines = [
-        "# Competitor Price Watch — Sample Change Report",
+        "# Competitor Price Watch — Change Report",
         "",
         f"**Scope:** {len(products)} DTC stores · baseline `{prev_ts}` → check `{curr_ts}`",
-        f"**Changes:** {len(changes)} · **Unchanged:** {len(unchanged)} · **Needs review:** {len(needs_review)} · **Trusted:** {sum(1 for p in products if _is_trusted(p))}/{len(products)}",
+        f"**Changes:** {len(changes)} · **Evidenced price/stock claims:** {evidenced_n}/{len(claims)} · **Unchanged:** {len(unchanged)} · "
+        f"**Needs review:** {len(needs_review)} · **Trusted strict:** "
+        f"{sum(1 for p in products if _is_trusted(p))}/{len(products)} · **Trusted legacy:** "
+        f"{sum(1 for p in products if _is_trusted_legacy(p))}/{len(products)}",
         "",
-        "> This is a sample report to demonstrate the change-detection pipeline for a",
-        "> paid price/stock monitor concierge. Extraction: JSON-LD > og:price > schema table >",
-        "> content outline > regex. Confidence: high = JSON-LD/og with ISO currency,",
-        "> medium = schema with currency, low = regex only. Identity: live /products/ URL.",
+        "> Extraction: JSON-LD > og:price > schema table > content outline > regex. Confidence:",
+        "> high = JSON-LD/og with ISO currency, medium = schema with currency, low = regex only.",
+        "> Every `high`/`medium` change must carry the plane, the raw value, the product-name match",
+        "> and a capture block; a change without them is printed as `UNVERIFIED` and must not be",
+        "> delivered as a claim.",
         "",
     ]
 
     lines.append("## Changes")
     if changes:
         lines.append("")
-        lines.append("| # | Store | Type | From | To | Severity |")
-        lines.append("|---|-------|------|------|----|----------|")
+        lines.append("| # | Store | Type | From | To | Severity | Evidence |")
+        lines.append("|---|-------|------|------|----|----------|----------|")
         for i, c in enumerate(changes, 1):
             note = f" _{c.get('note')}_" if c.get("note") else ""
             lines.append(
                 f"| {i} | {c.get('id')} | {c.get('type')} | {str(c.get('from'))[:60]} | "
-                f"{str(c.get('to'))[:60]} | {c.get('severity')}{note} |"
+                f"{str(c.get('to'))[:60]} | {c.get('severity')}{note} | "
+                f"{_evidence_cell(c)} |"
             )
     else:
         lines.append("")
         lines.append("_No price/stock/promo changes detected between the two scans._")
     lines.append("")
 
+    if changes:
+        lines.append("## Evidence")
+        lines.append("")
+        for c in claims:
+            lines.append(f"### {c.get('id')} — {c.get('type')} ({c.get('severity')})")
+            if not _change_is_evidenced(c):
+                lines.append("")
+                lines.append(
+                    "**UNVERIFIED** — no plane/value/capture stored for this change. Treat it as a "
+                    "lead for manual review, never as a delivered claim."
+                )
+            else:
+                lines.append("")
+                lines.append(f"- from: {_fmt_evidence(c.get('from_evidence'))}")
+                lines.append(f"- to: {_fmt_evidence(c.get('to_evidence'))}")
+                capture = c.get("to_capture") or c.get("from_capture") or {}
+                lines.append(f"- capture: {_fmt_capture(capture)}")
+            lines.append("")
+
     lines.append("## Needs review")
     if needs_review:
         lines.append("")
         lines.append(
-            "_These rows are honestly unclassified: the extractor could not confirm a price "
-            "for them on its own, so they are queued for manual check. This is a known "
-            "coverage limit of the regex plane, not a defect in the pipeline — every other "
-            "row carries JSON-LD or og:price with an explicit ISO currency._"
+            "_Rows the extractor could not confirm on its own (no structured plane, no explicit "
+            "currency, no stock signal, or an unconfirmed product name). They are queued for a "
+            "manual check; they are not delivered as claims._"
         )
         lines.append("")
+        lines.append("| Store | Reason | Confidence | Evidence |")
+        lines.append("|-------|--------|------------|----------|")
         for p in needs_review:
+            ev = p.get("price_evidence") or {}
+            ev_text = f"{ev.get('plane')}/{ev.get('path')}" if ev.get("plane") else "—"
             lines.append(
-                f"- **{p.get('id')}** — {p.get('needs_review_reason')} "
-                f"({p.get('confidence')}) → wait for manual check"
+                f"| {p.get('id')} | {p.get('needs_review_reason') or '—'} | "
+                f"{p.get('confidence')} | {ev_text} |"
             )
     else:
         lines.append("")
@@ -676,7 +1456,12 @@ def render_markdown(prev: dict, curr: dict, changes: list[dict]) -> str:
         lines.append("")
         for p in unchanged:
             price = p.get("price_raw") or "n/a"
-            lines.append(f"- {p.get('id')}: {price} · stock={p.get('stock')} · conf={p.get('confidence')}")
+            ev = p.get("price_evidence") or {}
+            plane = f" · plane={ev.get('plane')}" if ev.get("plane") else ""
+            lines.append(
+                f"- {p.get('id')}: {price} · stock={p.get('stock')} · conf={p.get('confidence')}"
+                f"{plane} · name={p.get('name_match')}"
+            )
     else:
         lines.append("")
         lines.append("_None._")
@@ -684,36 +1469,71 @@ def render_markdown(prev: dict, curr: dict, changes: list[dict]) -> str:
 
     lines.append("## Scan summary")
     lines.append("")
-    lines.append("| Store | Kind | Page class | Price | Stock | Confidence | Planes |")
-    lines.append("|-------|------|-----------|-------|-------|------------|--------|")
+    lines.append("| Store | Kind | Page class | Price | Stock | Confidence | Plane | Status (price/stock) |")
+    lines.append("|-------|------|-----------|-------|-------|------------|-------|----------------------|")
     for p in products:
         lines.append(
             f"| {p.get('id')} | {p.get('kind')} | {p.get('page_class')} | "
             f"{p.get('price_raw') or '—'} | {p.get('stock')} | {p.get('confidence')} | "
-            f"{','.join(p.get('planes') or []) or '—'} |"
+            f"{p.get('price_plane') or '—'} | {p.get('price_status')}/{p.get('stock_status')} |"
         )
     lines.append("")
 
     lines.append("## Method")
     lines.append("")
     lines.append("- Success: live PDP (HTTP <400, title not 404, URL still /products/) with a product price.")
-    lines.append("- Trusted row: success + JSON-LD/og:price + ISO-4217 currency. Gate: ≥70% trusted.")
-    lines.append("- Change severity: high = price/stock/availability flip; medium = promo/confidence collapse.")
-    lines.append("- Geo: JSON-LD/og currency follows the store's localized offer (EU IP can yield EUR on US brands). Pin locale for the client market.")
-    lines.append("- Snapshots: `reports/price_watch/*.json` — rerun `scan` daily to build history.")
+    lines.append("- Trusted strict (W2): success + confidence high/medium + structured plane + ISO-4217 currency + name match + verified price and stock + stored evidence; gate ≥80%.")
+    lines.append("- Trusted legacy: success + confidence high/medium + ISO-4217 currency; shown for comparison only, never quoted to a client.")
+    lines.append("- Evidence: `price_evidence` = plane + raw value + path + currency + snippet; `capture` = timestamp, clean-HTML sha256, screenshot, final URL.")
+    lines.append("- Name match: token overlap between the product name (JSON-LD / og / h1) and page title + slug; ≥0.6 `match`, 0.3–0.6 `partial`, <0.3 `mismatch`, missing `unknown`.")
+    lines.append("- Severity: `high` only when both sides are evidenced, price and stock are `verified`, and the name matches; otherwise `medium` with the cap reason.")
+    lines.append("- Geo: JSON-LD/og currency follows the store's localized offer (EU IP can yield EUR on US brands). Pin locale per client market.")
+    lines.append("- Snapshots: `reports/price_watch/*.json`; screenshots: `reports/price_watch/evidence/<date>/` (git-ignored, 90-day retention).")
     lines.append("")
     return "\n".join(lines)
 
 
+def load_targets(path: Path) -> list[dict]:
+    """Load a targets/acceptance JSON ({targets: [...]} or a bare list).
+
+    Fails closed: https only, non-empty, unique ids — a typo must not silently
+    shrink the acceptance set (the gate is meaningless with fewer rows).
+    """
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    rows = data.get("targets") if isinstance(data, dict) else data
+    if not isinstance(rows, list) or not rows:
+        raise SystemExit(f"no targets in {path}")
+    out: list[dict] = []
+    seen: set[str] = set()
+    for i, row in enumerate(rows):
+        if not isinstance(row, dict):
+            raise SystemExit(f"{path}: target #{i} is not an object")
+        url = str(row.get("url") or "").strip()
+        target_id = str(row.get("id") or f"target_{i}").strip()
+        if not url.startswith("https://"):
+            raise SystemExit(f"{path}: {target_id}: url must be https, got {url!r}")
+        if target_id in seen:
+            raise SystemExit(f"{path}: duplicate target id {target_id!r}")
+        seen.add(target_id)
+        out.append({"id": target_id, "kind": row.get("kind") or "shopify_pdp", "url": url})
+    return out
+
+
 def cmd_scan(args: argparse.Namespace) -> int:
-    targets = WATCH_TARGETS[: args.limit] if args.limit else WATCH_TARGETS
+    targets = load_targets(args.targets) if getattr(args, "targets", None) else list(WATCH_TARGETS)
+    if args.limit:
+        targets = targets[: args.limit]
     products = scan_targets(targets, limit=0)
-    snap = write_snapshot(args.json, products)
+    write_snapshot(args.json, products)
 
     ok_n = sum(1 for p in products if p.get("success"))
-    trusted_n = sum(1 for p in products if _is_trusted(p))
+    strict_n = sum(1 for p in products if _is_trusted(p))
+    legacy_n = sum(1 for p in products if _is_trusted_legacy(p))
     print("\n" + "=" * 72)
-    print(f" SCAN DONE — {ok_n}/{len(products)} success | trusted {trusted_n}/{len(products)}")
+    print(
+        f" SCAN DONE — {ok_n}/{len(products)} success | trusted strict {strict_n}/{len(products)} "
+        f"| trusted legacy {legacy_n}/{len(products)}"
+    )
     print(f" Snapshot: {args.json}")
     print("=" * 72)
     for p in products:
@@ -721,13 +1541,44 @@ def cmd_scan(args: argparse.Namespace) -> int:
         print(
             f"  {mark} {p['id']:<18} price={str(p.get('price_raw'))[:28]:<28} "
             f"stock={p.get('stock'):<12} conf={p.get('confidence'):<6} "
-            f"ccy={p.get('currency') or '-':<4} "
-            f"planes={','.join(p.get('planes') or []) or '-'}"
+            f"plane={str(p.get('price_plane')):<9} name={str(p.get('name_match')):<8} "
+            f"status={p.get('price_status')}/{p.get('stock_status')}"
         )
 
     gates = evaluate_gates(products)
     print(" Gates: " + " | ".join(f"{k}={v}" for k, v in gates.items()))
+    cov = evidence_coverage(products)
+    print(
+        f" Evidence: price={cov['price_evidence']}/{cov['priced']} priced rows "
+        f"({cov['price_evidence_pct']}%) | capture={cov['capture']}/{cov['rows']} "
+        f"| price_verified={cov['price_verified']}"
+    )
     return 0 if all(gates.values()) else 2
+
+
+def cmd_accuracy(args: argparse.Namespace) -> int:
+    snapshot = load_snapshot(args.snapshot)
+    products = snapshot.get("products") or []
+    report = accuracy_report(products, snapshot=str(args.snapshot))
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    args.out.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    md_path = args.out.with_suffix(".md")
+    md_path.write_text(render_accuracy_markdown(report), encoding="utf-8")
+    acc = report.get("acceptance") or {}
+    print(
+        f" STRICT TRUSTED — {report['trusted_strict']}/{report['n']} "
+        f"(legacy {report['trusted_legacy']}/{report['n']})"
+    )
+    print(f" Reasons: {report['reason_counts']}")
+    if report["n"] >= 30 and acc:
+        print(
+            f" Acceptance: verifiable {acc['verifiable']}/{acc['n']} | false verified {acc['false_verified']} "
+            f"| {'PASS' if acc['passes'] else 'FAIL'}"
+        )
+    print(f" Wrote {args.out} + {md_path}")
+    if report["n"] >= 30 and not acc["passes"]:
+        return 2
+    return 0 if report["trusted_strict_rate"] >= 0.80 else 2
 
 
 def _is_self_diff(prev: dict, curr: dict) -> bool:
@@ -743,9 +1594,10 @@ def _is_self_diff(prev: dict, curr: dict) -> bool:
 
 
 # Gates that must hold before a diff may be rendered. success_80 / identity_100
-# stay scan-level warnings; a 404 leak or an untrusted majority makes the report
-# itself untrustworthy.
-_DIFF_REQUIRED_GATES = ("trusted_70", "no_404_leak")
+# stay scan-level warnings; a report is only as good as its evidence, so the
+# strict metric, evidence coverage and name agreement are hard requirements.
+# `trusted_70` is intentionally absent: it is the legacy definition.
+_DIFF_REQUIRED_GATES = ("trusted_80_strict", "evidence_100", "no_name_mismatch", "no_404_leak")
 
 
 def _gate_failures(snapshots: list[tuple[str, dict]]) -> list[str]:
@@ -809,8 +1661,19 @@ def main() -> int:
 
     s = sub.add_parser("scan", help="Run a price/stock scan → snapshot JSON")
     s.add_argument("--json", type=Path, default=DEFAULT_SNAPSHOT)
-    s.add_argument("--limit", type=int, default=0, help="Limit targets (0=all 10)")
+    s.add_argument("--limit", type=int, default=0, help="Limit targets (0=all)")
+    s.add_argument(
+        "--targets",
+        type=Path,
+        default=None,
+        help="JSON target list ({targets:[{id,kind,url}]} or a list) — e.g. acceptance-30.json",
+    )
     s.set_defaults(func=cmd_scan)
+
+    a = sub.add_parser("accuracy", help="Strict metric + reason codes for a snapshot")
+    a.add_argument("--snapshot", type=Path, required=True)
+    a.add_argument("--out", type=Path, default=ROOT / "reports" / "price_watch" / "accuracy.json")
+    a.set_defaults(func=cmd_accuracy)
 
     d = sub.add_parser("diff", help="Diff two snapshots → markdown report")
     d.add_argument("--previous", type=Path, required=True)

@@ -1,0 +1,415 @@
+{
+  "generated_at": "2026-10-18T09:41:37.505934+00:00",
+  "snapshot": "reports/price_watch/acceptance-2026-10-18.json",
+  "definition": "trusted = success AND confidence in {high,medium} AND price_plane in {jsonld,og_meta,schema} AND ISO-4217 currency AND name_match in {match,partial} AND price_status=verified AND stock_status=verified AND price_evidence present",
+  "n": 30,
+  "trusted_strict": 27,
+  "trusted_legacy": 27,
+  "trusted_strict_rate": 0.9,
+  "reason_counts": {
+    "jsonld_ok": 23,
+    "og_ok": 4,
+    "regex_only": 3
+  },
+  "acceptance": {
+    "n": 30,
+    "priced": 30,
+    "verifiable": 30,
+    "price_verified": 27,
+    "false_verified": 0,
+    "false_verified_ids": [],
+    "passes": true
+  },
+  "rows": [
+    {
+      "id": "allbirds_womens-wool-runners-natural-grey",
+      "url": "https://www.allbirds.com/products/womens-wool-runners-natural-grey",
+      "price": "USD 49",
+      "plane": "jsonld",
+      "name_match": "match",
+      "price_status": "verified",
+      "stock_status": "verified",
+      "verdict": "trusted",
+      "reason_codes": [
+        "jsonld_ok"
+      ]
+    },
+    {
+      "id": "allbirds_mens-tree-runners",
+      "url": "https://www.allbirds.com/products/mens-tree-runners",
+      "price": "USD 100",
+      "plane": "jsonld",
+      "name_match": "match",
+      "price_status": "verified",
+      "stock_status": "verified",
+      "verdict": "trusted",
+      "reason_codes": [
+        "jsonld_ok"
+      ]
+    },
+    {
+      "id": "allbirds_womens-wool-lounger-mule-stony-cream",
+      "url": "https://www.allbirds.com/products/womens-wool-lounger-mule-stony-cream",
+      "price": "USD 80",
+      "plane": "jsonld",
+      "name_match": "match",
+      "price_status": "verified",
+      "stock_status": "verified",
+      "verdict": "trusted",
+      "reason_codes": [
+        "jsonld_ok"
+      ]
+    },
+    {
+      "id": "brooklinen_essential-sheet-set",
+      "url": "https://www.brooklinen.com/products/essential-sheet-set",
+      "price": "USD 149.00",
+      "plane": "jsonld",
+      "name_match": "match",
+      "price_status": "verified",
+      "stock_status": "verified",
+      "verdict": "trusted",
+      "reason_codes": [
+        "jsonld_ok"
+      ]
+    },
+    {
+      "id": "brooklinen_super-plush-4-piece-bath-towel-set",
+      "url": "https://www.brooklinen.com/products/super-plush-4-piece-bath-towel-set",
+      "price": "USD 168.00",
+      "plane": "jsonld",
+      "name_match": "match",
+      "price_status": "verified",
+      "stock_status": "verified",
+      "verdict": "trusted",
+      "reason_codes": [
+        "jsonld_ok"
+      ]
+    },
+    {
+      "id": "brooklinen_down-alternative-pillow-insert",
+      "url": "https://www.brooklinen.com/products/down-alternative-pillow-insert?variant=43933103226970",
+      "price": "USD 31.20",
+      "plane": "jsonld",
+      "name_match": "match",
+      "price_status": "verified",
+      "stock_status": "verified",
+      "verdict": "trusted",
+      "reason_codes": [
+        "jsonld_ok"
+      ]
+    },
+    {
+      "id": "brooklinen_super-fluff-throw-blanket",
+      "url": "https://www.brooklinen.com/products/super-fluff-throw-blanket?variant=44105230221402",
+      "price": "USD 103.20",
+      "plane": "jsonld",
+      "name_match": "match",
+      "price_status": "verified",
+      "stock_status": "verified",
+      "verdict": "trusted",
+      "reason_codes": [
+        "jsonld_ok"
+      ]
+    },
+    {
+      "id": "publicgoods_natural-dish-soap",
+      "url": "https://www.publicgoods.com/products/natural-dish-soap",
+      "price": "USD 9.95",
+      "plane": "jsonld",
+      "name_match": "match",
+      "price_status": "verified",
+      "stock_status": "verified",
+      "verdict": "trusted",
+      "reason_codes": [
+        "jsonld_ok"
+      ]
+    },
+    {
+      "id": "publicgoods_dental-floss",
+      "url": "https://www.publicgoods.com/products/dental-floss",
+      "price": "USD 9.95",
+      "plane": "jsonld",
+      "name_match": "match",
+      "price_status": "verified",
+      "stock_status": "verified",
+      "verdict": "trusted",
+      "reason_codes": [
+        "jsonld_ok"
+      ]
+    },
+    {
+      "id": "publicgoods_bottle-opener",
+      "url": "https://www.publicgoods.com/products/bottle-opener",
+      "price": "USD 12.95",
+      "plane": "jsonld",
+      "name_match": "match",
+      "price_status": "verified",
+      "stock_status": "verified",
+      "verdict": "trusted",
+      "reason_codes": [
+        "jsonld_ok"
+      ]
+    },
+    {
+      "id": "glossier_balm-dotcom",
+      "url": "https://www.glossier.com/en-lv/products/balm-dotcom",
+      "price": "EUR 20",
+      "plane": "jsonld",
+      "name_match": "match",
+      "price_status": "verified",
+      "stock_status": "verified",
+      "verdict": "trusted",
+      "reason_codes": [
+        "jsonld_ok"
+      ]
+    },
+    {
+      "id": "glossier_lip-gloss",
+      "url": "https://www.glossier.com/en-lv/products/lip-gloss",
+      "price": "EUR 23",
+      "plane": "jsonld",
+      "name_match": "match",
+      "price_status": "verified",
+      "stock_status": "verified",
+      "verdict": "trusted",
+      "reason_codes": [
+        "jsonld_ok"
+      ]
+    },
+    {
+      "id": "glossier_hand-cream",
+      "url": "https://www.glossier.com/en-lv/products/hand-cream",
+      "price": "EUR 25",
+      "plane": "jsonld",
+      "name_match": "match",
+      "price_status": "verified",
+      "stock_status": "verified",
+      "verdict": "trusted",
+      "reason_codes": [
+        "jsonld_ok"
+      ]
+    },
+    {
+      "id": "glossier_milky-oil",
+      "url": "https://www.glossier.com/en-lv/products/milky-oil",
+      "price": "EUR 23",
+      "plane": "jsonld",
+      "name_match": "match",
+      "price_status": "verified",
+      "stock_status": "verified",
+      "verdict": "trusted",
+      "reason_codes": [
+        "jsonld_ok"
+      ]
+    },
+    {
+      "id": "tentree_harwood-puffer-meteorite-black",
+      "url": "https://www.tentree.com/products/harwood-puffer-meteorite-black",
+      "price": "USD 298.0",
+      "plane": "jsonld",
+      "name_match": "match",
+      "price_status": "verified",
+      "stock_status": "verified",
+      "verdict": "trusted",
+      "reason_codes": [
+        "jsonld_ok"
+      ]
+    },
+    {
+      "id": "tentree_colorado-sweater-light-grey-heather-plum-royale-",
+      "url": "https://www.tentree.com/products/colorado-sweater-light-grey-heather-plum-royale-blend",
+      "price": "USD 128.0",
+      "plane": "jsonld",
+      "name_match": "match",
+      "price_status": "verified",
+      "stock_status": "verified",
+      "verdict": "trusted",
+      "reason_codes": [
+        "jsonld_ok"
+      ]
+    },
+    {
+      "id": "tentree_alden-beanie-alpine-blue",
+      "url": "https://www.tentree.com/products/alden-beanie-alpine-blue",
+      "price": "USD 35.0",
+      "plane": "jsonld",
+      "name_match": "match",
+      "price_status": "verified",
+      "stock_status": "verified",
+      "verdict": "trusted",
+      "reason_codes": [
+        "jsonld_ok"
+      ]
+    },
+    {
+      "id": "colourpop_fallen-collection",
+      "url": "https://colourpop.com/products/fallen-collection",
+      "price": "USD 107.00",
+      "plane": "jsonld",
+      "name_match": "match",
+      "price_status": "verified",
+      "stock_status": "verified",
+      "verdict": "trusted",
+      "reason_codes": [
+        "jsonld_ok"
+      ]
+    },
+    {
+      "id": "colourpop_super-stain-full-collection",
+      "url": "https://colourpop.com/products/super-stain-full-collection",
+      "price": "USD 84.00",
+      "plane": "jsonld",
+      "name_match": "match",
+      "price_status": "verified",
+      "stock_status": "verified",
+      "verdict": "trusted",
+      "reason_codes": [
+        "jsonld_ok"
+      ]
+    },
+    {
+      "id": "colourpop_jelly-glow-collection",
+      "url": "https://colourpop.com/products/jelly-glow-collection",
+      "price": "USD 54.00",
+      "plane": "jsonld",
+      "name_match": "match",
+      "price_status": "verified",
+      "stock_status": "verified",
+      "verdict": "trusted",
+      "reason_codes": [
+        "jsonld_ok"
+      ]
+    },
+    {
+      "id": "koio_monza-in-nero",
+      "url": "https://www.koio.co/products/monza-in-nero?variant=47295062999209",
+      "price": "EUR 248.95",
+      "plane": "jsonld",
+      "name_match": "match",
+      "price_status": "verified",
+      "stock_status": "verified",
+      "verdict": "trusted",
+      "reason_codes": [
+        "jsonld_ok"
+      ]
+    },
+    {
+      "id": "koio_vegan-01-ocean-mens",
+      "url": "https://www.koio.co/products/vegan-01-ocean-mens",
+      "price": "EUR 167.95",
+      "plane": "jsonld",
+      "name_match": "match",
+      "price_status": "verified",
+      "stock_status": "verified",
+      "verdict": "trusted",
+      "reason_codes": [
+        "jsonld_ok"
+      ]
+    },
+    {
+      "id": "koio_vegan-01-triple-white-1-mens",
+      "url": "https://www.koio.co/products/vegan-01-triple-white-1-mens",
+      "price": "EUR 167.95",
+      "plane": "jsonld",
+      "name_match": "match",
+      "price_status": "verified",
+      "stock_status": "verified",
+      "verdict": "trusted",
+      "reason_codes": [
+        "jsonld_ok"
+      ]
+    },
+    {
+      "id": "outdoorvoices_w-ride-pant-plaid",
+      "url": "https://www.outdoorvoices.com/products/w-ride-pant-plaid",
+      "price": "USD $108",
+      "plane": "regex",
+      "name_match": "match",
+      "price_status": "review",
+      "stock_status": "verified",
+      "verdict": "priced_review",
+      "reason_codes": [
+        "regex_only"
+      ]
+    },
+    {
+      "id": "outdoorvoices_w-techsweat-core-7-8-legging-forest",
+      "url": "https://www.outdoorvoices.com/products/w-techsweat-core-7-8-legging-forest",
+      "price": "USD $58",
+      "plane": "regex",
+      "name_match": "match",
+      "price_status": "review",
+      "stock_status": "verified",
+      "verdict": "priced_review",
+      "reason_codes": [
+        "regex_only"
+      ]
+    },
+    {
+      "id": "outdoorvoices_w-energy-dress-botanical",
+      "url": "https://www.outdoorvoices.com/products/w-energy-dress-botanical",
+      "price": "USD $108",
+      "plane": "regex",
+      "name_match": "match",
+      "price_status": "review",
+      "stock_status": "verified",
+      "verdict": "priced_review",
+      "reason_codes": [
+        "regex_only"
+      ]
+    },
+    {
+      "id": "rothys_the-jodhpur-boot",
+      "url": "https://rothys.com/en-at/products/the-jodhpur-boot",
+      "price": "EUR 315,00",
+      "plane": "og_meta",
+      "name_match": "match",
+      "price_status": "verified",
+      "stock_status": "verified",
+      "verdict": "trusted",
+      "reason_codes": [
+        "og_ok"
+      ]
+    },
+    {
+      "id": "rothys_the-driver-moc",
+      "url": "https://rothys.com/en-at/products/the-driver-moc",
+      "price": "EUR 200,00",
+      "plane": "og_meta",
+      "name_match": "match",
+      "price_status": "verified",
+      "stock_status": "verified",
+      "verdict": "trusted",
+      "reason_codes": [
+        "og_ok"
+      ]
+    },
+    {
+      "id": "rothys_the-block-heel-loafer",
+      "url": "https://rothys.com/en-at/products/the-block-heel-loafer",
+      "price": "EUR 215,00",
+      "plane": "og_meta",
+      "name_match": "match",
+      "price_status": "verified",
+      "stock_status": "verified",
+      "verdict": "trusted",
+      "reason_codes": [
+        "og_ok"
+      ]
+    },
+    {
+      "id": "rothys_the-baby-moc",
+      "url": "https://rothys.com/en-at/products/the-baby-moc",
+      "price": "EUR 52,00",
+      "plane": "og_meta",
+      "name_match": "match",
+      "price_status": "verified",
+      "stock_status": "verified",
+      "verdict": "trusted",
+      "reason_codes": [
+        "og_ok"
+      ]
+    }
+  ]
+}

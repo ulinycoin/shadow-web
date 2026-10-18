@@ -1,0 +1,98 @@
+{
+  "scanned_at": "2026-10-18T09:00:00+00:00",
+  "n": 1,
+  "products": [
+    {
+      "id": "brooklinen_pdp",
+      "kind": "shopify_pdp",
+      "url": "https://www.brooklinen.com/products/classic-core-sheet-set",
+      "identity": "https://www.brooklinen.com/products/classic-core-sheet-set",
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Closed Shadow",
+      "title": "Classic Percale Sheet Set | Brooklinen",
+      "product_name": "Classic Percale Sheet Set",
+      "product_name_source": "jsonld",
+      "name_match": "match",
+      "name_match_score": 1.0,
+      "price_raw": "USD 135.15",
+      "price_norm": 135.15,
+      "currency": "USD",
+      "stock": "in_stock",
+      "stock_evidence": {
+        "state": "in_stock",
+        "source": "jsonld",
+        "hits": ["InStock"]
+      },
+      "promo": false,
+      "confidence": "high",
+      "needs_review": false,
+      "price_plane": "jsonld",
+      "price_evidence": {
+        "plane": "jsonld",
+        "raw": "135.15",
+        "currency_raw": "USD",
+        "path": "Product.offers.price",
+        "value": 135.15,
+        "snippet": "{\"@type\": \"Product\", \"name\": \"Classic Percale Sheet Set\", \"offers\": {\"price\": \"135.15\", \"priceCurrency\": \"USD\"}}",
+        "name_match": "match"
+      },
+      "price_candidates": [
+        {
+          "plane": "jsonld",
+          "raw": "135.15",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "value": 135.15,
+          "snippet": "{\"price\": \"135.15\", \"priceCurrency\": \"USD\"}"
+        },
+        {
+          "plane": "og_meta",
+          "raw": "135.15",
+          "currency": "USD",
+          "path": "product:price:amount",
+          "value": 135.15,
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "$14",
+          "currency": null,
+          "path": "content_outline#2",
+          "value": 14.0,
+          "reason": "not_selected_by_median"
+        }
+      ],
+      "price_status": "verified",
+      "stock_status": "verified",
+      "capture": {
+        "captured_at": "2026-10-18T09:00:00+00:00",
+        "html_sha256": "3d1f0c2b4a5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4c5d6e7f8",
+        "screenshot": "reports/price_watch/evidence/2026-10-18/brooklinen_pdp.png",
+        "final_url": "https://www.brooklinen.com/products/classic-core-sheet-set",
+        "http_status": 200,
+        "page_class": "Closed Shadow",
+        "html_chars": 48213
+      },
+      "evidence": {
+        "price": {
+          "plane": "jsonld",
+          "raw": "135.15",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "name_match": "match",
+          "status": "verified"
+        },
+        "capture": {
+          "captured_at": "2026-10-18T09:00:00+00:00",
+          "html_sha256": "3d1f0c2b4a5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4c5d6e7f8",
+          "screenshot": "reports/price_watch/evidence/2026-10-18/brooklinen_pdp.png",
+          "final_url": "https://www.brooklinen.com/products/classic-core-sheet-set",
+          "http_status": 200,
+          "page_class": "Closed Shadow",
+          "html_chars": 48213
+        }
+      }
+    }
+  ]
+}

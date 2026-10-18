@@ -47,6 +47,16 @@ def _probe(**overrides):
         "prices": [],
         "stock_hits": ["Add to cart"],
         "planes": [],
+        # W1: the probe always records the product name and a capture block.
+        "product_name": {"name": "Classic Percale Sheet Set", "source": "jsonld"},
+        "capture": {
+            "captured_at": "2026-10-18T09:00:00+00:00",
+            "html_sha256": "a" * 64,
+            "screenshot": "reports/price_watch/evidence/2026-10-18/brooklinen_pdp.png",
+            "final_url": "https://www.brooklinen.com/products/classic-core-sheet-set",
+            "http_status": 200,
+            "page_class": "Closed Shadow",
+        },
     }
     base.update(overrides)
     return base
@@ -176,27 +186,24 @@ def test_gates_pass_on_eight_trusted_pdps():
         "success_80": True,
         "identity_100": True,
         "trusted_70": True,
+        "trusted_80_strict": True,
+        "evidence_100": True,
+        "no_name_mismatch": True,
+        "no_false_verified": True,
         "no_404_leak": True,
     }
 
 
 def test_diff_flags_price_change():
-    # Currency is carried explicitly: unlabelled numbers are not comparable
-    # (see test_diff_missing_currency_on_either_side_is_review_only).
-    prev = {
-        "products": [
-            {"identity": "https://x.com/products/a", "id": "a", "price_norm": 50.0, "price_raw": "USD 50", "currency": "USD", "confidence": "high", "stock": "in_stock", "promo": False, "success": True}
-        ]
-    }
-    curr = {
-        "products": [
-            {"identity": "https://x.com/products/a", "id": "a", "price_norm": 45.0, "price_raw": "USD 45", "currency": "USD", "confidence": "high", "stock": "in_stock", "promo": False, "success": True}
-        ]
-    }
+    # Currency and evidence are carried explicitly: unlabelled numbers are not
+    # comparable, and a claim without a stored plane/capture is never `high`.
+    prev = {"products": [_snap_row(price_norm=50.0, price_raw="USD 50")]}
+    curr = {"products": [_snap_row(price_norm=45.0, price_raw="USD 45")]}
     changes = diff_snapshots(prev, curr)
     assert len(changes) == 1
     assert changes[0]["type"] == "price"
     assert changes[0]["severity"] == "high"
+    assert changes[0]["to_evidence"]["plane"] == "jsonld"
 
 
 def test_jsonld_trailing_comma_and_price_specification():
@@ -262,7 +269,9 @@ def test_jev_price_leaves_jsonld_rows_alone():
     assert snap["price_norm"] == 89.0
     assert snap["confidence"] == "high"
     assert snap["needs_review"] is False
-    assert "price_plane" not in snap
+    # W1: every priced row records its winning plane, including JSON-LD rows.
+    assert snap["price_plane"] == "jsonld"
+    assert snap["price_evidence"]["path"] == "Product.offers.price"
 
 
 def test_jev_price_accepts_confident_pick_on_regex_row():
@@ -295,7 +304,7 @@ def test_jev_price_keeps_low_row_when_unconfident():
     assert snap["needs_review"] is True
     assert snap["needs_review_reason"] == "price from regex only (low confidence)"
     assert "jev_price" not in snap
-    assert "price_plane" not in snap
+    assert snap["price_plane"] == "regex"
     # the refusal stays auditable instead of silently vanishing
     assert snap["jev_price_note"]["confidence"] == 0.41
 
@@ -310,7 +319,9 @@ def test_jev_price_disabled_by_default_is_a_noop():
     assert first["price_norm"] == 120.0
     assert "jev_price" not in first
     assert "jev_price_note" not in first
-    assert "price_plane" not in first
+    # W1: the regex winner is recorded too — `jev_regex` only appears when the
+    # optional judge accepts a pick.
+    assert first["price_plane"] == "regex"
 
 
 def test_jev_price_refuses_when_noul_disagrees_on_a_real_choice():
@@ -393,8 +404,27 @@ def _snap_row(**kw):
         "url": "https://x.com/products/a", "success": True, "confidence": "high",
         "price_norm": 50.0, "price_raw": "USD 50", "currency": "USD", "stock": "in_stock",
         "promo": False, "variant": None,
+        "product_name": "Test Product", "name_match": "match",
+        "price_plane": "jsonld", "price_status": "verified", "stock_status": "verified",
     }
     row.update(kw)
+    # Evidence follows the (possibly overridden) price so the fixture stays coherent.
+    row["price_evidence"] = {
+        "plane": row.get("price_plane") or "jsonld",
+        "raw": str(row.get("price_norm")) if row.get("price_norm") is not None else None,
+        "currency_raw": row.get("currency"),
+        "path": "Product.offers.price",
+        "value": row.get("price_norm"),
+        "name_match": row.get("name_match"),
+        "snippet": None,
+    }
+    row["capture"] = {
+        "captured_at": "2026-10-18T09:00:00+00:00",
+        "html_sha256": "b" * 64,
+        "final_url": row.get("url"),
+        "http_status": 200,
+        "page_class": "Static",
+    }
     return row
 
 
@@ -472,12 +502,13 @@ def _write_snapshot(path, scanned_at, products):
 
 
 def _trusted_row(i=0, **kw):
-    row = {
-        "id": f"p{i}", "identity": f"https://shop.example/products/p{i}", "kind": "shopify_pdp",
-        "url": f"https://shop.example/products/p{i}", "success": True, "confidence": "high",
-        "price_norm": 20.0 + i, "price_raw": f"USD {20 + i}", "currency": "USD",
-        "stock": "in_stock", "promo": False, "variant": None,
-    }
+    row = _snap_row(
+        id=f"p{i}",
+        identity=f"https://shop.example/products/p{i}",
+        url=f"https://shop.example/products/p{i}",
+        price_norm=20.0 + i,
+        price_raw=f"USD {20 + i}",
+    )
     row.update(kw)
     return row
 

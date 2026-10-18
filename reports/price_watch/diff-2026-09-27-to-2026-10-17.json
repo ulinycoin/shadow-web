@@ -1,0 +1,69 @@
+{
+  "baseline": "2026-09-27T10:41:09.790301+00:00",
+  "check": "2026-10-17T08:57:02.210474+00:00",
+  "changes": [
+    {
+      "id": "brooklinen_pdp",
+      "identity": "https://www.brooklinen.com/products/classic-core-sheet-set",
+      "kind": "shopify_pdp",
+      "url": "https://www.brooklinen.com/products/classic-core-sheet-set",
+      "type": "price",
+      "severity": "high",
+      "from": "USD 135.15",
+      "to": "USD 127.20"
+    },
+    {
+      "id": "glossier_pdp",
+      "identity": "https://www.glossier.com/en-lv/products/boy-brow",
+      "kind": "shopify_pdp",
+      "url": "https://www.glossier.com/en-lv/products/boy-brow",
+      "type": "price",
+      "severity": "high",
+      "from": "EUR 27",
+      "to": "EUR 28"
+    },
+    {
+      "id": "tentree_pdp",
+      "identity": "https://www.tentree.com/products/mens-classic-cotton-t-shirt",
+      "kind": "shopify_pdp",
+      "url": "https://www.tentree.com/products/mens-classic-cotton-t-shirt",
+      "type": "currency_unverified",
+      "severity": "medium",
+      "from": "n/a",
+      "to": "USD",
+      "note": "currency missing on one snapshot — numbers not comparable, no price alert"
+    },
+    {
+      "id": "tentree_pdp",
+      "identity": "https://www.tentree.com/products/mens-classic-cotton-t-shirt",
+      "kind": "shopify_pdp",
+      "url": "https://www.tentree.com/products/mens-classic-cotton-t-shirt",
+      "type": "stock",
+      "severity": "high",
+      "from": "in_stock",
+      "to": "out_of_stock"
+    },
+    {
+      "id": "koio_pdp",
+      "identity": "https://www.koio.co/",
+      "kind": "shopify_pdp",
+      "url": "https://www.koio.co/",
+      "type": "currency_unverified",
+      "severity": "medium",
+      "from": "n/a",
+      "to": "n/a",
+      "note": "currency missing on one snapshot — numbers not comparable, no price alert"
+    },
+    {
+      "id": "outdoorvoices_pdp",
+      "identity": "https://www.outdoorvoices.com/products/w-the-exercise-dress-twilight",
+      "kind": "d2c_pdp",
+      "url": "https://www.outdoorvoices.com/products/w-the-exercise-dress-twilight",
+      "type": "currency_unverified",
+      "severity": "medium",
+      "from": "n/a",
+      "to": "n/a",
+      "note": "currency missing on one snapshot — numbers not comparable, no price alert"
+    }
+  ]
+}

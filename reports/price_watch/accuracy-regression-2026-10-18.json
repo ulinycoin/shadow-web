@@ -1,0 +1,151 @@
+{
+  "generated_at": "2026-10-18T09:31:14.181111+00:00",
+  "snapshot": "reports/price_watch/w1-2026-10-18.json",
+  "definition": "trusted = success AND confidence in {high,medium} AND price_plane in {jsonld,og_meta,schema} AND ISO-4217 currency AND name_match in {match,partial} AND price_status=verified AND stock_status=verified AND price_evidence present",
+  "n": 10,
+  "trusted_strict": 8,
+  "trusted_legacy": 8,
+  "trusted_strict_rate": 0.8,
+  "reason_counts": {
+    "jsonld_ok": 7,
+    "regex_only": 2,
+    "og_ok": 1,
+    "scan_failed": 1,
+    "stock_unknown": 1
+  },
+  "acceptance": null,
+  "rows": [
+    {
+      "id": "allbirds_pdp",
+      "url": "https://www.allbirds.com/products/mens-tree-runner-go",
+      "price": "USD 120",
+      "plane": "jsonld",
+      "name_match": "match",
+      "price_status": "verified",
+      "stock_status": "verified",
+      "verdict": "trusted",
+      "reason_codes": [
+        "jsonld_ok"
+      ]
+    },
+    {
+      "id": "brooklinen_pdp",
+      "url": "https://www.brooklinen.com/products/classic-core-sheet-set",
+      "price": "USD 127.20",
+      "plane": "jsonld",
+      "name_match": "match",
+      "price_status": "verified",
+      "stock_status": "verified",
+      "verdict": "trusted",
+      "reason_codes": [
+        "jsonld_ok"
+      ]
+    },
+    {
+      "id": "publicgoods_pdp",
+      "url": "https://www.publicgoods.com/products/natural-hand-soap",
+      "price": "USD 14.95",
+      "plane": "jsonld",
+      "name_match": "match",
+      "price_status": "verified",
+      "stock_status": "verified",
+      "verdict": "trusted",
+      "reason_codes": [
+        "jsonld_ok"
+      ]
+    },
+    {
+      "id": "glossier_pdp",
+      "url": "https://www.glossier.com/en-lv/products/boy-brow",
+      "price": "EUR 28",
+      "plane": "jsonld",
+      "name_match": "match",
+      "price_status": "verified",
+      "stock_status": "verified",
+      "verdict": "trusted",
+      "reason_codes": [
+        "jsonld_ok"
+      ]
+    },
+    {
+      "id": "tentree_pdp",
+      "url": "https://www.tentree.com/products/mens-classic-cotton-t-shirt",
+      "price": "USD 45.0",
+      "plane": "jsonld",
+      "name_match": "match",
+      "price_status": "verified",
+      "stock_status": "verified",
+      "verdict": "trusted",
+      "reason_codes": [
+        "jsonld_ok"
+      ]
+    },
+    {
+      "id": "colourpop_pdp",
+      "url": "https://colourpop.com/products/toast-ultra-matte-lip",
+      "price": "USD 6.30",
+      "plane": "jsonld",
+      "name_match": "partial",
+      "price_status": "verified",
+      "stock_status": "verified",
+      "verdict": "trusted",
+      "reason_codes": [
+        "jsonld_ok"
+      ]
+    },
+    {
+      "id": "koio_pdp",
+      "url": "https://www.koio.co/",
+      "price": "EUR €60,95",
+      "plane": "regex",
+      "name_match": "match",
+      "price_status": "review",
+      "stock_status": "unknown",
+      "verdict": "failed",
+      "reason_codes": [
+        "scan_failed",
+        "regex_only",
+        "stock_unknown"
+      ]
+    },
+    {
+      "id": "drsquatch_pdp",
+      "url": "https://www.drsquatch.com/products/pine-tar",
+      "price": "USD 7.00",
+      "plane": "jsonld",
+      "name_match": "match",
+      "price_status": "verified",
+      "stock_status": "verified",
+      "verdict": "trusted",
+      "reason_codes": [
+        "jsonld_ok"
+      ]
+    },
+    {
+      "id": "outdoorvoices_pdp",
+      "url": "https://www.outdoorvoices.com/products/w-the-exercise-dress-twilight",
+      "price": "USD $59.99",
+      "plane": "regex",
+      "name_match": "match",
+      "price_status": "review",
+      "stock_status": "verified",
+      "verdict": "priced_review",
+      "reason_codes": [
+        "regex_only"
+      ]
+    },
+    {
+      "id": "rothys_pdp",
+      "url": "https://rothys.com/en-at/products/the-flat",
+      "price": "EUR 45,00",
+      "plane": "og_meta",
+      "name_match": "partial",
+      "price_status": "verified",
+      "stock_status": "verified",
+      "verdict": "trusted",
+      "reason_codes": [
+        "og_ok"
+      ]
+    }
+  ]
+}

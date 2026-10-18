@@ -43,6 +43,12 @@ tests/test_lv_tender.py
 .backoffice-state.json
 reports/backoffice/
 
+# Price watch runtime artifacts (FAMILY_PLAN W1/W3): screenshots, SQLite state, alert outbox.
+# Snapshots and rendered reports stay tracked; evidence does not belong in a public repo.
+reports/price_watch/evidence/
+reports/price_watch/state/
+reports/price_watch/outbox/
+
 # Outreach: prospect-specific bids and pricing (internal, repo is public)
 reports/outreach/
 reports/freelance/

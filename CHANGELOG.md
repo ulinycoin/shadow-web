@@ -6,6 +6,56 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added — Price change intelligence: evidence pack + strict metric (W1/W2)
+
+Pipeline-only change (`scripts/`, `tests/`); the MCP surface, the SDK API and the
+runtime dependencies are untouched. Every claim in a change report is now
+auditable from the snapshot alone.
+
+- **Evidence travels with the price.** Each priced row stores `price_plane`
+  (`jsonld` / `og_meta` / `schema` / `regex` / `jev_regex`), `price_evidence`
+  (plane, raw value, currency, path such as `Product.offers.price`, capped
+  snippet) and up to three rejected candidates with the reason they lost.
+  JSON-LD evidence uses an object path, never a fabricated CSS selector.
+- **Capture block per scan:** `captured_at`, `html_sha256` of the cleaned HTML,
+  viewport screenshot (`reports/price_watch/evidence/<date>/<id>.png`, 2 MB cap,
+  opt-out `SHADOW_WEB_EVIDENCE_SCREENSHOTS=0`, full page behind
+  `SHADOW_WEB_EVIDENCE_FULL_PAGE=1`), `final_url`, `http_status`, `page_class`.
+- **Product identity check:** `product_name` (JSON-LD → og/product meta → h1) is
+  compared with the page title and slug by token overlap → `name_match`
+  `match` / `partial` / `mismatch` / `unknown`. A mismatch caps confidence and
+  forces review; a single-token name can only reach `partial`.
+- **Per-field statuses:** `price_status` and `stock_status` in
+  `verified | review | unknown`. `verified` needs a structured plane, an explicit
+  ISO-4217 currency, a matched name and a successful PDP identity.
+- **Strict trusted metric (W2):** `_is_trusted()` now means "the product's price,
+  from a structured plane, matched to the product" and requires verified price and
+  stock plus stored evidence. The old definition is kept as
+  `_is_trusted_legacy()` for reading pre-W1 snapshots and is never quoted.
+- **Gates:** `trusted_80_strict`, `evidence_100`, `no_name_mismatch`,
+  `no_false_verified`, and `acceptance_30` on a 30-row pilot set
+  (0 false `verified`, ≥27/30 verifiable). `trusted_70` remains as a legacy
+  informational gate. A diff is refused unless `trusted_80_strict`, `evidence_100`,
+  `no_name_mismatch` and `no_404_leak` hold for both snapshots.
+- **Report:** a two-sided Evidence section per change (`UNVERIFIED` when absent),
+  evidence column in the needs-review table, and `high` only when both sides are
+  evidenced, price and stock are verified and the name matches — otherwise
+  `medium` with the exact cap reason.
+- **Commands:** `scan --targets reports/price_watch/acceptance-30.json` (fails
+  closed on http URLs, duplicate ids or an empty list) and
+  `accuracy --snapshot <json> --out <json>` producing per-row reason codes
+  (`jsonld_ok`, `og_ok`, `schema_ok`, `regex_only`, `no_price`, `no_currency`,
+  `name_mismatch`, `name_unknown`, `no_stock`, `stock_unknown`, `no_evidence`,
+  `scan_failed`) plus the definition and denominator.
+- **Snapshots carry `schema_version: 2`.**
+
+### Fixed
+
+- Regex-plane amounts now record the currency named in the text (`80 CAD` →
+  `CAD`) instead of leaving it implicit; the plane still stays `low` confidence.
+- A priced row that is not `verified` can no longer read as clean: `needs_review`
+  is set from `price_status`, so the review table and the gates agree.
+
 ## [0.4.4] - 2026-10-11
 
 The extraction core moves out of the tree. `shadow_web.schema_snap` becomes a facade

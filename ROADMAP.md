@@ -1,8 +1,11 @@
 # Shadow Web — Roadmap
 
 > Version: 0.4.4 → 1.0.0
-> Last updated: 2026-10-11
+> Last updated: 2026-10-17
 > Status: open-source engine (PyPI + GitHub, MIT) + **primary bet: managed product-change monitoring concierge for DTC/e-commerce**
+>
+> Execution sub-plan (2026-10-17): [`docs/FAMILY_PLAN.md`](docs/FAMILY_PLAN.md) — Verify → paid pilot →
+> minimal Watch; Collect deferred. Scoped to the monitor bet; it does not replace this roadmap.
 
 ## The Bet (decided 2026-08-15)
 
@@ -46,7 +49,7 @@ Why this direction wins:
 - ✅ Standalone `shadow-web exec` agent loop (OpenAI-compatible, bounded, single-call finish, bounded LLM client)
 - ✅ MCP server (stdio): 27 tools incl. thick `agent_run` (always returns its envelope), thin navigate/schema/content tools with hard caps, **per-session browser state**
 - ✅ Security surface scanner: 8 modules (forms, links, headers, cookies, SRI, mixed content, CORS, page meta) — not a pentest tool
-- ✅ **547 tests passing**, CI (GitHub Actions), PyPI + Claude Code plugin marketplace + LobeHub manifest (tool list now generated from the code and guarded by `tests/test_tool_surface.py`)
+- ✅ **595 tests passing**, CI (GitHub Actions), PyPI + Claude Code plugin marketplace + LobeHub manifest (tool list now generated from the code and guarded by `tests/test_tool_surface.py`)
 
 ### Fixed in 0.4.2 (adversarial review, 2026-09-27)
 
@@ -118,9 +121,9 @@ the five confirmed findings were fixed. Full detail in `CHANGELOG.md`:
   - [x] Configurable price filters (hardcoded $100/$1 drop removed from the structured planes; kept only for regex candidates)
   - [ ] `_parse_amount` locale handling + unit tests (`1.234` vs `1234`, `€1.234,56`)
   - [x] Price regex anchors in content_index (quadratic backtracking removed; `$1234.56` no longer truncates)
-  - [ ] Evidence pack per change: screenshot + JSON-LD/og sample + confidence — the **winning price plane is still not stored**, so `high` cannot be audited from the artifact
+  - [x] Evidence pack per change — **2026-10-18**: winning plane, raw value, path, name match and a capture block (timestamp, clean-HTML sha256, viewport screenshot) are stored and rendered per change; a change without them is `UNVERIFIED` and can never be `high`
   - [x] Self-diff refusal + quality gates enforced in the diff/render path
-  - [ ] Rebuild the accuracy metric: "price from a structured plane, cross-checked against the product name" (the old "93.3%" was a ≥2-price-strings heuristic)
+  - [x] Rebuild the accuracy metric — **2026-10-18**: strict `trusted` = structured plane + ISO currency + name match + verified price AND stock + stored evidence. Frozen 10 → **8/10**; 30-PDP acceptance → **27/30 strict, 0 false `verified`** (`reports/price_watch/accuracy-2026-10-18.md`)
 - [ ] Landing page: "Send 5–10 competitor URLs for a free baseline scan"
 - [ ] 10 outreach drafts (public send = OK)
 - [ ] Manual concierge fulfillment: daily scan → verified report → email/Sheet
@@ -156,11 +159,11 @@ the five confirmed findings were fixed. Full detail in `CHANGELOG.md`:
 
 ### Остаточные риски, сознательно не закрытые в 0.4.2
 
-- **Точность извлечения цены (B14)** — по-прежнему берётся первый Product-узел без сверки `name`/`sku` с заголовком и слагом страницы. Это главный оставшийся источник ложных «цен»; без него метрику точности продавать нельзя.
-- **Метрика точности (B11)** — «93.3%» было «на странице ≥2 похожих на цену строки». Нужна метрика «цена из структурной плоскости + совпадение с именем товара».
+- ✅ **Точность извлечения цены (B14)** — закрыто 2026-10-18: при нескольких JSON-LD `Product`-узлах выигрывает сумма, подтверждённая другой плоскостью, а не первый узел; `name_match` сверяет имя с title/слагом (односложное имя — максимум `partial`). Остаток: 3 Outdoor Voices PDP без структурной цены — regex-only `review`.
+- ✅ **Метрика точности (B11)** — закрыто 2026-10-18: строгая метрика «цена из структурной плоскости + ISO-валюта + совпадение имени + verified price/stock + evidence»; отчёт печатает определение, знаменатель и reason-коды, без процента-заголовка.
 - **Гейт валюты внутри одной валюты** — дрейф EUR→EUR из-за локали/FX не гейтится; нужен market pin на цель.
-- **Аудит provenance (M12)** — снапшоты не сохраняют, из какой плоскости взята цена, поэтому метку `high` нельзя проверить по артефакту.
-- **`_is_trusted` (M10)** — считает и LLM-выбранные (Jev) цены, и эвристику `cents/100`, помеченную как `og_meta`.
+- ✅ **Аудит provenance (M12)** — закрыто 2026-10-18: `price_plane`, `price_evidence` (plane/raw/path/snippet) и `capture` (sha256 + screenshot) пишутся в снапшот; отчёт даёт Evidence-секцию по каждому изменению.
+- ✅ **`_is_trusted` (M10)** — закрыто 2026-10-18: строгая метрика требует структурную плоскость (`jev_regex` и regex в неё не входят), verified-статусы и evidence; старая логика осталась как `_is_trusted_legacy` только для чтения старых снапшотов.
 - **DNS-rebinding** — проверка резолва best-effort (по умолчанию включена, `SHADOW_WEB_URL_DNS_CHECK`); Chromium резолвит повторно, полная защита требует пиннинга IP через route interception.
 - **Ограничения ценового паттерна** — `nur .99 €`, `1500 руб`, `руб.1 500` дают `None`; ослаблять lookbehind нельзя (вернётся O(n²)).
 - **Разделяемый lxml-парсер** — шарится между потоками; измерено, что thread-local не ускоряет (узкое место GIL), но явное владение лучше.

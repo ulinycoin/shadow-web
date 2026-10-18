@@ -1,0 +1,13 @@
+{
+  "@context": "https://schema.org",
+  "@type": "Product",
+  "name": "Classic Percale Sheet Set",
+  "sku": "BL-PERCALE-Q",
+  "offers": {
+    "@type": "Offer",
+    "price": "135.15",
+    "priceCurrency": "USD",
+    "availability": "https://schema.org/InStock",
+    "url": "https://www.brooklinen.com/products/classic-core-sheet-set"
+  }
+}

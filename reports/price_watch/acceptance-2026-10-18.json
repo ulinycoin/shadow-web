@@ -1,0 +1,3834 @@
+{
+  "schema_version": 2,
+  "scanned_at": "2026-10-18T09:41:31.501195+00:00",
+  "n": 30,
+  "products": [
+    {
+      "id": "allbirds_womens-wool-runners-natural-grey",
+      "kind": "shopify_pdp",
+      "url": "https://www.allbirds.com/products/womens-wool-runners-natural-grey",
+      "identity": "https://www.allbirds.com/products/womens-wool-runners-natural-grey",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Closed Shadow",
+      "title": "Allbirds Wool Runners, Women's | Reviews, SIzing Info | Casual Walking, Running Shoes",
+      "price_raw": "USD 49",
+      "price_norm": 49.0,
+      "currency": "USD",
+      "stock": "in_stock",
+      "promo": false,
+      "confidence": "high",
+      "needs_review": false,
+      "planes": [
+        "content_outline",
+        "jsonld",
+        "og_meta"
+      ],
+      "product_name": "Women's Wool Runner",
+      "name_match": "match",
+      "price_plane": "jsonld",
+      "price_evidence": {
+        "plane": "jsonld",
+        "raw": "49",
+        "currency_raw": "USD",
+        "path": "Product.offers.price",
+        "value": 49.0,
+        "snippet": "{\"name\": \"Women's Wool Runner\", \"sku\": \"WOMENS_WOOL_RUNNERS\", \"price\": 49, \"from_price\": null, \"currency\": \"USD\", \"availability\": \"https://schema.org/InStock\"}",
+        "name_match": "match"
+      },
+      "price_candidates": [
+        {
+          "plane": "jsonld",
+          "raw": "49",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "value": 49.0,
+          "snippet": "{\"name\": \"Women's Wool Runner\", \"sku\": \"WOMENS_WOOL_RUNNERS\", \"price\": 49, \"from_price\": null, \"currency\": \"USD\", \"availability\": \"https://schema.org/InStock\"}"
+        },
+        {
+          "plane": "og_meta",
+          "raw": "49.00",
+          "currency": "USD",
+          "path": "og:price:amount",
+          "value": 49.0,
+          "snippet": "<meta property=\"og:price:amount\" content=\"49.00\">",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "$49",
+          "currency": "USD",
+          "path": "content_outline#0",
+          "value": 49.0,
+          "snippet": "…to earn free shipping! p14 | Added to Cart | card | 9t | Spend $100 more to earn free shipping! p27 | Women's Wool Runner | card | 26t | Sale Final Few Previous Image Next Image Women's Wool Runner $49 Select A Size A p25 | Women's Wool Runner | card | 7t | $49 $110 (55% off) final sale * p17 | Added to Cart > You may also like | text_group | 1t | $14 p19 | Added to Cart > You may also like | text…",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "$110",
+          "currency": "USD",
+          "path": "content_outline#1",
+          "value": 110.0,
+          "snippet": "…100 more to earn free shipping! p27 | Women's Wool Runner | card | 26t | Sale Final Few Previous Image Next Image Women's Wool Runner $49 Select A Size A p25 | Women's Wool Runner | card | 7t | $49 $110 (55% off) final sale * p17 | Added to Cart > You may also like | text_group | 1t | $14 p19 | Added to Cart > You may also like | text_group | 1t | $18 p21 | Added to Cart > You may also like | text…",
+          "reason": "lower_priority_plane"
+        }
+      ],
+      "price_status": "verified",
+      "stock_status": "verified",
+      "capture": {
+        "captured_at": "2026-10-18T09:31:24.326820+00:00",
+        "html_sha256": "0b34de1a205525d62717cc2b718b50cd3241a65978112449ea140b881cde5dfa",
+        "screenshot": "reports/price_watch/evidence/2026-10-18/allbirds_womens-wool-runners-natural-grey.png",
+        "final_url": "https://www.allbirds.com/products/womens-wool-runners-natural-grey",
+        "http_status": 200,
+        "page_class": "Closed Shadow",
+        "html_chars": 157439,
+        "screenshot_bytes": 252364,
+        "screenshot_full_page": false
+      },
+      "requested_url": "https://www.allbirds.com/products/womens-wool-runners-natural-grey",
+      "http_status": 200,
+      "variant": "WOMENS_WOOL_RUNNERS",
+      "product_name_source": "jsonld",
+      "name_match_score": 0.67,
+      "name_match_detail": {
+        "score": 0.67,
+        "matched": [
+          "women",
+          "wool"
+        ],
+        "missing": [
+          "runner"
+        ],
+        "single_token": false
+      },
+      "stock_evidence": {
+        "state": "in_stock",
+        "source": "jsonld",
+        "hits": [
+          "available",
+          "Add to Cart",
+          "Out of stock"
+        ]
+      },
+      "evidence": {
+        "price": {
+          "plane": "jsonld",
+          "raw": "49",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "name_match": "match",
+          "status": "verified"
+        },
+        "capture": {
+          "captured_at": "2026-10-18T09:31:24.326820+00:00",
+          "html_sha256": "0b34de1a205525d62717cc2b718b50cd3241a65978112449ea140b881cde5dfa",
+          "screenshot": "reports/price_watch/evidence/2026-10-18/allbirds_womens-wool-runners-natural-grey.png",
+          "final_url": "https://www.allbirds.com/products/womens-wool-runners-natural-grey",
+          "http_status": 200,
+          "page_class": "Closed Shadow",
+          "html_chars": 157439,
+          "screenshot_bytes": 252364,
+          "screenshot_full_page": false
+        }
+      }
+    },
+    {
+      "id": "allbirds_mens-tree-runners",
+      "kind": "shopify_pdp",
+      "url": "https://www.allbirds.com/products/mens-tree-runners",
+      "identity": "https://www.allbirds.com/products/mens-tree-runners",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Closed Shadow",
+      "title": "Men's Tree Runners - Black - Everyday Sneakers | Allbirds",
+      "price_raw": "USD 100",
+      "price_norm": 100.0,
+      "currency": "USD",
+      "stock": "in_stock",
+      "promo": false,
+      "confidence": "high",
+      "needs_review": false,
+      "planes": [
+        "content_outline",
+        "jsonld",
+        "og_meta"
+      ],
+      "product_name": "Men's Tree Runner",
+      "name_match": "match",
+      "price_plane": "jsonld",
+      "price_evidence": {
+        "plane": "jsonld",
+        "raw": "100",
+        "currency_raw": "USD",
+        "path": "Product.offers.price",
+        "value": 100.0,
+        "snippet": "{\"name\": \"Men's Tree Runner\", \"sku\": \"MENS_TREE_RUNNERS\", \"price\": 100, \"from_price\": null, \"currency\": \"USD\", \"availability\": \"https://schema.org/InStock\"}",
+        "name_match": "match"
+      },
+      "price_candidates": [
+        {
+          "plane": "jsonld",
+          "raw": "100",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "value": 100.0,
+          "snippet": "{\"name\": \"Men's Tree Runner\", \"sku\": \"MENS_TREE_RUNNERS\", \"price\": 100, \"from_price\": null, \"currency\": \"USD\", \"availability\": \"https://schema.org/InStock\"}"
+        },
+        {
+          "plane": "og_meta",
+          "raw": "100.00",
+          "currency": "USD",
+          "path": "og:price:amount",
+          "value": 100.0,
+          "snippet": "<meta property=\"og:price:amount\" content=\"100.00\">",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "$14",
+          "currency": "USD",
+          "path": "content_outline#0",
+          "value": 14.0,
+          "snippet": "…nner | card | 5t | $100 + Free shipping p93 | Men's Tree Runner > Compare our styles > Men's Tree Runner | card | 4t | ADD TO CART - $100 p17 | Added to Cart > You may also like | text_group | 1t | $14 p19 | Added to Cart > You may also like | text_group | 1t | $18 p21 | Added to Cart > You may also like | text_group | 1t | $14 p81 | Men's Tree Runner > Compare our styles > Men's Tree Runner | tex…",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "$18",
+          "currency": "USD",
+          "path": "content_outline#1",
+          "value": 18.0,
+          "snippet": "…> Compare our styles > Men's Tree Runner | card | 4t | ADD TO CART - $100 p17 | Added to Cart > You may also like | text_group | 1t | $14 p19 | Added to Cart > You may also like | text_group | 1t | $18 p21 | Added to Cart > You may also like | text_group | 1t | $14 p81 | Men's Tree Runner > Compare our styles > Men's Tree Runner | text_group | 1t | $100 p96 | Men's Tree Runner > Compare our styles…",
+          "reason": "lower_priority_plane"
+        }
+      ],
+      "price_status": "verified",
+      "stock_status": "verified",
+      "capture": {
+        "captured_at": "2026-10-18T09:31:37.080123+00:00",
+        "html_sha256": "d27b56d8decf45f4b2df1e08dc45dafbcb1e8d7c930d9e234e0f87430314d4f1",
+        "screenshot": "reports/price_watch/evidence/2026-10-18/allbirds_mens-tree-runners.png",
+        "final_url": "https://www.allbirds.com/products/mens-tree-runners",
+        "http_status": 200,
+        "page_class": "Closed Shadow",
+        "html_chars": 165593,
+        "screenshot_bytes": 199742,
+        "screenshot_full_page": false
+      },
+      "requested_url": "https://www.allbirds.com/products/mens-tree-runners",
+      "http_status": 200,
+      "variant": "MENS_TREE_RUNNERS",
+      "product_name_source": "jsonld",
+      "name_match_score": 0.67,
+      "name_match_detail": {
+        "score": 0.67,
+        "matched": [
+          "men",
+          "tree"
+        ],
+        "missing": [
+          "runner"
+        ],
+        "single_token": false
+      },
+      "stock_evidence": {
+        "state": "in_stock",
+        "source": "jsonld",
+        "hits": [
+          "ADD TO CART",
+          "available",
+          "Add to Cart",
+          "Out of stock"
+        ]
+      },
+      "evidence": {
+        "price": {
+          "plane": "jsonld",
+          "raw": "100",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "name_match": "match",
+          "status": "verified"
+        },
+        "capture": {
+          "captured_at": "2026-10-18T09:31:37.080123+00:00",
+          "html_sha256": "d27b56d8decf45f4b2df1e08dc45dafbcb1e8d7c930d9e234e0f87430314d4f1",
+          "screenshot": "reports/price_watch/evidence/2026-10-18/allbirds_mens-tree-runners.png",
+          "final_url": "https://www.allbirds.com/products/mens-tree-runners",
+          "http_status": 200,
+          "page_class": "Closed Shadow",
+          "html_chars": 165593,
+          "screenshot_bytes": 199742,
+          "screenshot_full_page": false
+        }
+      }
+    },
+    {
+      "id": "allbirds_womens-wool-lounger-mule-stony-cream",
+      "kind": "shopify_pdp",
+      "url": "https://www.allbirds.com/products/womens-wool-lounger-mule-stony-cream",
+      "identity": "https://www.allbirds.com/products/womens-wool-lounger-mule-stony-cream",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Closed Shadow",
+      "title": "Women's Wool Lounger Mule - Stony Cream (Stony Cream Sole)",
+      "price_raw": "USD 80",
+      "price_norm": 80.0,
+      "currency": "USD",
+      "stock": "in_stock",
+      "promo": false,
+      "confidence": "high",
+      "needs_review": false,
+      "planes": [
+        "content_outline",
+        "jsonld",
+        "og_meta"
+      ],
+      "product_name": "Women's Wool Lounger Mule",
+      "name_match": "match",
+      "price_plane": "jsonld",
+      "price_evidence": {
+        "plane": "jsonld",
+        "raw": "80",
+        "currency_raw": "USD",
+        "path": "Product.offers.price",
+        "value": 80.0,
+        "snippet": "{\"name\": \"Women's Wool Lounger Mule\", \"sku\": \"WOMENS_WOOL_LOUNGER_MULE\", \"price\": 80, \"from_price\": null, \"currency\": \"USD\", \"availability\": \"https://schema.org/InStock\"}",
+        "name_match": "match"
+      },
+      "price_candidates": [
+        {
+          "plane": "jsonld",
+          "raw": "80",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "value": 80.0,
+          "snippet": "{\"name\": \"Women's Wool Lounger Mule\", \"sku\": \"WOMENS_WOOL_LOUNGER_MULE\", \"price\": 80, \"from_price\": null, \"currency\": \"USD\", \"availability\": \"https://schema.org/InStock\"}"
+        },
+        {
+          "plane": "og_meta",
+          "raw": "80.00",
+          "currency": "USD",
+          "path": "og:price:amount",
+          "value": 80.0,
+          "snippet": "<meta property=\"og:price:amount\" content=\"80.00\">",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "$14",
+          "currency": "USD",
+          "path": "content_outline#0",
+          "value": 14.0,
+          "snippet": "… shipping! p25 | Women's Wool Lounger Mule | card | 31t | Final Few Easy On, Easy Off Previous Image Next Image Women's Wool Lounger Mule p17 | Added to Cart > You may also like | text_group | 1t | $14 p19 | Added to Cart > You may also like | text_group | 1t | $18 p21 | Added to Cart > You may also like | text_group | 1t | $14 p24 | Women's Wool Lounger Mule | text_group | 1t | $80 p52 | Women's …",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "$18",
+          "currency": "USD",
+          "path": "content_outline#1",
+          "value": 18.0,
+          "snippet": "…Few Easy On, Easy Off Previous Image Next Image Women's Wool Lounger Mule p17 | Added to Cart > You may also like | text_group | 1t | $14 p19 | Added to Cart > You may also like | text_group | 1t | $18 p21 | Added to Cart > You may also like | text_group | 1t | $14 p24 | Women's Wool Lounger Mule | text_group | 1t | $80 p52 | Women's Wool Lounger Mule > You May Also Like | paragraph | 1t | $115 p5…",
+          "reason": "lower_priority_plane"
+        }
+      ],
+      "price_status": "verified",
+      "stock_status": "verified",
+      "capture": {
+        "captured_at": "2026-10-18T09:31:47.846609+00:00",
+        "html_sha256": "a617d82696d1af40a269689b696da5a1ecf3708afdb424f6529a1a7495aa9b29",
+        "screenshot": "reports/price_watch/evidence/2026-10-18/allbirds_womens-wool-lounger-mule-stony-cream.png",
+        "final_url": "https://www.allbirds.com/products/womens-wool-lounger-mule-stony-cream",
+        "http_status": 200,
+        "page_class": "Closed Shadow",
+        "html_chars": 156622,
+        "screenshot_bytes": 237907,
+        "screenshot_full_page": false
+      },
+      "requested_url": "https://www.allbirds.com/products/womens-wool-lounger-mule-stony-cream",
+      "http_status": 200,
+      "variant": "WOMENS_WOOL_LOUNGER_MULE",
+      "product_name_source": "jsonld",
+      "name_match_score": 1.0,
+      "name_match_detail": {
+        "score": 1.0,
+        "matched": [
+          "women",
+          "wool",
+          "lounger",
+          "mule"
+        ],
+        "missing": [],
+        "single_token": false
+      },
+      "stock_evidence": {
+        "state": "in_stock",
+        "source": "jsonld",
+        "hits": [
+          "Add to Cart",
+          "Out of stock",
+          "available"
+        ]
+      },
+      "evidence": {
+        "price": {
+          "plane": "jsonld",
+          "raw": "80",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "name_match": "match",
+          "status": "verified"
+        },
+        "capture": {
+          "captured_at": "2026-10-18T09:31:47.846609+00:00",
+          "html_sha256": "a617d82696d1af40a269689b696da5a1ecf3708afdb424f6529a1a7495aa9b29",
+          "screenshot": "reports/price_watch/evidence/2026-10-18/allbirds_womens-wool-lounger-mule-stony-cream.png",
+          "final_url": "https://www.allbirds.com/products/womens-wool-lounger-mule-stony-cream",
+          "http_status": 200,
+          "page_class": "Closed Shadow",
+          "html_chars": 156622,
+          "screenshot_bytes": 237907,
+          "screenshot_full_page": false
+        }
+      }
+    },
+    {
+      "id": "brooklinen_essential-sheet-set",
+      "kind": "shopify_pdp",
+      "url": "https://www.brooklinen.com/products/essential-sheet-set",
+      "identity": "https://www.brooklinen.com/products/essential-sheet-set",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Closed Shadow",
+      "title": "Essential Sheet Set | Long-Staple Cotton | Brooklinen",
+      "price_raw": "USD 149.00",
+      "price_norm": 149.0,
+      "currency": "USD",
+      "stock": "in_stock",
+      "promo": false,
+      "confidence": "high",
+      "needs_review": false,
+      "planes": [
+        "content_outline",
+        "jsonld"
+      ],
+      "product_name": "Essential Sheet Set",
+      "name_match": "match",
+      "price_plane": "jsonld",
+      "price_evidence": {
+        "plane": "jsonld",
+        "raw": "149.00",
+        "currency_raw": "USD",
+        "path": "Product.offers.price",
+        "value": 149.0,
+        "snippet": "{\"name\": \"Essential Sheet Set\", \"sku\": \"COR-CSS-Q1\", \"price\": \"149.00\", \"from_price\": null, \"currency\": \"USD\", \"availability\": \"https://schema.org/InStock\"}",
+        "name_match": "match"
+      },
+      "price_candidates": [
+        {
+          "plane": "jsonld",
+          "raw": "149.00",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "value": 149.0,
+          "snippet": "{\"name\": \"Essential Sheet Set\", \"sku\": \"COR-CSS-Q1\", \"price\": \"149.00\", \"from_price\": null, \"currency\": \"USD\", \"availability\": \"https://schema.org/InStock\"}"
+        },
+        {
+          "plane": "regex",
+          "raw": "$149",
+          "currency": "USD",
+          "path": "content_outline#0",
+          "value": 149.0,
+          "snippet": "… on orders $100+* p150 | Your Cart | card | 7t | Free shipping on orders $100+* p290 | Essential Sheet Set | card | 7t | Free shipping on orders $100+* p281 | Essential Sheet Set | paragraph | 1t | $149 p288 | Essential Sheet Set | paragraph | 1t | $149 p280 | h1 | Essential Sheet Set | 4t p297 | h2 | Essential Sheet Set > Why You'll Love It | 4t p305 | h2 | Essential Sheet Set > Details | 1t p314…",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "$149",
+          "currency": "USD",
+          "path": "html_regex#0",
+          "value": 149.0,
+          "snippet": "…<svg><path></path><path></path><path></path></svg></span></div></button><div><span>1 / 4</span></div></div><div><div></div></div></div><div><div><h1>Essential Sheet Set</h1><div><div><p><span><span>$149</span></span></p><div></div></div><div><p>Excluded from promotions.</p></div></div></div><p><span>Includes 1 Fitted Sheet, 1 Flat Sheet, and 2 Pillowcases</span></p><figure><figcaption><div><span>C…",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "$9.95",
+          "currency": "USD",
+          "path": "html_regex#1",
+          "value": 9.95,
+          "snippet": "…> </button> </h2> </dt> <dd> <div> <p></p><p>If you're unhappy with your purchase, we'll find a solution for you. Most of our products can be returned within 365 days. All returns are subject to a $9.95 return fee deducted from your refund amount. Returns will be refunded to the original payment method or as a store credit. We do our best to make you comfortable, because let's face it, you're the …",
+          "reason": "lower_priority_plane"
+        }
+      ],
+      "price_status": "verified",
+      "stock_status": "verified",
+      "capture": {
+        "captured_at": "2026-10-18T09:32:04.775191+00:00",
+        "html_sha256": "0b95439e565a514a22edc06c9d3561c639de6d6ef1f344418e67ab61a0fe2057",
+        "screenshot": "reports/price_watch/evidence/2026-10-18/brooklinen_essential-sheet-set.png",
+        "final_url": "https://www.brooklinen.com/products/essential-sheet-set",
+        "http_status": 200,
+        "page_class": "Closed Shadow",
+        "html_chars": 124675,
+        "screenshot_bytes": 142939,
+        "screenshot_full_page": false
+      },
+      "requested_url": "https://www.brooklinen.com/products/essential-sheet-set",
+      "http_status": 200,
+      "variant": "COR-CSS-Q1",
+      "product_name_source": "jsonld",
+      "name_match_score": 1.0,
+      "name_match_detail": {
+        "score": 1.0,
+        "matched": [
+          "essential",
+          "sheet",
+          "set"
+        ],
+        "missing": [],
+        "single_token": false
+      },
+      "stock_evidence": {
+        "state": "in_stock",
+        "source": "jsonld",
+        "hits": [
+          "Add to Cart",
+          "available"
+        ]
+      },
+      "evidence": {
+        "price": {
+          "plane": "jsonld",
+          "raw": "149.00",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "name_match": "match",
+          "status": "verified"
+        },
+        "capture": {
+          "captured_at": "2026-10-18T09:32:04.775191+00:00",
+          "html_sha256": "0b95439e565a514a22edc06c9d3561c639de6d6ef1f344418e67ab61a0fe2057",
+          "screenshot": "reports/price_watch/evidence/2026-10-18/brooklinen_essential-sheet-set.png",
+          "final_url": "https://www.brooklinen.com/products/essential-sheet-set",
+          "http_status": 200,
+          "page_class": "Closed Shadow",
+          "html_chars": 124675,
+          "screenshot_bytes": 142939,
+          "screenshot_full_page": false
+        }
+      }
+    },
+    {
+      "id": "brooklinen_super-plush-4-piece-bath-towel-set",
+      "kind": "shopify_pdp",
+      "url": "https://www.brooklinen.com/products/super-plush-4-piece-bath-towel-set",
+      "identity": "https://www.brooklinen.com/products/super-plush-4-piece-bath-towel-set",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Shadow DOM",
+      "title": "Classic Cotton Sheet Set | Brooklinen",
+      "price_raw": "USD 168.00",
+      "price_norm": 168.0,
+      "currency": "USD",
+      "stock": "in_stock",
+      "promo": false,
+      "confidence": "high",
+      "needs_review": false,
+      "planes": [
+        "content_outline",
+        "jsonld"
+      ],
+      "product_name": "Super-Plush 4-Piece Bath Towel Set",
+      "name_match": "match",
+      "price_plane": "jsonld",
+      "price_evidence": {
+        "plane": "jsonld",
+        "raw": "168.00",
+        "currency_raw": "USD",
+        "path": "Product.offers.price",
+        "value": 168.0,
+        "snippet": "{\"name\": \"Super-Plush 4-Piece Bath Towel Set\", \"sku\": \"BTHT-1SP\", \"price\": \"168.00\", \"from_price\": null, \"currency\": \"USD\", \"availability\": \"https://schema.org/InStock\"}",
+        "name_match": "match"
+      },
+      "price_candidates": [
+        {
+          "plane": "jsonld",
+          "raw": "168.00",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "value": 168.0,
+          "snippet": "{\"name\": \"Super-Plush 4-Piece Bath Towel Set\", \"sku\": \"BTHT-1SP\", \"price\": \"168.00\", \"from_price\": null, \"currency\": \"USD\", \"availability\": \"https://schema.org/InStock\"}"
+        }
+      ],
+      "price_status": "verified",
+      "stock_status": "verified",
+      "capture": {
+        "captured_at": "2026-10-18T09:32:21.335172+00:00",
+        "html_sha256": "516705e7bfa661f9266a8b5ef7e16597ba2e54c7a24c61fc73a6cfeb20f6b1fb",
+        "screenshot": "reports/price_watch/evidence/2026-10-18/brooklinen_super-plush-4-piece-bath-towel-set.png",
+        "final_url": "https://www.brooklinen.com/products/super-plush-4-piece-bath-towel-set",
+        "http_status": 200,
+        "page_class": "Shadow DOM",
+        "html_chars": 95664,
+        "screenshot_bytes": 5865,
+        "screenshot_full_page": false
+      },
+      "requested_url": "https://www.brooklinen.com/products/super-plush-4-piece-bath-towel-set",
+      "http_status": 200,
+      "variant": "BTHT-1SP",
+      "product_name_source": "jsonld",
+      "name_match_score": 1.0,
+      "name_match_detail": {
+        "score": 1.0,
+        "matched": [
+          "super",
+          "plush",
+          "piece",
+          "bath",
+          "towel",
+          "set"
+        ],
+        "missing": [],
+        "single_token": false
+      },
+      "stock_evidence": {
+        "state": "in_stock",
+        "source": "jsonld",
+        "hits": []
+      },
+      "evidence": {
+        "price": {
+          "plane": "jsonld",
+          "raw": "168.00",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "name_match": "match",
+          "status": "verified"
+        },
+        "capture": {
+          "captured_at": "2026-10-18T09:32:21.335172+00:00",
+          "html_sha256": "516705e7bfa661f9266a8b5ef7e16597ba2e54c7a24c61fc73a6cfeb20f6b1fb",
+          "screenshot": "reports/price_watch/evidence/2026-10-18/brooklinen_super-plush-4-piece-bath-towel-set.png",
+          "final_url": "https://www.brooklinen.com/products/super-plush-4-piece-bath-towel-set",
+          "http_status": 200,
+          "page_class": "Shadow DOM",
+          "html_chars": 95664,
+          "screenshot_bytes": 5865,
+          "screenshot_full_page": false
+        }
+      }
+    },
+    {
+      "id": "brooklinen_down-alternative-pillow-insert",
+      "kind": "shopify_pdp",
+      "url": "https://www.brooklinen.com/products/down-alternative-pillow-insert?variant=43933103226970",
+      "identity": "https://www.brooklinen.com/products/down-alternative-pillow-insert",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Closed Shadow",
+      "title": "Down Alternative Pillow Insert | Lumbar + Square Pillow | Brooklinen",
+      "price_raw": "USD 31.20",
+      "price_norm": 31.2,
+      "currency": "USD",
+      "stock": "in_stock",
+      "promo": false,
+      "confidence": "high",
+      "needs_review": false,
+      "planes": [
+        "content_outline",
+        "jsonld"
+      ],
+      "product_name": "Down Alternative Pillow Insert",
+      "name_match": "match",
+      "price_plane": "jsonld",
+      "price_evidence": {
+        "plane": "jsonld",
+        "raw": "31.20",
+        "currency_raw": "USD",
+        "path": "Product.offers.price",
+        "value": 31.2,
+        "snippet": "{\"name\": \"Down Alternative Pillow Insert\", \"sku\": \"PLWDA-20\", \"price\": \"31.20\", \"from_price\": null, \"currency\": \"USD\", \"availability\": \"https://schema.org/InStock\"}",
+        "name_match": "match"
+      },
+      "price_candidates": [
+        {
+          "plane": "jsonld",
+          "raw": "31.20",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "value": 31.2,
+          "snippet": "{\"name\": \"Down Alternative Pillow Insert\", \"sku\": \"PLWDA-20\", \"price\": \"31.20\", \"from_price\": null, \"currency\": \"USD\", \"availability\": \"https://schema.org/InStock\"}"
+        },
+        {
+          "plane": "regex",
+          "raw": "$39",
+          "currency": "USD",
+          "path": "content_outline#0",
+          "value": 39.0,
+          "snippet": "… | Your Cart | card | 7t | Free shipping on orders $100+* p287 | Down Alternative Pillow Insert | card | 7t | Free shipping on orders $100+* p280 | Down Alternative Pillow Insert | paragraph | 2t | $39 $31.20 p285 | Down Alternative Pillow Insert | paragraph | 2t | $39 $31.20 p295 | Down Alternative Pillow Insert | paragraph | 2t | $39 $31.20 p297 | Down Alternative Pillow Insert | paragraph | 2t …",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "$31.20",
+          "currency": "USD",
+          "path": "content_outline#1",
+          "value": 31.2,
+          "snippet": "…ur Cart | card | 7t | Free shipping on orders $100+* p287 | Down Alternative Pillow Insert | card | 7t | Free shipping on orders $100+* p280 | Down Alternative Pillow Insert | paragraph | 2t | $39 $31.20 p285 | Down Alternative Pillow Insert | paragraph | 2t | $39 $31.20 p295 | Down Alternative Pillow Insert | paragraph | 2t | $39 $31.20 p297 | Down Alternative Pillow Insert | paragraph | 2t | $39…",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "$39",
+          "currency": "USD",
+          "path": "html_regex#0",
+          "value": 39.0,
+          "snippet": "…</path><path></path><path></path></svg></span></div></button><div><span>1 / 4</span></div></div><div><div></div></div></div><div><div><h1>Down Alternative Pillow Insert</h1><div><div><p><span><span>$39</span><span>$31.20</span></span></p><div><span><span>20% off</span></span></div></div><div></div></div></div><figure><figcaption><div><span>Size</span><span>Square</span></div><button data-sw-bind=\"…",
+          "reason": "lower_priority_plane"
+        }
+      ],
+      "price_status": "verified",
+      "stock_status": "verified",
+      "capture": {
+        "captured_at": "2026-10-18T09:32:37.624662+00:00",
+        "html_sha256": "d452c547bd8400816c96678b354d21f77cea9ba8cbec3c4dfe87c8b38b499587",
+        "screenshot": "reports/price_watch/evidence/2026-10-18/brooklinen_down-alternative-pillow-insert.png",
+        "final_url": "https://www.brooklinen.com/products/down-alternative-pillow-insert?variant=43933103226970",
+        "http_status": 200,
+        "page_class": "Closed Shadow",
+        "html_chars": 116877,
+        "screenshot_bytes": 163635,
+        "screenshot_full_page": false
+      },
+      "requested_url": "https://www.brooklinen.com/products/down-alternative-pillow-insert",
+      "http_status": 200,
+      "variant": "43933103226970",
+      "product_name_source": "jsonld",
+      "name_match_score": 1.0,
+      "name_match_detail": {
+        "score": 1.0,
+        "matched": [
+          "down",
+          "alternative",
+          "pillow",
+          "insert"
+        ],
+        "missing": [],
+        "single_token": false
+      },
+      "stock_evidence": {
+        "state": "in_stock",
+        "source": "jsonld",
+        "hits": [
+          "Add to Cart",
+          "available"
+        ]
+      },
+      "evidence": {
+        "price": {
+          "plane": "jsonld",
+          "raw": "31.20",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "name_match": "match",
+          "status": "verified"
+        },
+        "capture": {
+          "captured_at": "2026-10-18T09:32:37.624662+00:00",
+          "html_sha256": "d452c547bd8400816c96678b354d21f77cea9ba8cbec3c4dfe87c8b38b499587",
+          "screenshot": "reports/price_watch/evidence/2026-10-18/brooklinen_down-alternative-pillow-insert.png",
+          "final_url": "https://www.brooklinen.com/products/down-alternative-pillow-insert?variant=43933103226970",
+          "http_status": 200,
+          "page_class": "Closed Shadow",
+          "html_chars": 116877,
+          "screenshot_bytes": 163635,
+          "screenshot_full_page": false
+        }
+      }
+    },
+    {
+      "id": "brooklinen_super-fluff-throw-blanket",
+      "kind": "shopify_pdp",
+      "url": "https://www.brooklinen.com/products/super-fluff-throw-blanket?variant=44105230221402",
+      "identity": "https://www.brooklinen.com/products/super-fluff-throw-blanket",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Closed Shadow",
+      "title": "Super Fluff Throw Blanket | Ultra-Plush | Brooklinen",
+      "price_raw": "USD 103.20",
+      "price_norm": 103.2,
+      "currency": "USD",
+      "stock": "in_stock",
+      "promo": false,
+      "confidence": "high",
+      "needs_review": false,
+      "planes": [
+        "content_outline",
+        "jsonld"
+      ],
+      "product_name": "Super Fluff Throw Blanket",
+      "name_match": "match",
+      "price_plane": "jsonld",
+      "price_evidence": {
+        "plane": "jsonld",
+        "raw": "103.20",
+        "currency_raw": "USD",
+        "path": "Product.offers.price",
+        "value": 103.2,
+        "snippet": "{\"name\": \"Super Fluff Throw Blanket\", \"sku\": \"THRW-37SF\", \"price\": \"103.20\", \"from_price\": null, \"currency\": \"USD\", \"availability\": \"https://schema.org/InStock\"}",
+        "name_match": "match"
+      },
+      "price_candidates": [
+        {
+          "plane": "jsonld",
+          "raw": "103.20",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "value": 103.2,
+          "snippet": "{\"name\": \"Super Fluff Throw Blanket\", \"sku\": \"THRW-37SF\", \"price\": \"103.20\", \"from_price\": null, \"currency\": \"USD\", \"availability\": \"https://schema.org/InStock\"}"
+        },
+        {
+          "plane": "regex",
+          "raw": "$129",
+          "currency": "USD",
+          "path": "content_outline#0",
+          "value": 129.0,
+          "snippet": "…100+* p149 | Your Cart | card | 7t | Free shipping on orders $100+* p288 | Super Fluff Throw Blanket | card | 7t | Free shipping on orders $100+* p279 | Super Fluff Throw Blanket | paragraph | 3t | $129 $103.20 p286 | Super Fluff Throw Blanket | paragraph | 3t | $129 $103.20 p298 | Super Fluff Throw Blanket | paragraph | 2t | $89 $71.20 p300 | Super Fluff Throw Blanket | paragraph | 3t | $149 $119…",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "$103.20",
+          "currency": "USD",
+          "path": "content_outline#1",
+          "value": 103.2,
+          "snippet": "…149 | Your Cart | card | 7t | Free shipping on orders $100+* p288 | Super Fluff Throw Blanket | card | 7t | Free shipping on orders $100+* p279 | Super Fluff Throw Blanket | paragraph | 3t | $129 $103.20 p286 | Super Fluff Throw Blanket | paragraph | 3t | $129 $103.20 p298 | Super Fluff Throw Blanket | paragraph | 2t | $89 $71.20 p300 | Super Fluff Throw Blanket | paragraph | 3t | $149 $119.20 p30…",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "$89",
+          "currency": "USD",
+          "path": "content_outline#2",
+          "value": 89.0,
+          "snippet": "…n orders $100+* p279 | Super Fluff Throw Blanket | paragraph | 3t | $129 $103.20 p286 | Super Fluff Throw Blanket | paragraph | 3t | $129 $103.20 p298 | Super Fluff Throw Blanket | paragraph | 2t | $89 $71.20 p300 | Super Fluff Throw Blanket | paragraph | 3t | $149 $119.20 p302 | Super Fluff Throw Blanket | paragraph | 3t | $129 $103.20 p304 | Super Fluff Throw Blanket | paragraph | 3t | $169 $135…",
+          "reason": "lower_priority_plane"
+        }
+      ],
+      "price_status": "verified",
+      "stock_status": "verified",
+      "capture": {
+        "captured_at": "2026-10-18T09:32:57.802443+00:00",
+        "html_sha256": "91184583ae9ffb776a81fe781e1dc133c362e1585eab34b0fa847c997d9402ee",
+        "screenshot": "reports/price_watch/evidence/2026-10-18/brooklinen_super-fluff-throw-blanket.png",
+        "final_url": "https://www.brooklinen.com/products/super-fluff-throw-blanket?variant=44105230221402",
+        "http_status": 200,
+        "page_class": "Closed Shadow",
+        "html_chars": 122304,
+        "screenshot_bytes": 294432,
+        "screenshot_full_page": false
+      },
+      "requested_url": "https://www.brooklinen.com/products/super-fluff-throw-blanket",
+      "http_status": 200,
+      "variant": "44105230221402",
+      "product_name_source": "jsonld",
+      "name_match_score": 1.0,
+      "name_match_detail": {
+        "score": 1.0,
+        "matched": [
+          "super",
+          "fluff",
+          "throw",
+          "blanket"
+        ],
+        "missing": [],
+        "single_token": false
+      },
+      "stock_evidence": {
+        "state": "in_stock",
+        "source": "jsonld",
+        "hits": [
+          "Add to Cart",
+          "available"
+        ]
+      },
+      "evidence": {
+        "price": {
+          "plane": "jsonld",
+          "raw": "103.20",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "name_match": "match",
+          "status": "verified"
+        },
+        "capture": {
+          "captured_at": "2026-10-18T09:32:57.802443+00:00",
+          "html_sha256": "91184583ae9ffb776a81fe781e1dc133c362e1585eab34b0fa847c997d9402ee",
+          "screenshot": "reports/price_watch/evidence/2026-10-18/brooklinen_super-fluff-throw-blanket.png",
+          "final_url": "https://www.brooklinen.com/products/super-fluff-throw-blanket?variant=44105230221402",
+          "http_status": 200,
+          "page_class": "Closed Shadow",
+          "html_chars": 122304,
+          "screenshot_bytes": 294432,
+          "screenshot_full_page": false
+        }
+      }
+    },
+    {
+      "id": "publicgoods_natural-dish-soap",
+      "kind": "shopify_pdp",
+      "url": "https://www.publicgoods.com/products/natural-dish-soap",
+      "identity": "https://www.publicgoods.com/products/natural-dish-soap",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Closed Shadow",
+      "title": "Dish Soap – Public Goods",
+      "price_raw": "USD 9.95",
+      "price_norm": 9.95,
+      "currency": "USD",
+      "stock": "in_stock",
+      "promo": false,
+      "confidence": "high",
+      "needs_review": false,
+      "planes": [
+        "content_outline",
+        "jsonld",
+        "og_meta"
+      ],
+      "product_name": "Dish Soap",
+      "name_match": "match",
+      "price_plane": "jsonld",
+      "price_evidence": {
+        "plane": "jsonld",
+        "raw": "9.95",
+        "currency_raw": "USD",
+        "path": "Product.offers.price",
+        "value": 9.95,
+        "snippet": "{\"name\": \"Dish Soap\", \"sku\": null, \"price\": \"9.95\", \"from_price\": null, \"currency\": \"USD\", \"availability\": \"InStock\"}",
+        "name_match": "match"
+      },
+      "price_candidates": [
+        {
+          "plane": "jsonld",
+          "raw": "9.95",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "value": 9.95,
+          "snippet": "{\"name\": \"Dish Soap\", \"sku\": null, \"price\": \"9.95\", \"from_price\": null, \"currency\": \"USD\", \"availability\": \"InStock\"}"
+        },
+        {
+          "plane": "og_meta",
+          "raw": "9.95",
+          "currency": "USD",
+          "path": "og:price:amount",
+          "value": 9.95,
+          "snippet": "<meta property=\"og:price:amount\" content=\"9.95\">",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "$80",
+          "currency": "USD",
+          "path": "content_outline#0",
+          "value": 80.0,
+          "snippet": "p11 | root | card | 18t | 20% off everything, free shipping on all orders and a yearly $80 credit. p14 | root | card | 18t | 20% off everything, free shipping on all orders and a yearly $80 credit. p17 | root | card | 18t | 20% off everything, free shipping on all orders and a yearly $80 credit. p20 | root | card | 18t | 20% off everything, free shipping on all orders and a yearly $80 credit. p23 …",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "$45",
+          "currency": "USD",
+          "path": "content_outline#1",
+          "value": 45.0,
+          "snippet": "…g on all orders and a yearly $80 credit. p29 | root | card | 14t | 20% off everything, free shipping and a yearly $80 credit p31 | 0 products in cart | card | 15t | Free shipping is unlocked You're $45 away from free shipping p65 | 0 products in cart > No more products available for purchase | card | 13t | Shop as non-member $0.00 Shop as member & save $0.00 p72 | For just $65/year, your membershi…",
+          "reason": "lower_priority_plane"
+        }
+      ],
+      "price_status": "verified",
+      "stock_status": "verified",
+      "capture": {
+        "captured_at": "2026-10-18T09:33:15.110643+00:00",
+        "html_sha256": "7835f9cf345f4ad6174806ae85f43f046a0e76d85dbcd98022f3706e119da699",
+        "screenshot": "reports/price_watch/evidence/2026-10-18/publicgoods_natural-dish-soap.png",
+        "final_url": "https://www.publicgoods.com/products/natural-dish-soap",
+        "http_status": 200,
+        "page_class": "Closed Shadow",
+        "html_chars": 150758,
+        "screenshot_bytes": 119182,
+        "screenshot_full_page": false
+      },
+      "requested_url": "https://www.publicgoods.com/products/natural-dish-soap",
+      "http_status": 200,
+      "variant": null,
+      "product_name_source": "jsonld",
+      "name_match_score": 1.0,
+      "name_match_detail": {
+        "score": 1.0,
+        "matched": [
+          "dish",
+          "soap"
+        ],
+        "missing": [],
+        "single_token": false
+      },
+      "stock_evidence": {
+        "state": "in_stock",
+        "source": "jsonld",
+        "hits": [
+          "available",
+          "Add to Cart",
+          "Sold Out",
+          "Available"
+        ]
+      },
+      "evidence": {
+        "price": {
+          "plane": "jsonld",
+          "raw": "9.95",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "name_match": "match",
+          "status": "verified"
+        },
+        "capture": {
+          "captured_at": "2026-10-18T09:33:15.110643+00:00",
+          "html_sha256": "7835f9cf345f4ad6174806ae85f43f046a0e76d85dbcd98022f3706e119da699",
+          "screenshot": "reports/price_watch/evidence/2026-10-18/publicgoods_natural-dish-soap.png",
+          "final_url": "https://www.publicgoods.com/products/natural-dish-soap",
+          "http_status": 200,
+          "page_class": "Closed Shadow",
+          "html_chars": 150758,
+          "screenshot_bytes": 119182,
+          "screenshot_full_page": false
+        }
+      }
+    },
+    {
+      "id": "publicgoods_dental-floss",
+      "kind": "shopify_pdp",
+      "url": "https://www.publicgoods.com/products/dental-floss",
+      "identity": "https://www.publicgoods.com/products/dental-floss",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Closed Shadow",
+      "title": "Dental Floss – Public Goods",
+      "price_raw": "USD 9.95",
+      "price_norm": 9.95,
+      "currency": "USD",
+      "stock": "in_stock",
+      "promo": false,
+      "confidence": "high",
+      "needs_review": false,
+      "planes": [
+        "content_outline",
+        "jsonld",
+        "og_meta"
+      ],
+      "product_name": "Dental Floss",
+      "name_match": "match",
+      "price_plane": "jsonld",
+      "price_evidence": {
+        "plane": "jsonld",
+        "raw": "9.95",
+        "currency_raw": "USD",
+        "path": "Product.offers.price",
+        "value": 9.95,
+        "snippet": "{\"name\": \"Dental Floss\", \"sku\": null, \"price\": \"9.95\", \"from_price\": null, \"currency\": \"USD\", \"availability\": \"InStock\"}",
+        "name_match": "match"
+      },
+      "price_candidates": [
+        {
+          "plane": "jsonld",
+          "raw": "9.95",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "value": 9.95,
+          "snippet": "{\"name\": \"Dental Floss\", \"sku\": null, \"price\": \"9.95\", \"from_price\": null, \"currency\": \"USD\", \"availability\": \"InStock\"}"
+        },
+        {
+          "plane": "og_meta",
+          "raw": "9.95",
+          "currency": "USD",
+          "path": "og:price:amount",
+          "value": 9.95,
+          "snippet": "<meta property=\"og:price:amount\" content=\"9.95\">",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "$80",
+          "currency": "USD",
+          "path": "content_outline#0",
+          "value": 80.0,
+          "snippet": "p10 | root | card | 18t | 20% off everything, free shipping on all orders and a yearly $80 credit. p13 | root | card | 18t | 20% off everything, free shipping on all orders and a yearly $80 credit. p16 | root | card | 18t | 20% off everything, free shipping on all orders and a yearly $80 credit. p19 | root | card | 18t | 20% off everything, free shipping on all orders and a yearly $80 credit. p22 …",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "$45",
+          "currency": "USD",
+          "path": "content_outline#1",
+          "value": 45.0,
+          "snippet": "…g on all orders and a yearly $80 credit. p28 | root | card | 14t | 20% off everything, free shipping and a yearly $80 credit p30 | 0 products in cart | card | 15t | Free shipping is unlocked You're $45 away from free shipping p52 | 0 products in cart > No more products available for purchase | card | 13t | Shop as non-member $0.00 Shop as member & save $0.00 p59 | For just $65/year, your membershi…",
+          "reason": "lower_priority_plane"
+        }
+      ],
+      "price_status": "verified",
+      "stock_status": "verified",
+      "capture": {
+        "captured_at": "2026-10-18T09:33:29.893522+00:00",
+        "html_sha256": "e0afef49f20202709fc06c61b588329f3882c5f910af832a096e2e87d77b1a7e",
+        "screenshot": "reports/price_watch/evidence/2026-10-18/publicgoods_dental-floss.png",
+        "final_url": "https://www.publicgoods.com/products/dental-floss",
+        "http_status": 200,
+        "page_class": "Closed Shadow",
+        "html_chars": 132309,
+        "screenshot_bytes": 172422,
+        "screenshot_full_page": false
+      },
+      "requested_url": "https://www.publicgoods.com/products/dental-floss",
+      "http_status": 200,
+      "variant": null,
+      "product_name_source": "jsonld",
+      "name_match_score": 1.0,
+      "name_match_detail": {
+        "score": 1.0,
+        "matched": [
+          "dental",
+          "floss"
+        ],
+        "missing": [],
+        "single_token": false
+      },
+      "stock_evidence": {
+        "state": "in_stock",
+        "source": "jsonld",
+        "hits": [
+          "available",
+          "Add to Cart",
+          "Sold Out",
+          "Available"
+        ]
+      },
+      "evidence": {
+        "price": {
+          "plane": "jsonld",
+          "raw": "9.95",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "name_match": "match",
+          "status": "verified"
+        },
+        "capture": {
+          "captured_at": "2026-10-18T09:33:29.893522+00:00",
+          "html_sha256": "e0afef49f20202709fc06c61b588329f3882c5f910af832a096e2e87d77b1a7e",
+          "screenshot": "reports/price_watch/evidence/2026-10-18/publicgoods_dental-floss.png",
+          "final_url": "https://www.publicgoods.com/products/dental-floss",
+          "http_status": 200,
+          "page_class": "Closed Shadow",
+          "html_chars": 132309,
+          "screenshot_bytes": 172422,
+          "screenshot_full_page": false
+        }
+      }
+    },
+    {
+      "id": "publicgoods_bottle-opener",
+      "kind": "shopify_pdp",
+      "url": "https://www.publicgoods.com/products/bottle-opener",
+      "identity": "https://www.publicgoods.com/products/bottle-opener",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Closed Shadow",
+      "title": "Bottle Opener – Public Goods",
+      "price_raw": "USD 12.95",
+      "price_norm": 12.95,
+      "currency": "USD",
+      "stock": "in_stock",
+      "promo": false,
+      "confidence": "high",
+      "needs_review": false,
+      "planes": [
+        "content_outline",
+        "jsonld",
+        "og_meta"
+      ],
+      "product_name": "Bottle Opener",
+      "name_match": "match",
+      "price_plane": "jsonld",
+      "price_evidence": {
+        "plane": "jsonld",
+        "raw": "12.95",
+        "currency_raw": "USD",
+        "path": "Product.offers.price",
+        "value": 12.95,
+        "snippet": "{\"name\": \"Bottle Opener\", \"sku\": null, \"price\": \"12.95\", \"from_price\": null, \"currency\": \"USD\", \"availability\": \"InStock\"}",
+        "name_match": "match"
+      },
+      "price_candidates": [
+        {
+          "plane": "jsonld",
+          "raw": "12.95",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "value": 12.95,
+          "snippet": "{\"name\": \"Bottle Opener\", \"sku\": null, \"price\": \"12.95\", \"from_price\": null, \"currency\": \"USD\", \"availability\": \"InStock\"}"
+        },
+        {
+          "plane": "og_meta",
+          "raw": "12.95",
+          "currency": "USD",
+          "path": "og:price:amount",
+          "value": 12.95,
+          "snippet": "<meta property=\"og:price:amount\" content=\"12.95\">",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "$80",
+          "currency": "USD",
+          "path": "content_outline#0",
+          "value": 80.0,
+          "snippet": "p10 | root | card | 18t | 20% off everything, free shipping on all orders and a yearly $80 credit. p13 | root | card | 18t | 20% off everything, free shipping on all orders and a yearly $80 credit. p16 | root | card | 18t | 20% off everything, free shipping on all orders and a yearly $80 credit. p19 | root | card | 18t | 20% off everything, free shipping on all orders and a yearly $80 credit. p22 …",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "$45",
+          "currency": "USD",
+          "path": "content_outline#1",
+          "value": 45.0,
+          "snippet": "…g on all orders and a yearly $80 credit. p28 | root | card | 14t | 20% off everything, free shipping and a yearly $80 credit p30 | 0 products in cart | card | 15t | Free shipping is unlocked You're $45 away from free shipping p52 | 0 products in cart > No more products available for purchase | card | 13t | Shop as non-member $0.00 Shop as member & save $0.00 p59 | For just $65/year, your membershi…",
+          "reason": "lower_priority_plane"
+        }
+      ],
+      "price_status": "verified",
+      "stock_status": "verified",
+      "capture": {
+        "captured_at": "2026-10-18T09:33:40.793740+00:00",
+        "html_sha256": "ea6f6bad9c9179652ff337570eec2c9b8c810b4d55c6acca2fd8fd60f22f42d0",
+        "screenshot": "reports/price_watch/evidence/2026-10-18/publicgoods_bottle-opener.png",
+        "final_url": "https://www.publicgoods.com/products/bottle-opener",
+        "http_status": 200,
+        "page_class": "Closed Shadow",
+        "html_chars": 130517,
+        "screenshot_bytes": 119050,
+        "screenshot_full_page": false
+      },
+      "requested_url": "https://www.publicgoods.com/products/bottle-opener",
+      "http_status": 200,
+      "variant": null,
+      "product_name_source": "jsonld",
+      "name_match_score": 1.0,
+      "name_match_detail": {
+        "score": 1.0,
+        "matched": [
+          "bottle",
+          "opener"
+        ],
+        "missing": [],
+        "single_token": false
+      },
+      "stock_evidence": {
+        "state": "in_stock",
+        "source": "jsonld",
+        "hits": [
+          "available",
+          "Add to Cart",
+          "Sold Out",
+          "Available"
+        ]
+      },
+      "evidence": {
+        "price": {
+          "plane": "jsonld",
+          "raw": "12.95",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "name_match": "match",
+          "status": "verified"
+        },
+        "capture": {
+          "captured_at": "2026-10-18T09:33:40.793740+00:00",
+          "html_sha256": "ea6f6bad9c9179652ff337570eec2c9b8c810b4d55c6acca2fd8fd60f22f42d0",
+          "screenshot": "reports/price_watch/evidence/2026-10-18/publicgoods_bottle-opener.png",
+          "final_url": "https://www.publicgoods.com/products/bottle-opener",
+          "http_status": 200,
+          "page_class": "Closed Shadow",
+          "html_chars": 130517,
+          "screenshot_bytes": 119050,
+          "screenshot_full_page": false
+        }
+      }
+    },
+    {
+      "id": "glossier_balm-dotcom",
+      "kind": "shopify_pdp",
+      "url": "https://www.glossier.com/en-lv/products/balm-dotcom",
+      "identity": "https://www.glossier.com/en-lv/products/balm-dotcom",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Closed Shadow",
+      "title": "Balm Dotcom – Glossier",
+      "price_raw": "EUR 20",
+      "price_norm": 20.0,
+      "currency": "EUR",
+      "stock": "in_stock",
+      "promo": false,
+      "confidence": "high",
+      "needs_review": false,
+      "planes": [
+        "content_outline",
+        "jsonld",
+        "og_meta"
+      ],
+      "product_name": "Balm Dotcom",
+      "name_match": "match",
+      "price_plane": "jsonld",
+      "price_evidence": {
+        "plane": "jsonld",
+        "raw": "20",
+        "currency_raw": "EUR",
+        "path": "Product.offers.price",
+        "value": 20.0,
+        "snippet": "{\"name\": \"Balm Dotcom\", \"sku\": null, \"price\": \"20\", \"from_price\": null, \"currency\": \"EUR\", \"availability\": \"InStock\"}",
+        "name_match": "match"
+      },
+      "price_candidates": [
+        {
+          "plane": "jsonld",
+          "raw": "20",
+          "currency": "EUR",
+          "path": "Product.offers.price",
+          "value": 20.0,
+          "snippet": "{\"name\": \"Balm Dotcom\", \"sku\": null, \"price\": \"20\", \"from_price\": null, \"currency\": \"EUR\", \"availability\": \"InStock\"}"
+        },
+        {
+          "plane": "og_meta",
+          "raw": "20,95",
+          "currency": "USD",
+          "path": "product:price:amount",
+          "value": 20.95,
+          "snippet": "<meta property=\"product:price:amount\" content=\"20,95\">",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "$75",
+          "currency": "USD",
+          "path": "content_outline#0",
+          "value": 75.0,
+          "snippet": "p8 | root | card | 12t | Free Futuredew Solid on us with your $75+ order. p9 | root | card | 12t | Free Futuredew Solid on us with your $100+ order. p10 | root | card | 12t | Free Futuredew Solid on us with your €95+ order. p12 | root | card | 9t | Free standard shipping on orders $40+ p13 | root | card | 33t | Free standard shipping on orders $60 CAD+. For more information on shipping rate p14 | …",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "€95",
+          "currency": "EUR",
+          "path": "content_outline#1",
+          "value": 95.0,
+          "snippet": "…rd | 12t | Free Futuredew Solid on us with your $75+ order. p9 | root | card | 12t | Free Futuredew Solid on us with your $100+ order. p10 | root | card | 12t | Free Futuredew Solid on us with your €95+ order. p12 | root | card | 9t | Free standard shipping on orders $40+ p13 | root | card | 33t | Free standard shipping on orders $60 CAD+. For more information on shipping rate p14 | root | card | …",
+          "reason": "lower_priority_plane"
+        }
+      ],
+      "price_status": "verified",
+      "stock_status": "verified",
+      "capture": {
+        "captured_at": "2026-10-18T09:34:14.612669+00:00",
+        "html_sha256": "e893466019554390c79b7c2ae91a05160decd1aeb39afa2e8a0eab08e6f1a285",
+        "screenshot": "reports/price_watch/evidence/2026-10-18/glossier_balm-dotcom.png",
+        "final_url": "https://www.glossier.com/en-lv/products/balm-dotcom",
+        "http_status": 200,
+        "page_class": "Closed Shadow",
+        "html_chars": 330600,
+        "screenshot_bytes": 506281,
+        "screenshot_full_page": false
+      },
+      "requested_url": "https://www.glossier.com/products/balm-dotcom",
+      "http_status": 200,
+      "variant": null,
+      "product_name_source": "jsonld",
+      "name_match_score": 1.0,
+      "name_match_detail": {
+        "score": 1.0,
+        "matched": [
+          "balm",
+          "dotcom"
+        ],
+        "missing": [],
+        "single_token": false
+      },
+      "stock_evidence": {
+        "state": "in_stock",
+        "source": "jsonld",
+        "hits": [
+          "Add to bag"
+        ]
+      },
+      "evidence": {
+        "price": {
+          "plane": "jsonld",
+          "raw": "20",
+          "currency": "EUR",
+          "path": "Product.offers.price",
+          "name_match": "match",
+          "status": "verified"
+        },
+        "capture": {
+          "captured_at": "2026-10-18T09:34:14.612669+00:00",
+          "html_sha256": "e893466019554390c79b7c2ae91a05160decd1aeb39afa2e8a0eab08e6f1a285",
+          "screenshot": "reports/price_watch/evidence/2026-10-18/glossier_balm-dotcom.png",
+          "final_url": "https://www.glossier.com/en-lv/products/balm-dotcom",
+          "http_status": 200,
+          "page_class": "Closed Shadow",
+          "html_chars": 330600,
+          "screenshot_bytes": 506281,
+          "screenshot_full_page": false
+        }
+      }
+    },
+    {
+      "id": "glossier_lip-gloss",
+      "kind": "shopify_pdp",
+      "url": "https://www.glossier.com/en-lv/products/lip-gloss",
+      "identity": "https://www.glossier.com/en-lv/products/lip-gloss",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Closed Shadow",
+      "title": "Lip Gloss – Glossier",
+      "price_raw": "EUR 23",
+      "price_norm": 23.0,
+      "currency": "EUR",
+      "stock": "in_stock",
+      "promo": false,
+      "confidence": "high",
+      "needs_review": false,
+      "planes": [
+        "content_outline",
+        "jsonld",
+        "og_meta"
+      ],
+      "product_name": "Lip Gloss",
+      "name_match": "match",
+      "price_plane": "jsonld",
+      "price_evidence": {
+        "plane": "jsonld",
+        "raw": "23",
+        "currency_raw": "EUR",
+        "path": "Product.offers.price",
+        "value": 23.0,
+        "snippet": "{\"name\": \"Lip Gloss\", \"sku\": null, \"price\": \"23\", \"from_price\": null, \"currency\": \"EUR\", \"availability\": \"InStock\"}",
+        "name_match": "match"
+      },
+      "price_candidates": [
+        {
+          "plane": "jsonld",
+          "raw": "23",
+          "currency": "EUR",
+          "path": "Product.offers.price",
+          "value": 23.0,
+          "snippet": "{\"name\": \"Lip Gloss\", \"sku\": null, \"price\": \"23\", \"from_price\": null, \"currency\": \"EUR\", \"availability\": \"InStock\"}"
+        },
+        {
+          "plane": "og_meta",
+          "raw": "23,95",
+          "currency": "USD",
+          "path": "product:price:amount",
+          "value": 23.95,
+          "snippet": "<meta property=\"product:price:amount\" content=\"23,95\">",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "$75",
+          "currency": "USD",
+          "path": "content_outline#0",
+          "value": 75.0,
+          "snippet": "p4 | root | card | 12t | Free Futuredew Solid on us with your $75+ order. p5 | root | card | 12t | Free Futuredew Solid on us with your $100+ order. p6 | root | card | 12t | Free Futuredew Solid on us with your €95+ order. p8 | root | card | 9t | Free standard shipping on orders $40+ p9 | root | card | 33t | Free standard shipping on orders $60 CAD+. For more information on shipping rate p10 | roo…",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "€95",
+          "currency": "EUR",
+          "path": "content_outline#1",
+          "value": 95.0,
+          "snippet": "…ard | 12t | Free Futuredew Solid on us with your $75+ order. p5 | root | card | 12t | Free Futuredew Solid on us with your $100+ order. p6 | root | card | 12t | Free Futuredew Solid on us with your €95+ order. p8 | root | card | 9t | Free standard shipping on orders $40+ p9 | root | card | 33t | Free standard shipping on orders $60 CAD+. For more information on shipping rate p10 | root | card | 29…",
+          "reason": "lower_priority_plane"
+        }
+      ],
+      "price_status": "verified",
+      "stock_status": "verified",
+      "capture": {
+        "captured_at": "2026-10-18T09:34:37.586821+00:00",
+        "html_sha256": "1bdb334b033a5866f6453e343b01537cdee8a4b98a5b4b7e2299dac7f8b3a926",
+        "screenshot": "reports/price_watch/evidence/2026-10-18/glossier_lip-gloss.png",
+        "final_url": "https://www.glossier.com/en-lv/products/lip-gloss",
+        "http_status": 200,
+        "page_class": "Closed Shadow",
+        "html_chars": 203490,
+        "screenshot_bytes": 672518,
+        "screenshot_full_page": false
+      },
+      "requested_url": "https://www.glossier.com/products/lip-gloss",
+      "http_status": 200,
+      "variant": null,
+      "product_name_source": "jsonld",
+      "name_match_score": 1.0,
+      "name_match_detail": {
+        "score": 1.0,
+        "matched": [
+          "lip",
+          "gloss"
+        ],
+        "missing": [],
+        "single_token": false
+      },
+      "stock_evidence": {
+        "state": "in_stock",
+        "source": "jsonld",
+        "hits": [
+          "Add to bag",
+          "Out of stock"
+        ]
+      },
+      "evidence": {
+        "price": {
+          "plane": "jsonld",
+          "raw": "23",
+          "currency": "EUR",
+          "path": "Product.offers.price",
+          "name_match": "match",
+          "status": "verified"
+        },
+        "capture": {
+          "captured_at": "2026-10-18T09:34:37.586821+00:00",
+          "html_sha256": "1bdb334b033a5866f6453e343b01537cdee8a4b98a5b4b7e2299dac7f8b3a926",
+          "screenshot": "reports/price_watch/evidence/2026-10-18/glossier_lip-gloss.png",
+          "final_url": "https://www.glossier.com/en-lv/products/lip-gloss",
+          "http_status": 200,
+          "page_class": "Closed Shadow",
+          "html_chars": 203490,
+          "screenshot_bytes": 672518,
+          "screenshot_full_page": false
+        }
+      }
+    },
+    {
+      "id": "glossier_hand-cream",
+      "kind": "shopify_pdp",
+      "url": "https://www.glossier.com/en-lv/products/hand-cream",
+      "identity": "https://www.glossier.com/en-lv/products/hand-cream",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Closed Shadow",
+      "title": "Hand Cream – Glossier",
+      "price_raw": "EUR 25",
+      "price_norm": 25.0,
+      "currency": "EUR",
+      "stock": "in_stock",
+      "promo": false,
+      "confidence": "high",
+      "needs_review": false,
+      "planes": [
+        "content_outline",
+        "jsonld",
+        "og_meta"
+      ],
+      "product_name": "Hand Cream",
+      "name_match": "match",
+      "price_plane": "jsonld",
+      "price_evidence": {
+        "plane": "jsonld",
+        "raw": "25",
+        "currency_raw": "EUR",
+        "path": "Product.offers.price",
+        "value": 25.0,
+        "snippet": "{\"name\": \"Hand Cream\", \"sku\": null, \"price\": \"25\", \"from_price\": null, \"currency\": \"EUR\", \"availability\": \"InStock\"}",
+        "name_match": "match"
+      },
+      "price_candidates": [
+        {
+          "plane": "jsonld",
+          "raw": "25",
+          "currency": "EUR",
+          "path": "Product.offers.price",
+          "value": 25.0,
+          "snippet": "{\"name\": \"Hand Cream\", \"sku\": null, \"price\": \"25\", \"from_price\": null, \"currency\": \"EUR\", \"availability\": \"InStock\"}"
+        },
+        {
+          "plane": "og_meta",
+          "raw": "25,95",
+          "currency": "USD",
+          "path": "product:price:amount",
+          "value": 25.95,
+          "snippet": "<meta property=\"product:price:amount\" content=\"25,95\">",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "$75",
+          "currency": "USD",
+          "path": "content_outline#0",
+          "value": 75.0,
+          "snippet": "p4 | root | card | 12t | Free Futuredew Solid on us with your $75+ order. p5 | root | card | 12t | Free Futuredew Solid on us with your $100+ order. p6 | root | card | 12t | Free Futuredew Solid on us with your €95+ order. p8 | root | card | 9t | Free standard shipping on orders $40+ p9 | root | card | 33t | Free standard shipping on orders $60 CAD+. For more information on shipping rate p10 | roo…",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "€95",
+          "currency": "EUR",
+          "path": "content_outline#1",
+          "value": 95.0,
+          "snippet": "…ard | 12t | Free Futuredew Solid on us with your $75+ order. p5 | root | card | 12t | Free Futuredew Solid on us with your $100+ order. p6 | root | card | 12t | Free Futuredew Solid on us with your €95+ order. p8 | root | card | 9t | Free standard shipping on orders $40+ p9 | root | card | 33t | Free standard shipping on orders $60 CAD+. For more information on shipping rate p10 | root | card | 29…",
+          "reason": "lower_priority_plane"
+        }
+      ],
+      "price_status": "verified",
+      "stock_status": "verified",
+      "capture": {
+        "captured_at": "2026-10-18T09:34:59.371888+00:00",
+        "html_sha256": "e3c473255fcf1b829d240ce0a0f88d25ab8579b6eab9fe67500a95ffb355097a",
+        "screenshot": "reports/price_watch/evidence/2026-10-18/glossier_hand-cream.png",
+        "final_url": "https://www.glossier.com/en-lv/products/hand-cream",
+        "http_status": 200,
+        "page_class": "Closed Shadow",
+        "html_chars": 148335,
+        "screenshot_bytes": 402209,
+        "screenshot_full_page": false
+      },
+      "requested_url": "https://www.glossier.com/products/hand-cream",
+      "http_status": 200,
+      "variant": null,
+      "product_name_source": "jsonld",
+      "name_match_score": 1.0,
+      "name_match_detail": {
+        "score": 1.0,
+        "matched": [
+          "hand",
+          "cream"
+        ],
+        "missing": [],
+        "single_token": false
+      },
+      "stock_evidence": {
+        "state": "in_stock",
+        "source": "jsonld",
+        "hits": [
+          "Add to bag",
+          "Out of stock",
+          "Sold out"
+        ]
+      },
+      "evidence": {
+        "price": {
+          "plane": "jsonld",
+          "raw": "25",
+          "currency": "EUR",
+          "path": "Product.offers.price",
+          "name_match": "match",
+          "status": "verified"
+        },
+        "capture": {
+          "captured_at": "2026-10-18T09:34:59.371888+00:00",
+          "html_sha256": "e3c473255fcf1b829d240ce0a0f88d25ab8579b6eab9fe67500a95ffb355097a",
+          "screenshot": "reports/price_watch/evidence/2026-10-18/glossier_hand-cream.png",
+          "final_url": "https://www.glossier.com/en-lv/products/hand-cream",
+          "http_status": 200,
+          "page_class": "Closed Shadow",
+          "html_chars": 148335,
+          "screenshot_bytes": 402209,
+          "screenshot_full_page": false
+        }
+      }
+    },
+    {
+      "id": "glossier_milky-oil",
+      "kind": "shopify_pdp",
+      "url": "https://www.glossier.com/en-lv/products/milky-oil",
+      "identity": "https://www.glossier.com/en-lv/products/milky-oil",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Closed Shadow",
+      "title": "Milky Oil – Glossier",
+      "price_raw": "EUR 23",
+      "price_norm": 23.0,
+      "currency": "EUR",
+      "stock": "in_stock",
+      "promo": false,
+      "confidence": "high",
+      "needs_review": false,
+      "planes": [
+        "content_outline",
+        "jsonld",
+        "og_meta"
+      ],
+      "product_name": "Milky Oil",
+      "name_match": "match",
+      "price_plane": "jsonld",
+      "price_evidence": {
+        "plane": "jsonld",
+        "raw": "23",
+        "currency_raw": "EUR",
+        "path": "Product.offers.price",
+        "value": 23.0,
+        "snippet": "{\"name\": \"Milky Oil\", \"sku\": null, \"price\": \"23\", \"from_price\": null, \"currency\": \"EUR\", \"availability\": \"InStock\"}",
+        "name_match": "match"
+      },
+      "price_candidates": [
+        {
+          "plane": "jsonld",
+          "raw": "23",
+          "currency": "EUR",
+          "path": "Product.offers.price",
+          "value": 23.0,
+          "snippet": "{\"name\": \"Milky Oil\", \"sku\": null, \"price\": \"23\", \"from_price\": null, \"currency\": \"EUR\", \"availability\": \"InStock\"}"
+        },
+        {
+          "plane": "og_meta",
+          "raw": "23,95",
+          "currency": "USD",
+          "path": "product:price:amount",
+          "value": 23.95,
+          "snippet": "<meta property=\"product:price:amount\" content=\"23,95\">",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "$75",
+          "currency": "USD",
+          "path": "content_outline#0",
+          "value": 75.0,
+          "snippet": "p4 | root | card | 12t | Free Futuredew Solid on us with your $75+ order. p5 | root | card | 12t | Free Futuredew Solid on us with your $100+ order. p6 | root | card | 12t | Free Futuredew Solid on us with your €95+ order. p8 | root | card | 9t | Free standard shipping on orders $40+ p9 | root | card | 33t | Free standard shipping on orders $60 CAD+. For more information on shipping rate p10 | roo…",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "€95",
+          "currency": "EUR",
+          "path": "content_outline#1",
+          "value": 95.0,
+          "snippet": "…ard | 12t | Free Futuredew Solid on us with your $75+ order. p5 | root | card | 12t | Free Futuredew Solid on us with your $100+ order. p6 | root | card | 12t | Free Futuredew Solid on us with your €95+ order. p8 | root | card | 9t | Free standard shipping on orders $40+ p9 | root | card | 33t | Free standard shipping on orders $60 CAD+. For more information on shipping rate p10 | root | card | 29…",
+          "reason": "lower_priority_plane"
+        }
+      ],
+      "price_status": "verified",
+      "stock_status": "verified",
+      "capture": {
+        "captured_at": "2026-10-18T09:35:37.221743+00:00",
+        "html_sha256": "5111e6a9b6ad8710654771eb3d088cdca3a8b89985aa2d5e4bfd4e6eb44e87c1",
+        "screenshot": "reports/price_watch/evidence/2026-10-18/glossier_milky-oil.png",
+        "final_url": "https://www.glossier.com/en-lv/products/milky-oil",
+        "http_status": 200,
+        "page_class": "Closed Shadow",
+        "html_chars": 269072,
+        "screenshot_bytes": 833081,
+        "screenshot_full_page": false
+      },
+      "requested_url": "https://www.glossier.com/products/milky-oil",
+      "http_status": 200,
+      "variant": null,
+      "product_name_source": "jsonld",
+      "name_match_score": 1.0,
+      "name_match_detail": {
+        "score": 1.0,
+        "matched": [
+          "milky",
+          "oil"
+        ],
+        "missing": [],
+        "single_token": false
+      },
+      "stock_evidence": {
+        "state": "in_stock",
+        "source": "jsonld",
+        "hits": [
+          "Add to bag"
+        ]
+      },
+      "evidence": {
+        "price": {
+          "plane": "jsonld",
+          "raw": "23",
+          "currency": "EUR",
+          "path": "Product.offers.price",
+          "name_match": "match",
+          "status": "verified"
+        },
+        "capture": {
+          "captured_at": "2026-10-18T09:35:37.221743+00:00",
+          "html_sha256": "5111e6a9b6ad8710654771eb3d088cdca3a8b89985aa2d5e4bfd4e6eb44e87c1",
+          "screenshot": "reports/price_watch/evidence/2026-10-18/glossier_milky-oil.png",
+          "final_url": "https://www.glossier.com/en-lv/products/milky-oil",
+          "http_status": 200,
+          "page_class": "Closed Shadow",
+          "html_chars": 269072,
+          "screenshot_bytes": 833081,
+          "screenshot_full_page": false
+        }
+      }
+    },
+    {
+      "id": "tentree_harwood-puffer-meteorite-black",
+      "kind": "shopify_pdp",
+      "url": "https://www.tentree.com/products/harwood-puffer-meteorite-black",
+      "identity": "https://www.tentree.com/products/harwood-puffer-meteorite-black",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Closed Shadow",
+      "title": "Womens Harwood Puffer | Recycled Polyester",
+      "price_raw": "USD 298.0",
+      "price_norm": 298.0,
+      "currency": "USD",
+      "stock": "in_stock",
+      "promo": false,
+      "confidence": "high",
+      "needs_review": false,
+      "planes": [
+        "content_outline",
+        "jsonld"
+      ],
+      "product_name": "Harwood Puffer",
+      "name_match": "match",
+      "price_plane": "jsonld",
+      "price_evidence": {
+        "plane": "jsonld",
+        "raw": "298.0",
+        "currency_raw": "USD",
+        "path": "Product.offers.price",
+        "value": 298.0,
+        "snippet": "{\"name\": \"Harwood Puffer\", \"sku\": null, \"price\": \"298.0\", \"from_price\": null, \"currency\": \"USD\", \"availability\": \"InStock\"}",
+        "name_match": "match"
+      },
+      "price_candidates": [
+        {
+          "plane": "jsonld",
+          "raw": "298.0",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "value": 298.0,
+          "snippet": "{\"name\": \"Harwood Puffer\", \"sku\": null, \"price\": \"298.0\", \"from_price\": null, \"currency\": \"USD\", \"availability\": \"InStock\"}"
+        },
+        {
+          "plane": "regex",
+          "raw": "$78.00",
+          "currency": "USD",
+          "path": "content_outline#0",
+          "value": 78.0,
+          "snippet": "… p112 | Cookie consent > Harwood Puffer | card | 13t | Free Shipping over $100 Free Exchanges & Easy Returns p119 | Cookie consent > Complete the Look | card | 20t | 30% off * Juniper Outline Crew $78.00 $54.60 50% off * Cowen Pant $108.00 $54.00 p104 | Cookie consent > Harwood Puffer | text_group | 1t | $298 p0 | h2 | Cookie consent | 3t p120 | h2 | We Think You'll Like... | 5t p122 | h2 | Every …",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "$54.60",
+          "currency": "USD",
+          "path": "content_outline#1",
+          "value": 54.6,
+          "snippet": "… Cookie consent > Harwood Puffer | card | 13t | Free Shipping over $100 Free Exchanges & Easy Returns p119 | Cookie consent > Complete the Look | card | 20t | 30% off * Juniper Outline Crew $78.00 $54.60 50% off * Cowen Pant $108.00 $54.00 p104 | Cookie consent > Harwood Puffer | text_group | 1t | $298 p0 | h2 | Cookie consent | 3t p120 | h2 | We Think You'll Like... | 5t p122 | h2 | Every Item Pl…",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "$108.00",
+          "currency": "USD",
+          "path": "content_outline#2",
+          "value": 108.0,
+          "snippet": "…fer | card | 13t | Free Shipping over $100 Free Exchanges & Easy Returns p119 | Cookie consent > Complete the Look | card | 20t | 30% off * Juniper Outline Crew $78.00 $54.60 50% off * Cowen Pant $108.00 $54.00 p104 | Cookie consent > Harwood Puffer | text_group | 1t | $298 p0 | h2 | Cookie consent | 3t p120 | h2 | We Think You'll Like... | 5t p122 | h2 | Every Item Plants 10 Trees | 6t p1 | Cooki…",
+          "reason": "lower_priority_plane"
+        }
+      ],
+      "price_status": "verified",
+      "stock_status": "verified",
+      "capture": {
+        "captured_at": "2026-10-18T09:35:49.911020+00:00",
+        "html_sha256": "d3405fd8dcfca9c980237c73b01401ad36042cf15276fb92c71eeb59a43e834d",
+        "screenshot": "reports/price_watch/evidence/2026-10-18/tentree_harwood-puffer-meteorite-black.png",
+        "final_url": "https://www.tentree.com/products/harwood-puffer-meteorite-black",
+        "http_status": 200,
+        "page_class": "Closed Shadow",
+        "html_chars": 66735,
+        "screenshot_bytes": 396006,
+        "screenshot_full_page": false
+      },
+      "requested_url": "https://www.tentree.com/products/harwood-puffer-meteorite-black",
+      "http_status": 200,
+      "variant": null,
+      "product_name_source": "jsonld",
+      "name_match_score": 1.0,
+      "name_match_detail": {
+        "score": 1.0,
+        "matched": [
+          "harwood",
+          "puffer"
+        ],
+        "missing": [],
+        "single_token": false
+      },
+      "stock_evidence": {
+        "state": "in_stock",
+        "source": "jsonld",
+        "hits": [
+          "Only 3 Left",
+          "Add to bag",
+          "available"
+        ]
+      },
+      "evidence": {
+        "price": {
+          "plane": "jsonld",
+          "raw": "298.0",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "name_match": "match",
+          "status": "verified"
+        },
+        "capture": {
+          "captured_at": "2026-10-18T09:35:49.911020+00:00",
+          "html_sha256": "d3405fd8dcfca9c980237c73b01401ad36042cf15276fb92c71eeb59a43e834d",
+          "screenshot": "reports/price_watch/evidence/2026-10-18/tentree_harwood-puffer-meteorite-black.png",
+          "final_url": "https://www.tentree.com/products/harwood-puffer-meteorite-black",
+          "http_status": 200,
+          "page_class": "Closed Shadow",
+          "html_chars": 66735,
+          "screenshot_bytes": 396006,
+          "screenshot_full_page": false
+        }
+      }
+    },
+    {
+      "id": "tentree_colorado-sweater-light-grey-heather-plum-royale-",
+      "kind": "shopify_pdp",
+      "url": "https://www.tentree.com/products/colorado-sweater-light-grey-heather-plum-royale-blend",
+      "identity": "https://www.tentree.com/products/colorado-sweater-light-grey-heather-plum-royale-blend",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Closed Shadow",
+      "title": "Womens Colorado Sweater | Recycled Polyester",
+      "price_raw": "USD 128.0",
+      "price_norm": 128.0,
+      "currency": "USD",
+      "stock": "in_stock",
+      "promo": false,
+      "confidence": "high",
+      "needs_review": false,
+      "planes": [
+        "content_outline",
+        "jsonld"
+      ],
+      "product_name": "Colorado Sweater",
+      "name_match": "match",
+      "price_plane": "jsonld",
+      "price_evidence": {
+        "plane": "jsonld",
+        "raw": "128.0",
+        "currency_raw": "USD",
+        "path": "Product.offers.price",
+        "value": 128.0,
+        "snippet": "{\"name\": \"Colorado Sweater\", \"sku\": null, \"price\": \"128.0\", \"from_price\": null, \"currency\": \"USD\", \"availability\": \"InStock\"}",
+        "name_match": "match"
+      },
+      "price_candidates": [
+        {
+          "plane": "jsonld",
+          "raw": "128.0",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "value": 128.0,
+          "snippet": "{\"name\": \"Colorado Sweater\", \"sku\": null, \"price\": \"128.0\", \"from_price\": null, \"currency\": \"USD\", \"availability\": \"InStock\"}"
+        },
+        {
+          "plane": "regex",
+          "raw": "$118.00",
+          "currency": "USD",
+          "path": "content_outline#0",
+          "value": 118.0,
+          "snippet": "…N ORDERS OVER $100 p108 | Cookie consent > Colorado Sweater | card | 13t | Free Shipping over $100 Free Exchanges & Easy Returns p115 | Cookie consent > Complete the Look | card | 7t | Flint Pant $118.00 3 reviews p100 | Cookie consent > Colorado Sweater | text_group | 1t | $128 p0 | h2 | Cookie consent | 3t p116 | h2 | We Think You'll Like... | 5t p118 | h2 | Every Item Plants 10 Trees | 6t p1 | …",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "$128",
+          "currency": "USD",
+          "path": "content_outline#1",
+          "value": 128.0,
+          "snippet": "…ee Shipping over $100 Free Exchanges & Easy Returns p115 | Cookie consent > Complete the Look | card | 7t | Flint Pant $118.00 3 reviews p100 | Cookie consent > Colorado Sweater | text_group | 1t | $128 p0 | h2 | Cookie consent | 3t p116 | h2 | We Think You'll Like... | 5t p118 | h2 | Every Item Plants 10 Trees | 6t p1 | Cookie consent | paragraph | 67t | We and our partners, including Shopify, us…",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "$128",
+          "currency": "USD",
+          "path": "html_regex#0",
+          "value": 128.0,
+          "snippet": "…se><use href=\"#oke-star-empty\"></use><use href=\"#oke-star-empty\"></use><use href=\"#oke-star-empty\"></use></svg></div><span>No reviews yet</span></div></div></div></div><div><div><div type=\"\" value=\"$128\">$128</div></div></div></div></div></div> <div><div></div></div> <div></div> </div> <div> <div><div><div></div><div><div><span><b>Colour:</b> light grey heather plum royale blend</span><div><div><s…",
+          "reason": "lower_priority_plane"
+        }
+      ],
+      "price_status": "verified",
+      "stock_status": "verified",
+      "capture": {
+        "captured_at": "2026-10-18T09:35:59.034276+00:00",
+        "html_sha256": "d89f6e08b96136ba4b7eb055256441c6caa6a132f15711c43cc5be6997fadb2f",
+        "screenshot": "reports/price_watch/evidence/2026-10-18/tentree_colorado-sweater-light-grey-heather-plum-royale-.png",
+        "final_url": "https://www.tentree.com/products/colorado-sweater-light-grey-heather-plum-royale-blend",
+        "http_status": 200,
+        "page_class": "Closed Shadow",
+        "html_chars": 47037,
+        "screenshot_bytes": 613375,
+        "screenshot_full_page": false
+      },
+      "requested_url": "https://www.tentree.com/products/colorado-sweater-light-grey-heather-plum-royale-blend",
+      "http_status": 200,
+      "variant": null,
+      "product_name_source": "jsonld",
+      "name_match_score": 1.0,
+      "name_match_detail": {
+        "score": 1.0,
+        "matched": [
+          "colorado",
+          "sweater"
+        ],
+        "missing": [],
+        "single_token": false
+      },
+      "stock_evidence": {
+        "state": "in_stock",
+        "source": "jsonld",
+        "hits": [
+          "Only 3 Left",
+          "Add to bag",
+          "available"
+        ]
+      },
+      "evidence": {
+        "price": {
+          "plane": "jsonld",
+          "raw": "128.0",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "name_match": "match",
+          "status": "verified"
+        },
+        "capture": {
+          "captured_at": "2026-10-18T09:35:59.034276+00:00",
+          "html_sha256": "d89f6e08b96136ba4b7eb055256441c6caa6a132f15711c43cc5be6997fadb2f",
+          "screenshot": "reports/price_watch/evidence/2026-10-18/tentree_colorado-sweater-light-grey-heather-plum-royale-.png",
+          "final_url": "https://www.tentree.com/products/colorado-sweater-light-grey-heather-plum-royale-blend",
+          "http_status": 200,
+          "page_class": "Closed Shadow",
+          "html_chars": 47037,
+          "screenshot_bytes": 613375,
+          "screenshot_full_page": false
+        }
+      }
+    },
+    {
+      "id": "tentree_alden-beanie-alpine-blue",
+      "kind": "shopify_pdp",
+      "url": "https://www.tentree.com/products/alden-beanie-alpine-blue",
+      "identity": "https://www.tentree.com/products/alden-beanie-alpine-blue",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Closed Shadow",
+      "title": "Ungendered Alden Beanie | Organic Cotton",
+      "price_raw": "USD 35.0",
+      "price_norm": 35.0,
+      "currency": "USD",
+      "stock": "in_stock",
+      "promo": false,
+      "confidence": "high",
+      "needs_review": false,
+      "planes": [
+        "content_outline",
+        "jsonld"
+      ],
+      "product_name": "Alden Beanie",
+      "name_match": "match",
+      "price_plane": "jsonld",
+      "price_evidence": {
+        "plane": "jsonld",
+        "raw": "35.0",
+        "currency_raw": "USD",
+        "path": "Product.offers.price",
+        "value": 35.0,
+        "snippet": "{\"name\": \"Alden Beanie\", \"sku\": null, \"price\": \"35.0\", \"from_price\": null, \"currency\": \"USD\", \"availability\": \"InStock\"}",
+        "name_match": "match"
+      },
+      "price_candidates": [
+        {
+          "plane": "jsonld",
+          "raw": "35.0",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "value": 35.0,
+          "snippet": "{\"name\": \"Alden Beanie\", \"sku\": null, \"price\": \"35.0\", \"from_price\": null, \"currency\": \"USD\", \"availability\": \"InStock\"}"
+        },
+        {
+          "plane": "regex",
+          "raw": "$35",
+          "currency": "USD",
+          "path": "content_outline#0",
+          "value": 35.0,
+          "snippet": "…IPPING ON ORDERS OVER $100 p0 | h2 | Cookie consent | 3t p113 | h2 | We Think You'll Like... | 5t p115 | h2 | Every Item Plants 10 Trees | 6t p99 | Cookie consent > Alden Beanie | text_group | 1t | $35 p1 | Cookie consent | paragraph | 67t | We and our partners, including Shopify, use cookies and other technologies to pe p5 | Cookie consent | list_item | 10t | FREE SHIPPING ENDS MONDAY. CODE: FREE…",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "$35",
+          "currency": "USD",
+          "path": "html_regex#0",
+          "value": 35.0,
+          "snippet": "…><use href=\"#oke-star-filled\"></use></svg></div><span>Rated 4.9 out of 5 stars</span></div></div><div><span>82</span><span> Reviews</span></div></div></div></div></div><div><div><div type=\"\" value=\"$35\">$35</div></div></div></div></div></div> <div><div></div></div> <div></div> </div> <div> <div><div><div></div><div><div><span><b>Colour:</b> alpine blue</span><div><div><div><div></div></div></div><…",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "$20",
+          "currency": "USD",
+          "path": "html_regex#1",
+          "value": 20.0,
+          "snippet": "….com\\\"' data-sid=\"136\">support@tentree.com</a>.</span></div> </div> </div> </div> <a data-sw-bind=\"sw-225\" href=\"/pages/refer-a-friend\" data-sid=\"137\"> <span>Give 20%</span> <span></span> <span>Get $20</span> <span></span> </a> <div> <a data-sw-bind=\"sw-226\" href=\"//instagram.com/tentree/\" data-sid=\"138\"><span></span></a> <a data-sw-bind=\"sw-227\" href=\"//facebook.com/tentree/\" data-sid=\"139\"><span…",
+          "reason": "lower_priority_plane"
+        }
+      ],
+      "price_status": "verified",
+      "stock_status": "verified",
+      "capture": {
+        "captured_at": "2026-10-18T09:36:09.293487+00:00",
+        "html_sha256": "ff4276aff38b5a66e48eab3e33f8326b2f071574e578e71c50c825b4798f76c9",
+        "screenshot": "reports/price_watch/evidence/2026-10-18/tentree_alden-beanie-alpine-blue.png",
+        "final_url": "https://www.tentree.com/products/alden-beanie-alpine-blue",
+        "http_status": 200,
+        "page_class": "Closed Shadow",
+        "html_chars": 49589,
+        "screenshot_bytes": 365990,
+        "screenshot_full_page": false
+      },
+      "requested_url": "https://www.tentree.com/products/alden-beanie-alpine-blue",
+      "http_status": 200,
+      "variant": null,
+      "product_name_source": "jsonld",
+      "name_match_score": 1.0,
+      "name_match_detail": {
+        "score": 1.0,
+        "matched": [
+          "alden",
+          "beanie"
+        ],
+        "missing": [],
+        "single_token": false
+      },
+      "stock_evidence": {
+        "state": "in_stock",
+        "source": "jsonld",
+        "hits": [
+          "Add to bag",
+          "available"
+        ]
+      },
+      "evidence": {
+        "price": {
+          "plane": "jsonld",
+          "raw": "35.0",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "name_match": "match",
+          "status": "verified"
+        },
+        "capture": {
+          "captured_at": "2026-10-18T09:36:09.293487+00:00",
+          "html_sha256": "ff4276aff38b5a66e48eab3e33f8326b2f071574e578e71c50c825b4798f76c9",
+          "screenshot": "reports/price_watch/evidence/2026-10-18/tentree_alden-beanie-alpine-blue.png",
+          "final_url": "https://www.tentree.com/products/alden-beanie-alpine-blue",
+          "http_status": 200,
+          "page_class": "Closed Shadow",
+          "html_chars": 49589,
+          "screenshot_bytes": 365990,
+          "screenshot_full_page": false
+        }
+      }
+    },
+    {
+      "id": "colourpop_fallen-collection",
+      "kind": "shopify_pdp",
+      "url": "https://colourpop.com/products/fallen-collection",
+      "identity": "https://colourpop.com/products/fallen-collection",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Closed Shadow",
+      "title": "The Fallen Collection | Fall Makeup | ColourPop",
+      "price_raw": "USD 107.00",
+      "price_norm": 107.0,
+      "currency": "USD",
+      "stock": "in_stock",
+      "promo": false,
+      "confidence": "high",
+      "needs_review": false,
+      "planes": [
+        "content_outline",
+        "jsonld",
+        "og_meta"
+      ],
+      "product_name": "Fallen Collection",
+      "name_match": "match",
+      "price_plane": "jsonld",
+      "price_evidence": {
+        "plane": "jsonld",
+        "raw": "107.00",
+        "currency_raw": "USD",
+        "path": "Product.offers.price",
+        "value": 107.0,
+        "snippet": "{\"name\": \"Fallen Collection\", \"sku\": \"Bundle-FallenCollection\", \"price\": \"107.00\", \"from_price\": null, \"currency\": \"USD\", \"availability\": \"http://schema.org/InStock\"}",
+        "name_match": "match"
+      },
+      "price_candidates": [
+        {
+          "plane": "jsonld",
+          "raw": "107.00",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "value": 107.0,
+          "snippet": "{\"name\": \"Fallen Collection\", \"sku\": \"Bundle-FallenCollection\", \"price\": \"107.00\", \"from_price\": null, \"currency\": \"USD\", \"availability\": \"http://schema.org/InStock\"}"
+        },
+        {
+          "plane": "jsonld",
+          "raw": "107.0",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "value": 107.0,
+          "snippet": "{\"name\": \"Fallen Collection\", \"sku\": null, \"price\": \"107.0\", \"from_price\": null, \"currency\": \"USD\", \"availability\": \"InStock\"}",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "og_meta",
+          "raw": "107.00",
+          "currency": "USD",
+          "path": "og:price:amount",
+          "value": 107.0,
+          "snippet": "<meta property=\"og:price:amount\" content=\"107.00\">",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "$90.00",
+          "currency": "USD",
+          "path": "content_outline#0",
+          "value": 90.0,
+          "snippet": "p151 | Hyper Shine Glossy LipStick Trios | card | 82t | Value Sets new $90.00 value Super Stain Full Collection 0 Rated 0 out of 5 stars p157 | Hyper Shine Glossy LipStick Trios | card | 80t | Eyes new limited edition You Made the List 4.8 Rated 4.8 out of 5 stars 265 Revi p161 | Hyper Shine Glossy LipStick Trios | card | 76t | Lips new limited edition $24.00 value Wrapped with a Bow 0 Rated 0 out…",
+          "reason": "lower_priority_plane"
+        }
+      ],
+      "price_status": "verified",
+      "stock_status": "verified",
+      "capture": {
+        "captured_at": "2026-10-18T09:36:47.460977+00:00",
+        "html_sha256": "4af348917ffc1d11554dd3b58605cc30f52e48aae968919f2fc210ea137dbe00",
+        "screenshot": "reports/price_watch/evidence/2026-10-18/colourpop_fallen-collection.png",
+        "final_url": "https://colourpop.com/products/fallen-collection",
+        "http_status": 200,
+        "page_class": "Closed Shadow",
+        "html_chars": 311322,
+        "screenshot_bytes": 595867,
+        "screenshot_full_page": false
+      },
+      "requested_url": "https://colourpop.com/products/fallen-collection",
+      "http_status": 200,
+      "variant": "Bundle-FallenCollection",
+      "product_name_source": "jsonld",
+      "name_match_score": 1.0,
+      "name_match_detail": {
+        "score": 1.0,
+        "matched": [
+          "fallen",
+          "collection"
+        ],
+        "missing": [],
+        "single_token": false
+      },
+      "stock_evidence": {
+        "state": "in_stock",
+        "source": "jsonld",
+        "hits": []
+      },
+      "evidence": {
+        "price": {
+          "plane": "jsonld",
+          "raw": "107.00",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "name_match": "match",
+          "status": "verified"
+        },
+        "capture": {
+          "captured_at": "2026-10-18T09:36:47.460977+00:00",
+          "html_sha256": "4af348917ffc1d11554dd3b58605cc30f52e48aae968919f2fc210ea137dbe00",
+          "screenshot": "reports/price_watch/evidence/2026-10-18/colourpop_fallen-collection.png",
+          "final_url": "https://colourpop.com/products/fallen-collection",
+          "http_status": 200,
+          "page_class": "Closed Shadow",
+          "html_chars": 311322,
+          "screenshot_bytes": 595867,
+          "screenshot_full_page": false
+        }
+      }
+    },
+    {
+      "id": "colourpop_super-stain-full-collection",
+      "kind": "shopify_pdp",
+      "url": "https://colourpop.com/products/super-stain-full-collection",
+      "identity": "https://colourpop.com/products/super-stain-full-collection",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Closed Shadow",
+      "title": "Super Stain Full Collection | 6-Piece Lip Set · ColourPop",
+      "price_raw": "USD 84.00",
+      "price_norm": 84.0,
+      "currency": "USD",
+      "stock": "in_stock",
+      "promo": false,
+      "confidence": "high",
+      "needs_review": false,
+      "planes": [
+        "content_outline",
+        "jsonld",
+        "og_meta"
+      ],
+      "product_name": "Super Stain Full Collection",
+      "name_match": "match",
+      "price_plane": "jsonld",
+      "price_evidence": {
+        "plane": "jsonld",
+        "raw": "84.00",
+        "currency_raw": "USD",
+        "path": "Product.offers.price",
+        "value": 84.0,
+        "snippet": "{\"name\": \"Super Stain Full Collection\", \"sku\": \"Bundle-SuperStainFullCollection\", \"price\": \"84.00\", \"from_price\": null, \"currency\": \"USD\", \"availability\": \"http://schema.org/InStock\"}",
+        "name_match": "match"
+      },
+      "price_candidates": [
+        {
+          "plane": "jsonld",
+          "raw": "84.00",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "value": 84.0,
+          "snippet": "{\"name\": \"Super Stain Full Collection\", \"sku\": \"Bundle-SuperStainFullCollection\", \"price\": \"84.00\", \"from_price\": null, \"currency\": \"USD\", \"availability\": \"http://schema.org/InStock\"}"
+        },
+        {
+          "plane": "jsonld",
+          "raw": "84.0",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "value": 84.0,
+          "snippet": "{\"name\": \"Super Stain Full Collection\", \"sku\": null, \"price\": \"84.0\", \"from_price\": null, \"currency\": \"USD\", \"availability\": \"InStock\"}",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "og_meta",
+          "raw": "84.00",
+          "currency": "USD",
+          "path": "og:price:amount",
+          "value": 84.0,
+          "snippet": "<meta property=\"og:price:amount\" content=\"84.00\">",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "$90.00",
+          "currency": "USD",
+          "path": "content_outline#0",
+          "value": 90.0,
+          "snippet": "p151 | Hyper Shine Glossy LipStick Trios | card | 82t | Value Sets new $90.00 value Super Stain Full Collection 0 Rated 0 out of 5 stars p157 | Hyper Shine Glossy LipStick Trios | card | 80t | Eyes new limited edition You Made the List 4.8 Rated 4.8 out of 5 stars 265 Revi p161 | Hyper Shine Glossy LipStick Trios | card | 76t | Lips new limited edition $24.00 value Wrapped with a Bow 0 Rated 0 out…",
+          "reason": "lower_priority_plane"
+        }
+      ],
+      "price_status": "verified",
+      "stock_status": "verified",
+      "capture": {
+        "captured_at": "2026-10-18T09:37:29.609759+00:00",
+        "html_sha256": "4deb079cf73af7b551b1ddc96a05a9cd61733186e6b771dde725780dfea3ec7f",
+        "screenshot": "reports/price_watch/evidence/2026-10-18/colourpop_super-stain-full-collection.png",
+        "final_url": "https://colourpop.com/products/super-stain-full-collection",
+        "http_status": 200,
+        "page_class": "Closed Shadow",
+        "html_chars": 326309,
+        "screenshot_bytes": 381125,
+        "screenshot_full_page": false
+      },
+      "requested_url": "https://colourpop.com/products/super-stain-full-collection",
+      "http_status": 200,
+      "variant": "Bundle-SuperStainFullCollection",
+      "product_name_source": "jsonld",
+      "name_match_score": 1.0,
+      "name_match_detail": {
+        "score": 1.0,
+        "matched": [
+          "super",
+          "stain",
+          "full",
+          "collection"
+        ],
+        "missing": [],
+        "single_token": false
+      },
+      "stock_evidence": {
+        "state": "in_stock",
+        "source": "jsonld",
+        "hits": []
+      },
+      "evidence": {
+        "price": {
+          "plane": "jsonld",
+          "raw": "84.00",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "name_match": "match",
+          "status": "verified"
+        },
+        "capture": {
+          "captured_at": "2026-10-18T09:37:29.609759+00:00",
+          "html_sha256": "4deb079cf73af7b551b1ddc96a05a9cd61733186e6b771dde725780dfea3ec7f",
+          "screenshot": "reports/price_watch/evidence/2026-10-18/colourpop_super-stain-full-collection.png",
+          "final_url": "https://colourpop.com/products/super-stain-full-collection",
+          "http_status": 200,
+          "page_class": "Closed Shadow",
+          "html_chars": 326309,
+          "screenshot_bytes": 381125,
+          "screenshot_full_page": false
+        }
+      }
+    },
+    {
+      "id": "colourpop_jelly-glow-collection",
+      "kind": "shopify_pdp",
+      "url": "https://colourpop.com/products/jelly-glow-collection",
+      "identity": "https://colourpop.com/products/jelly-glow-collection",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Closed Shadow",
+      "title": "Jelly Glow Collection",
+      "price_raw": "USD 54.00",
+      "price_norm": 54.0,
+      "currency": "USD",
+      "stock": "in_stock",
+      "promo": false,
+      "confidence": "high",
+      "needs_review": false,
+      "planes": [
+        "content_outline",
+        "jsonld",
+        "og_meta"
+      ],
+      "product_name": "Jelly Glow Collection",
+      "name_match": "match",
+      "price_plane": "jsonld",
+      "price_evidence": {
+        "plane": "jsonld",
+        "raw": "54.00",
+        "currency_raw": "USD",
+        "path": "Product.offers.price",
+        "value": 54.0,
+        "snippet": "{\"name\": \"Jelly Glow Collection\", \"sku\": \"Bundle-JellyGlowCollection\", \"price\": \"54.00\", \"from_price\": null, \"currency\": \"USD\", \"availability\": \"http://schema.org/InStock\"}",
+        "name_match": "match"
+      },
+      "price_candidates": [
+        {
+          "plane": "jsonld",
+          "raw": "54.00",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "value": 54.0,
+          "snippet": "{\"name\": \"Jelly Glow Collection\", \"sku\": \"Bundle-JellyGlowCollection\", \"price\": \"54.00\", \"from_price\": null, \"currency\": \"USD\", \"availability\": \"http://schema.org/InStock\"}"
+        },
+        {
+          "plane": "jsonld",
+          "raw": "54.0",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "value": 54.0,
+          "snippet": "{\"name\": \"Jelly Glow Collection\", \"sku\": null, \"price\": \"54.0\", \"from_price\": null, \"currency\": \"USD\", \"availability\": \"InStock\"}",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "og_meta",
+          "raw": "54.00",
+          "currency": "USD",
+          "path": "og:price:amount",
+          "value": 54.0,
+          "snippet": "<meta property=\"og:price:amount\" content=\"54.00\">",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "$90.00",
+          "currency": "USD",
+          "path": "content_outline#0",
+          "value": 90.0,
+          "snippet": "p151 | Hyper Shine Glossy LipStick Trios | card | 82t | Value Sets new $90.00 value Super Stain Full Collection 0 Rated 0 out of 5 stars p157 | Hyper Shine Glossy LipStick Trios | card | 80t | Eyes new limited edition You Made the List 4.8 Rated 4.8 out of 5 stars 265 Revi p161 | Hyper Shine Glossy LipStick Trios | card | 76t | Lips new limited edition $24.00 value Wrapped with a Bow 0 Rated 0 out…",
+          "reason": "lower_priority_plane"
+        }
+      ],
+      "price_status": "verified",
+      "stock_status": "verified",
+      "capture": {
+        "captured_at": "2026-10-18T09:38:10.909085+00:00",
+        "html_sha256": "56ba73d6c1cf99dc3562afad9a4b5c55db3448aa2bad586def32052d8837bcad",
+        "screenshot": "reports/price_watch/evidence/2026-10-18/colourpop_jelly-glow-collection.png",
+        "final_url": "https://colourpop.com/products/jelly-glow-collection",
+        "http_status": 200,
+        "page_class": "Closed Shadow",
+        "html_chars": 325105,
+        "screenshot_bytes": 383821,
+        "screenshot_full_page": false
+      },
+      "requested_url": "https://colourpop.com/products/jelly-glow-collection",
+      "http_status": 200,
+      "variant": "Bundle-JellyGlowCollection",
+      "product_name_source": "jsonld",
+      "name_match_score": 1.0,
+      "name_match_detail": {
+        "score": 1.0,
+        "matched": [
+          "jelly",
+          "glow",
+          "collection"
+        ],
+        "missing": [],
+        "single_token": false
+      },
+      "stock_evidence": {
+        "state": "in_stock",
+        "source": "jsonld",
+        "hits": []
+      },
+      "evidence": {
+        "price": {
+          "plane": "jsonld",
+          "raw": "54.00",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "name_match": "match",
+          "status": "verified"
+        },
+        "capture": {
+          "captured_at": "2026-10-18T09:38:10.909085+00:00",
+          "html_sha256": "56ba73d6c1cf99dc3562afad9a4b5c55db3448aa2bad586def32052d8837bcad",
+          "screenshot": "reports/price_watch/evidence/2026-10-18/colourpop_jelly-glow-collection.png",
+          "final_url": "https://colourpop.com/products/jelly-glow-collection",
+          "http_status": 200,
+          "page_class": "Closed Shadow",
+          "html_chars": 325105,
+          "screenshot_bytes": 383821,
+          "screenshot_full_page": false
+        }
+      }
+    },
+    {
+      "id": "koio_monza-in-nero",
+      "kind": "shopify_pdp",
+      "url": "https://www.koio.co/products/monza-in-nero?variant=47295062999209",
+      "identity": "https://www.koio.co/products/monza-in-nero",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Closed Shadow",
+      "title": "Men's Nero Leather Low-top Sneaker | Monza in Nero",
+      "price_raw": "EUR 248.95",
+      "price_norm": 248.95,
+      "currency": "EUR",
+      "stock": "in_stock",
+      "promo": false,
+      "confidence": "high",
+      "needs_review": false,
+      "planes": [
+        "content_outline",
+        "jsonld",
+        "og_meta"
+      ],
+      "product_name": "Monza Leather & Suede Sneaker in Nero",
+      "name_match": "match",
+      "price_plane": "jsonld",
+      "price_evidence": {
+        "plane": "jsonld",
+        "raw": "248.95",
+        "currency_raw": "EUR",
+        "path": "Product.offers.price",
+        "value": 248.95,
+        "snippet": "{\"name\": \"Monza Leather & Suede Sneaker in Nero\", \"sku\": null, \"price\": \"248.95\", \"from_price\": null, \"currency\": \"EUR\", \"availability\": \"InStock\"}",
+        "name_match": "match"
+      },
+      "price_candidates": [
+        {
+          "plane": "jsonld",
+          "raw": "248.95",
+          "currency": "EUR",
+          "path": "Product.offers.price",
+          "value": 248.95,
+          "snippet": "{\"name\": \"Monza Leather & Suede Sneaker in Nero\", \"sku\": null, \"price\": \"248.95\", \"from_price\": null, \"currency\": \"EUR\", \"availability\": \"InStock\"}"
+        },
+        {
+          "plane": "jsonld",
+          "raw": "248,95",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "value": 248.95,
+          "snippet": "{\"name\": \"Monza Leather & Suede Sneaker in Nero\", \"sku\": null, \"price\": \"248,95\", \"from_price\": null, \"currency\": \"USD\", \"availability\": \"http://schema.org/InStock\"}",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "og_meta",
+          "raw": "248,95",
+          "currency": "USD",
+          "path": "og:price:amount",
+          "value": 248.95,
+          "snippet": "<meta property=\"og:price:amount\" content=\"248,95\">",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "$150",
+          "currency": "USD",
+          "path": "content_outline#0",
+          "value": 150.0,
+          "snippet": "p34 | root | card | 52t | We accept returns on international orders within 14 days of delivery for unworn p238 | Instructions to Measure Your Foot | card | 10t | Free US Shipping on all orders over $150 p250 | Instructions to Measure Your Foot | card | 9t | Exchange/store credit. $20 restock fee. p251 | Instructions to Measure Your Foot | card | 39t | To sell this item at its deeply discounted pri…",
+          "reason": "lower_priority_plane"
+        }
+      ],
+      "price_status": "verified",
+      "stock_status": "verified",
+      "capture": {
+        "captured_at": "2026-10-18T09:38:52.401611+00:00",
+        "html_sha256": "9b6e9841a1866c058e488cbc7aefa27b7909121611d579452ef7af8efd6f03df",
+        "screenshot": "reports/price_watch/evidence/2026-10-18/koio_monza-in-nero.png",
+        "final_url": "https://www.koio.co/products/monza-in-nero?variant=47295062999209",
+        "http_status": 200,
+        "page_class": "Closed Shadow",
+        "html_chars": 224169,
+        "screenshot_bytes": 888063,
+        "screenshot_full_page": false
+      },
+      "requested_url": "https://www.koio.co/products/monza-in-nero",
+      "http_status": 200,
+      "variant": "47295062999209",
+      "product_name_source": "jsonld",
+      "name_match_score": 0.8,
+      "name_match_detail": {
+        "score": 0.8,
+        "matched": [
+          "monza",
+          "leather",
+          "sneaker",
+          "nero"
+        ],
+        "missing": [
+          "suede"
+        ],
+        "single_token": false
+      },
+      "stock_evidence": {
+        "state": "in_stock",
+        "source": "jsonld",
+        "hits": [
+          "in stock"
+        ]
+      },
+      "evidence": {
+        "price": {
+          "plane": "jsonld",
+          "raw": "248.95",
+          "currency": "EUR",
+          "path": "Product.offers.price",
+          "name_match": "match",
+          "status": "verified"
+        },
+        "capture": {
+          "captured_at": "2026-10-18T09:38:52.401611+00:00",
+          "html_sha256": "9b6e9841a1866c058e488cbc7aefa27b7909121611d579452ef7af8efd6f03df",
+          "screenshot": "reports/price_watch/evidence/2026-10-18/koio_monza-in-nero.png",
+          "final_url": "https://www.koio.co/products/monza-in-nero?variant=47295062999209",
+          "http_status": 200,
+          "page_class": "Closed Shadow",
+          "html_chars": 224169,
+          "screenshot_bytes": 888063,
+          "screenshot_full_page": false
+        }
+      }
+    },
+    {
+      "id": "koio_vegan-01-ocean-mens",
+      "kind": "shopify_pdp",
+      "url": "https://www.koio.co/products/vegan-01-ocean-mens",
+      "identity": "https://www.koio.co/products/vegan-01-ocean-mens",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Closed Shadow",
+      "title": "Men's Grey Vegan Sneakers | Vegan 01 in Ocean | Pale Blue Dot",
+      "price_raw": "EUR 167.95",
+      "price_norm": 167.95,
+      "currency": "EUR",
+      "stock": "in_stock",
+      "promo": false,
+      "confidence": "high",
+      "needs_review": false,
+      "planes": [
+        "content_outline",
+        "jsonld",
+        "og_meta"
+      ],
+      "product_name": "Vegan 01 Sneaker in Ocean",
+      "name_match": "match",
+      "price_plane": "jsonld",
+      "price_evidence": {
+        "plane": "jsonld",
+        "raw": "167.95",
+        "currency_raw": "EUR",
+        "path": "Product.offers.price",
+        "value": 167.95,
+        "snippet": "{\"name\": \"Vegan 01 Sneaker in Ocean\", \"sku\": null, \"price\": \"167.95\", \"from_price\": null, \"currency\": \"EUR\", \"availability\": \"InStock\"}",
+        "name_match": "match"
+      },
+      "price_candidates": [
+        {
+          "plane": "jsonld",
+          "raw": "167.95",
+          "currency": "EUR",
+          "path": "Product.offers.price",
+          "value": 167.95,
+          "snippet": "{\"name\": \"Vegan 01 Sneaker in Ocean\", \"sku\": null, \"price\": \"167.95\", \"from_price\": null, \"currency\": \"EUR\", \"availability\": \"InStock\"}"
+        },
+        {
+          "plane": "jsonld",
+          "raw": "167,95",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "value": 167.95,
+          "snippet": "{\"name\": \"Vegan 01 Sneaker in Ocean\", \"sku\": null, \"price\": \"167,95\", \"from_price\": null, \"currency\": \"USD\", \"availability\": \"http://schema.org/InStock\"}",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "og_meta",
+          "raw": "167,95",
+          "currency": "USD",
+          "path": "og:price:amount",
+          "value": 167.95,
+          "snippet": "<meta property=\"og:price:amount\" content=\"167,95\">",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "$150",
+          "currency": "USD",
+          "path": "content_outline#0",
+          "value": 150.0,
+          "snippet": "p22 | root | card | 52t | We accept returns on international orders within 14 days of delivery for unworn p132 | Instructions to Measure Your Foot | card | 10t | Free US Shipping on all orders over $150 p144 | Instructions to Measure Your Foot | card | 9t | Exchange/store credit. $20 restock fee. p145 | Instructions to Measure Your Foot | card | 39t | To sell this item at its deeply discounted pri…",
+          "reason": "lower_priority_plane"
+        }
+      ],
+      "price_status": "verified",
+      "stock_status": "verified",
+      "capture": {
+        "captured_at": "2026-10-18T09:39:20.686798+00:00",
+        "html_sha256": "940fd040365a4b5fef0a623d47a15b5c9a154c5e1bb745a8a00dde01fd7c9479",
+        "screenshot": "reports/price_watch/evidence/2026-10-18/koio_vegan-01-ocean-mens.png",
+        "final_url": "https://www.koio.co/products/vegan-01-ocean-mens",
+        "http_status": 200,
+        "page_class": "Closed Shadow",
+        "html_chars": 159232,
+        "screenshot_bytes": 895272,
+        "screenshot_full_page": false
+      },
+      "requested_url": "https://www.koio.co/products/vegan-01-ocean-mens",
+      "http_status": 200,
+      "variant": null,
+      "product_name_source": "jsonld",
+      "name_match_score": 0.75,
+      "name_match_detail": {
+        "score": 0.75,
+        "matched": [
+          "vegan",
+          "01",
+          "ocean"
+        ],
+        "missing": [
+          "sneaker"
+        ],
+        "single_token": false
+      },
+      "stock_evidence": {
+        "state": "in_stock",
+        "source": "jsonld",
+        "hits": [
+          "Sold Out",
+          "Add to Cart",
+          "Add To Bag",
+          "Pre-order"
+        ]
+      },
+      "evidence": {
+        "price": {
+          "plane": "jsonld",
+          "raw": "167.95",
+          "currency": "EUR",
+          "path": "Product.offers.price",
+          "name_match": "match",
+          "status": "verified"
+        },
+        "capture": {
+          "captured_at": "2026-10-18T09:39:20.686798+00:00",
+          "html_sha256": "940fd040365a4b5fef0a623d47a15b5c9a154c5e1bb745a8a00dde01fd7c9479",
+          "screenshot": "reports/price_watch/evidence/2026-10-18/koio_vegan-01-ocean-mens.png",
+          "final_url": "https://www.koio.co/products/vegan-01-ocean-mens",
+          "http_status": 200,
+          "page_class": "Closed Shadow",
+          "html_chars": 159232,
+          "screenshot_bytes": 895272,
+          "screenshot_full_page": false
+        }
+      }
+    },
+    {
+      "id": "koio_vegan-01-triple-white-1-mens",
+      "kind": "shopify_pdp",
+      "url": "https://www.koio.co/products/vegan-01-triple-white-1-mens",
+      "identity": "https://www.koio.co/products/vegan-01-triple-white-1-mens",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Closed Shadow",
+      "title": "Men's White Vegan Sneakers | Vegan 01 Triple White – KOIO",
+      "price_raw": "EUR 167.95",
+      "price_norm": 167.95,
+      "currency": "EUR",
+      "stock": "in_stock",
+      "promo": false,
+      "confidence": "high",
+      "needs_review": false,
+      "planes": [
+        "content_outline",
+        "jsonld",
+        "og_meta"
+      ],
+      "product_name": "Vegan 01 Sneaker in Triple White",
+      "name_match": "match",
+      "price_plane": "jsonld",
+      "price_evidence": {
+        "plane": "jsonld",
+        "raw": "167.95",
+        "currency_raw": "EUR",
+        "path": "Product.offers.price",
+        "value": 167.95,
+        "snippet": "{\"name\": \"Vegan 01 Sneaker in Triple White\", \"sku\": null, \"price\": \"167.95\", \"from_price\": null, \"currency\": \"EUR\", \"availability\": \"InStock\"}",
+        "name_match": "match"
+      },
+      "price_candidates": [
+        {
+          "plane": "jsonld",
+          "raw": "167.95",
+          "currency": "EUR",
+          "path": "Product.offers.price",
+          "value": 167.95,
+          "snippet": "{\"name\": \"Vegan 01 Sneaker in Triple White\", \"sku\": null, \"price\": \"167.95\", \"from_price\": null, \"currency\": \"EUR\", \"availability\": \"InStock\"}"
+        },
+        {
+          "plane": "jsonld",
+          "raw": "167,95",
+          "currency": "USD",
+          "path": "Product.offers.price",
+          "value": 167.95,
+          "snippet": "{\"name\": \"Vegan 01 Sneaker in Triple White\", \"sku\": null, \"price\": \"167,95\", \"from_price\": null, \"currency\": \"USD\", \"availability\": \"http://schema.org/OutOfStock\"}",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "og_meta",
+          "raw": "167,95",
+          "currency": "USD",
+          "path": "og:price:amount",
+          "value": 167.95,
+          "snippet": "<meta property=\"og:price:amount\" content=\"167,95\">",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "$150",
+          "currency": "USD",
+          "path": "content_outline#0",
+          "value": 150.0,
+          "snippet": "p19 | root | card | 52t | We accept returns on international orders within 14 days of delivery for unworn p129 | Instructions to Measure Your Foot | card | 10t | Free US Shipping on all orders over $150 p141 | Instructions to Measure Your Foot | card | 9t | Exchange/store credit. $20 restock fee. p142 | Instructions to Measure Your Foot | card | 39t | To sell this item at its deeply discounted pri…",
+          "reason": "lower_priority_plane"
+        }
+      ],
+      "price_status": "verified",
+      "stock_status": "verified",
+      "capture": {
+        "captured_at": "2026-10-18T09:39:49.090279+00:00",
+        "html_sha256": "98ca7455ebb9c76935a2e4024565a2be1ad78130f0c1d6a11964ce79d79d57bc",
+        "screenshot": "reports/price_watch/evidence/2026-10-18/koio_vegan-01-triple-white-1-mens.png",
+        "final_url": "https://www.koio.co/products/vegan-01-triple-white-1-mens",
+        "http_status": 200,
+        "page_class": "Closed Shadow",
+        "html_chars": 158897,
+        "screenshot_bytes": 895835,
+        "screenshot_full_page": false
+      },
+      "requested_url": "https://www.koio.co/products/vegan-01-triple-white-1-mens",
+      "http_status": 200,
+      "variant": null,
+      "product_name_source": "jsonld",
+      "name_match_score": 0.8,
+      "name_match_detail": {
+        "score": 0.8,
+        "matched": [
+          "vegan",
+          "01",
+          "triple",
+          "white"
+        ],
+        "missing": [
+          "sneaker"
+        ],
+        "single_token": false
+      },
+      "stock_evidence": {
+        "state": "in_stock",
+        "source": "jsonld",
+        "hits": [
+          "Sold Out",
+          "Add to Cart",
+          "Add To Bag",
+          "Pre-order"
+        ]
+      },
+      "evidence": {
+        "price": {
+          "plane": "jsonld",
+          "raw": "167.95",
+          "currency": "EUR",
+          "path": "Product.offers.price",
+          "name_match": "match",
+          "status": "verified"
+        },
+        "capture": {
+          "captured_at": "2026-10-18T09:39:49.090279+00:00",
+          "html_sha256": "98ca7455ebb9c76935a2e4024565a2be1ad78130f0c1d6a11964ce79d79d57bc",
+          "screenshot": "reports/price_watch/evidence/2026-10-18/koio_vegan-01-triple-white-1-mens.png",
+          "final_url": "https://www.koio.co/products/vegan-01-triple-white-1-mens",
+          "http_status": 200,
+          "page_class": "Closed Shadow",
+          "html_chars": 158897,
+          "screenshot_bytes": 895835,
+          "screenshot_full_page": false
+        }
+      }
+    },
+    {
+      "id": "outdoorvoices_w-ride-pant-plaid",
+      "kind": "shopify_pdp",
+      "url": "https://www.outdoorvoices.com/products/w-ride-pant-plaid",
+      "identity": "https://www.outdoorvoices.com/products/w-ride-pant-plaid",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Closed Shadow",
+      "title": "Ride Pant in Plaid | Riding Breeches | Outdoor Voices",
+      "price_raw": "USD $108",
+      "price_norm": 108.0,
+      "currency": "USD",
+      "stock": "out_of_stock",
+      "promo": false,
+      "confidence": "low",
+      "needs_review": true,
+      "planes": [
+        "content_outline"
+      ],
+      "product_name": "Ride Pant",
+      "name_match": "match",
+      "price_plane": "regex",
+      "price_evidence": {
+        "plane": "regex",
+        "raw": "$108",
+        "currency_raw": "USD",
+        "path": "html_regex#3",
+        "value": 108.0,
+        "snippet": "…0\" alt=\"\"> <div> <a data-sw-bind=\"sw-147\" href=\"/products/w-club-polo-dusty-pink-stripe\" data-sid=\"146\">Club Polo</a> <div> Pink Dust </div> <price-snippet> <span> <span>Regular price</span> <span> $108 </span> </span> </price-snippet> <quick-buy> <button data-sw-bind=\"sw-148\" type=\"button\" data-sid=\"147\"> + Quick Add </button> <div> <ul> <li> <button data-sw-bind=\"sw-149\" type=\"button\" data-sid=\"…",
+        "name_match": "match"
+      },
+      "price_candidates": [
+        {
+          "plane": "regex",
+          "raw": "$108",
+          "currency": "USD",
+          "path": "html_regex#3",
+          "value": 108.0,
+          "snippet": "…0\" alt=\"\"> <div> <a data-sw-bind=\"sw-147\" href=\"/products/w-club-polo-dusty-pink-stripe\" data-sid=\"146\">Club Polo</a> <div> Pink Dust </div> <price-snippet> <span> <span>Regular price</span> <span> $108 </span> </span> </price-snippet> <quick-buy> <button data-sw-bind=\"sw-148\" type=\"button\" data-sid=\"147\"> + Quick Add </button> <div> <ul> <li> <button data-sw-bind=\"sw-149\" type=\"button\" data-sid=\"…"
+        },
+        {
+          "plane": "regex",
+          "raw": "$58",
+          "currency": "USD",
+          "path": "content_outline#0",
+          "value": 58.0,
+          "snippet": "…on orders over $100 in the U.S. p15 | Your Bag | card | 11t | Free Shipping on orders over $100 in the U.S. p24 | Ride Pant > You Might Also Like: | card | 18t | Double Time Bra Black Regular price $58 + Quick Add Something went wrong. p33 | Ride Pant > You Might Also Like: | card | 18t | Club Polo Pink Dust Regular price $108 + Quick Add Something went wrong. p91 | Ride Pant > You Might Also Like…",
+          "reason": "not_selected_by_median"
+        },
+        {
+          "plane": "regex",
+          "raw": "$108",
+          "currency": "USD",
+          "path": "content_outline#1",
+          "value": 108.0,
+          "snippet": "…You Might Also Like: | card | 18t | Double Time Bra Black Regular price $58 + Quick Add Something went wrong. p33 | Ride Pant > You Might Also Like: | card | 18t | Club Polo Pink Dust Regular price $108 + Quick Add Something went wrong. p91 | Ride Pant > You Might Also Like: | card | 18t | Double Time Bra Black Regular price $58 + Quick Add Something went wrong. p100 | Ride Pant > You Might Also L…",
+          "reason": "not_selected_by_median"
+        },
+        {
+          "plane": "regex",
+          "raw": "$118",
+          "currency": "USD",
+          "path": "content_outline#2",
+          "value": 118.0,
+          "snippet": "… You | card | 15t | Pink Dust Club Polo Cotton Regular price $108 1 color available p122 | Ride Pant > Recommended For You | card | 20t | Botanical Energy Dress LightWave; Lightweight Regular price $118 1 color availab p130 | Ride Pant > Recommended For You | card | 20t | Sandstone Pink Dust RecTrek Zip Pant RecTrek Regular price $148 2 colors availab p141 | Ride Pant > Recommended For You | card …",
+          "reason": "not_selected_by_median"
+        }
+      ],
+      "price_status": "review",
+      "stock_status": "verified",
+      "capture": {
+        "captured_at": "2026-10-18T09:40:03.947110+00:00",
+        "html_sha256": "93ef13d726813bf3a951c4f599f5c87a9690f80eba87e2e3d8b5e3c9aa6539cb",
+        "screenshot": "reports/price_watch/evidence/2026-10-18/outdoorvoices_w-ride-pant-plaid.png",
+        "final_url": "https://www.outdoorvoices.com/products/w-ride-pant-plaid",
+        "http_status": 200,
+        "page_class": "Closed Shadow",
+        "html_chars": 105893,
+        "screenshot_bytes": 1529605,
+        "screenshot_full_page": false
+      },
+      "requested_url": "https://www.outdoorvoices.com/products/w-ride-pant-plaid",
+      "http_status": 200,
+      "variant": null,
+      "product_name_source": "jsonld",
+      "name_match_score": 1.0,
+      "name_match_detail": {
+        "score": 1.0,
+        "matched": [
+          "ride",
+          "pant"
+        ],
+        "missing": [],
+        "single_token": false
+      },
+      "stock_evidence": {
+        "state": "out_of_stock",
+        "source": "dom",
+        "hits": [
+          "available",
+          "Add to Bag",
+          "sold out"
+        ]
+      },
+      "needs_review_reason": "price from regex only (low confidence)",
+      "evidence": {
+        "price": {
+          "plane": "regex",
+          "raw": "$108",
+          "currency": "USD",
+          "path": "html_regex#3",
+          "name_match": "match",
+          "status": "review"
+        },
+        "capture": {
+          "captured_at": "2026-10-18T09:40:03.947110+00:00",
+          "html_sha256": "93ef13d726813bf3a951c4f599f5c87a9690f80eba87e2e3d8b5e3c9aa6539cb",
+          "screenshot": "reports/price_watch/evidence/2026-10-18/outdoorvoices_w-ride-pant-plaid.png",
+          "final_url": "https://www.outdoorvoices.com/products/w-ride-pant-plaid",
+          "http_status": 200,
+          "page_class": "Closed Shadow",
+          "html_chars": 105893,
+          "screenshot_bytes": 1529605,
+          "screenshot_full_page": false
+        }
+      }
+    },
+    {
+      "id": "outdoorvoices_w-techsweat-core-7-8-legging-forest",
+      "kind": "shopify_pdp",
+      "url": "https://www.outdoorvoices.com/products/w-techsweat-core-7-8-legging-forest",
+      "identity": "https://www.outdoorvoices.com/products/w-techsweat-core-7-8-legging-forest",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Closed Shadow",
+      "title": "TechSweat Core 7/8 Legging",
+      "price_raw": "USD $58",
+      "price_norm": 58.0,
+      "currency": "USD",
+      "stock": "in_stock",
+      "promo": false,
+      "confidence": "low",
+      "needs_review": true,
+      "planes": [
+        "content_outline"
+      ],
+      "product_name": "TechSweat Core 7/8 Legging",
+      "name_match": "match",
+      "price_plane": "regex",
+      "price_evidence": {
+        "plane": "regex",
+        "raw": "$58",
+        "currency_raw": "USD",
+        "path": "html_regex#4",
+        "value": 58.0,
+        "snippet": "…ata-sw-bind=\"sw-194\" href=\"/products/m-cloudknit-7-short-dark-bay\" data-sid=\"194\">CloudKnit 7\" Short</a> <div> CloudKnit; Relaxed Fit </div> <price-snippet> <span> <span>Regular price</span> <span> $58 </span> </span> </price-snippet> <div>3 colors available</div> </div> </product-card> </div></product-recommendations> </div> </section> </main> </div> <section> <section> <div> <ul> <li> <a data-sw…",
+        "name_match": "match"
+      },
+      "price_candidates": [
+        {
+          "plane": "regex",
+          "raw": "$58",
+          "currency": "USD",
+          "path": "html_regex#4",
+          "value": 58.0,
+          "snippet": "…ata-sw-bind=\"sw-194\" href=\"/products/m-cloudknit-7-short-dark-bay\" data-sid=\"194\">CloudKnit 7\" Short</a> <div> CloudKnit; Relaxed Fit </div> <price-snippet> <span> <span>Regular price</span> <span> $58 </span> </span> </price-snippet> <div>3 colors available</div> </div> </product-card> </div></product-recommendations> </div> </section> </main> </div> <section> <section> <div> <ul> <li> <a data-sw…"
+        },
+        {
+          "plane": "regex",
+          "raw": "$78",
+          "currency": "USD",
+          "path": "content_outline#0",
+          "value": 78.0,
+          "snippet": "…er $100 in the U.S. p15 | Your Bag | card | 11t | Free Shipping on orders over $100 in the U.S. p23 | TechSweat Core 7/8 Legging > You Might Also Like: | card | 17t | Doing Things Bra Regular price $78 + Quick Add Something went wrong. p62 | TechSweat Core 7/8 Legging > You Might Also Like: | card | 17t | Doing Things Bra Regular price $78 + Quick Add Something went wrong. p76 | TechSweat Core 7/8…",
+          "reason": "not_selected_by_median"
+        },
+        {
+          "plane": "regex",
+          "raw": "$48",
+          "currency": "USD",
+          "path": "content_outline#1",
+          "value": 48.0,
+          "snippet": "…e: | card | 17t | Doing Things Bra Regular price $78 + Quick Add Something went wrong. p76 | TechSweat Core 7/8 Legging > Recommended For You | card | 15t | Leaf Apple Bra Bubble Wrap Regular price $48 1 color available p87 | TechSweat Core 7/8 Legging > Recommended For You | card | 21t | Charcoal CloudKnit 3.5\" Short CloudKnit; High-Rise Regular price $48 1 color ava p95 | TechSweat Core 7/8 Legg…",
+          "reason": "not_selected_by_median"
+        },
+        {
+          "plane": "regex",
+          "raw": "$34",
+          "currency": "USD",
+          "path": "content_outline#2",
+          "value": 34.0,
+          "snippet": "….5\" Short CloudKnit; High-Rise Regular price $48 1 color ava p95 | TechSweat Core 7/8 Legging > Recommended For You | card | 22t | Charcoal Dark Bay CloudKnit Cami CloudKnit; Slim Fit Regular price $34 2 colors p103 | TechSweat Core 7/8 Legging > Recommended For You | card | 25t | Charcoal Grass Dark Bay CloudKnit 7\" Short CloudKnit; Relaxed Fit Regular price p0 | root | card | 7t | Free Shipping …",
+          "reason": "not_selected_by_median"
+        }
+      ],
+      "price_status": "review",
+      "stock_status": "verified",
+      "capture": {
+        "captured_at": "2026-10-18T09:40:11.123721+00:00",
+        "html_sha256": "4886732c798813d05bf2e67e7428bbb2824c45387e8c859fb0743427c103e08d",
+        "screenshot": "reports/price_watch/evidence/2026-10-18/outdoorvoices_w-techsweat-core-7-8-legging-forest.png",
+        "final_url": "https://www.outdoorvoices.com/products/w-techsweat-core-7-8-legging-forest",
+        "http_status": 200,
+        "page_class": "Closed Shadow",
+        "html_chars": 80309,
+        "screenshot_bytes": 417943,
+        "screenshot_full_page": false
+      },
+      "requested_url": "https://www.outdoorvoices.com/products/w-techsweat-core-7-8-legging-forest",
+      "http_status": 200,
+      "variant": null,
+      "product_name_source": "jsonld",
+      "name_match_score": 1.0,
+      "name_match_detail": {
+        "score": 1.0,
+        "matched": [
+          "techsweat",
+          "core",
+          "legging"
+        ],
+        "missing": [],
+        "single_token": false
+      },
+      "stock_evidence": {
+        "state": "in_stock",
+        "source": "dom",
+        "hits": [
+          "available",
+          "Add to Bag"
+        ]
+      },
+      "needs_review_reason": "price from regex only (low confidence)",
+      "evidence": {
+        "price": {
+          "plane": "regex",
+          "raw": "$58",
+          "currency": "USD",
+          "path": "html_regex#4",
+          "name_match": "match",
+          "status": "review"
+        },
+        "capture": {
+          "captured_at": "2026-10-18T09:40:11.123721+00:00",
+          "html_sha256": "4886732c798813d05bf2e67e7428bbb2824c45387e8c859fb0743427c103e08d",
+          "screenshot": "reports/price_watch/evidence/2026-10-18/outdoorvoices_w-techsweat-core-7-8-legging-forest.png",
+          "final_url": "https://www.outdoorvoices.com/products/w-techsweat-core-7-8-legging-forest",
+          "http_status": 200,
+          "page_class": "Closed Shadow",
+          "html_chars": 80309,
+          "screenshot_bytes": 417943,
+          "screenshot_full_page": false
+        }
+      }
+    },
+    {
+      "id": "outdoorvoices_w-energy-dress-botanical",
+      "kind": "shopify_pdp",
+      "url": "https://www.outdoorvoices.com/products/w-energy-dress-botanical",
+      "identity": "https://www.outdoorvoices.com/products/w-energy-dress-botanical",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Closed Shadow",
+      "title": "Energy Dress – Botanical | Outdoor Voices",
+      "price_raw": "USD $108",
+      "price_norm": 108.0,
+      "currency": "USD",
+      "stock": "in_stock",
+      "promo": false,
+      "confidence": "low",
+      "needs_review": true,
+      "planes": [
+        "content_outline"
+      ],
+      "product_name": "Energy Dress",
+      "name_match": "match",
+      "price_plane": "regex",
+      "price_evidence": {
+        "plane": "regex",
+        "raw": "$108",
+        "currency_raw": "USD",
+        "path": "html_regex#3",
+        "value": 108.0,
+        "snippet": "…duct-card-swatches> <a data-sw-bind=\"sw-162\" href=\"/products/w-club-polo-dusty-pink-stripe\" data-sid=\"161\">Club Polo</a> <div> Cotton </div> <price-snippet> <span> <span>Regular price</span> <span> $108 </span> </span> </price-snippet> <div>1 color available</div> </div> </product-card> <product-card> <div> </div> <div> <quick-buy> <button data-sw-bind=\"sw-163\" type=\"button\" data-sid=\"162\"> + Quic…",
+        "name_match": "match"
+      },
+      "price_candidates": [
+        {
+          "plane": "regex",
+          "raw": "$108",
+          "currency": "USD",
+          "path": "html_regex#3",
+          "value": 108.0,
+          "snippet": "…duct-card-swatches> <a data-sw-bind=\"sw-162\" href=\"/products/w-club-polo-dusty-pink-stripe\" data-sid=\"161\">Club Polo</a> <div> Cotton </div> <price-snippet> <span> <span>Regular price</span> <span> $108 </span> </span> </price-snippet> <div>1 color available</div> </div> </product-card> <product-card> <div> </div> <div> <quick-buy> <button data-sw-bind=\"sw-163\" type=\"button\" data-sid=\"162\"> + Quic…"
+        },
+        {
+          "plane": "regex",
+          "raw": "$108",
+          "currency": "USD",
+          "path": "content_outline#0",
+          "value": 108.0,
+          "snippet": "…r You | card | 34t | Dark Bay Polka Dot Met Blue Feather Night Dark Bay Polka + 3 more + 3 TechSweat p84 | Energy Dress > Recommended For You | card | 15t | Pink Dust Club Polo Cotton Regular price $108 1 color available p92 | Energy Dress > Recommended For You | card | 30t | Black Navy Juicy Fruit Balsam + 1 more + 1 The Exercise Dress LightSpeed; Lightw p100 | Energy Dress > Recommended For You …",
+          "reason": "not_selected_by_median"
+        },
+        {
+          "plane": "regex",
+          "raw": "$198",
+          "currency": "USD",
+          "path": "content_outline#1",
+          "value": 198.0,
+          "snippet": "…or You | card | 30t | Black Navy Juicy Fruit Balsam + 1 more + 1 The Exercise Dress LightSpeed; Lightw p100 | Energy Dress > Recommended For You | card | 15t | Plaid Ride Pant JumpOff Regular price $198 1 color available p0 | root | card | 7t | Free Shipping on orders $100+ p20 | h1 | Energy Dress | 3t p13 | h2 | Your Bag | 2t p16 | h2 | Your Bag Is Empty | 4t p68 | h2 | Energy Dress > Recommended…",
+          "reason": "not_selected_by_median"
+        },
+        {
+          "plane": "regex",
+          "raw": "$118",
+          "currency": "USD",
+          "path": "html_regex#0",
+          "value": 118.0,
+          "snippet": "…on> </product-form-selectors> <div> </div> <div> <button data-sw-bind=\"sw-122\" type=\"submit\" data-sid=\"122\"> <add-to-cart> Add to Bag <span> <price-snippet> <span> <span>Regular price</span> <span> $118 </span> </span> </price-snippet> </span> </add-to-cart> </button> </div> <div> <div> <square-placement><p><span>or 4 interest-free payments of <strong>$29.50</strong> with </span><span><button data…",
+          "reason": "not_selected_by_median"
+        }
+      ],
+      "price_status": "review",
+      "stock_status": "verified",
+      "capture": {
+        "captured_at": "2026-10-18T09:40:23.623863+00:00",
+        "html_sha256": "409f8952edb9b491577715084ac54b9c2939ef8ed4a17fc44807d79f86fb39eb",
+        "screenshot": "reports/price_watch/evidence/2026-10-18/outdoorvoices_w-energy-dress-botanical.png",
+        "final_url": "https://www.outdoorvoices.com/products/w-energy-dress-botanical",
+        "http_status": 200,
+        "page_class": "Closed Shadow",
+        "html_chars": 83868,
+        "screenshot_bytes": 1529602,
+        "screenshot_full_page": false
+      },
+      "requested_url": "https://www.outdoorvoices.com/products/w-energy-dress-botanical",
+      "http_status": 200,
+      "variant": null,
+      "product_name_source": "jsonld",
+      "name_match_score": 1.0,
+      "name_match_detail": {
+        "score": 1.0,
+        "matched": [
+          "energy",
+          "dress"
+        ],
+        "missing": [],
+        "single_token": false
+      },
+      "stock_evidence": {
+        "state": "in_stock",
+        "source": "dom",
+        "hits": [
+          "available",
+          "Add to Bag"
+        ]
+      },
+      "needs_review_reason": "price from regex only (low confidence)",
+      "evidence": {
+        "price": {
+          "plane": "regex",
+          "raw": "$108",
+          "currency": "USD",
+          "path": "html_regex#3",
+          "name_match": "match",
+          "status": "review"
+        },
+        "capture": {
+          "captured_at": "2026-10-18T09:40:23.623863+00:00",
+          "html_sha256": "409f8952edb9b491577715084ac54b9c2939ef8ed4a17fc44807d79f86fb39eb",
+          "screenshot": "reports/price_watch/evidence/2026-10-18/outdoorvoices_w-energy-dress-botanical.png",
+          "final_url": "https://www.outdoorvoices.com/products/w-energy-dress-botanical",
+          "http_status": 200,
+          "page_class": "Closed Shadow",
+          "html_chars": 83868,
+          "screenshot_bytes": 1529602,
+          "screenshot_full_page": false
+        }
+      }
+    },
+    {
+      "id": "rothys_the-jodhpur-boot",
+      "kind": "shopify_pdp",
+      "url": "https://rothys.com/en-at/products/the-jodhpur-boot",
+      "identity": "https://rothys.com/en-at/products/the-jodhpur-boot",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Shadow DOM",
+      "title": "The Jodhpur Boot",
+      "price_raw": "EUR 315,00",
+      "price_norm": 315.0,
+      "currency": "EUR",
+      "stock": "out_of_stock",
+      "promo": false,
+      "confidence": "high",
+      "needs_review": false,
+      "planes": [
+        "content_outline",
+        "og_meta"
+      ],
+      "product_name": "The Jodhpur Boot",
+      "name_match": "match",
+      "price_plane": "og_meta",
+      "price_evidence": {
+        "plane": "og_meta",
+        "raw": "315,00",
+        "currency_raw": "EUR",
+        "path": "og:price:amount",
+        "value": 315.0,
+        "snippet": "<meta property=\"og:price:amount\" content=\"315,00\">",
+        "name_match": "match"
+      },
+      "price_candidates": [
+        {
+          "plane": "og_meta",
+          "raw": "315,00",
+          "currency": "EUR",
+          "path": "og:price:amount",
+          "value": 315.0,
+          "snippet": "<meta property=\"og:price:amount\" content=\"315,00\">"
+        },
+        {
+          "plane": "regex",
+          "raw": "€315",
+          "currency": "EUR",
+          "path": "content_outline#0",
+          "value": 315.0,
+          "snippet": "p44 | My Cart | card | 25t | Regular price EUR €315 Regular price EUR Sale price EUR €315 Unit price / per (i p62 | Change Your Shipping Country | feed | 37t | [iframe: https://rothys.com/web-pixels@9f5e2762wb720532ap19708c42m93b2bec3/custo p63 | Change Your Shipping Country | feed | 37t | [iframe: https://rothys.com/web-pixels@9f5e2762wb720532ap19708c42m93b2bec3/custo p64 | Change Your Shipping C…",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "€315",
+          "currency": "EUR",
+          "path": "html_regex#0",
+          "value": 315.0,
+          "snippet": "…readcrumb> </dna-breadcrumb> </div><section> <section> <div> <div> <dna-product-details> <p> The Jodhpur Boot </p> <div> <dna-price> <div> <div> <span> Regular price </span><span> EUR </span><span> €315 </span> </div> <dl> <dt> Regular price </dt> <dd><s> EUR </s><s> </s> </dd> <dt> Sale price </dt> <dd><span> EUR </span><span> €315 </span> </dd> </dl> <small> <div>Unit price</div> <div> <span></s…",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "€200",
+          "currency": "EUR",
+          "path": "html_regex#1",
+          "value": 200.0,
+          "snippet": "…nd=\"sw-62\" type=\"hidden\" value=\"template--27918909210718__main\" name=\"section-id\" data-sid=\"56\"></form><div></div> <div> </div> <div></div> <div> <div> <div><p><strong>Free shipping on orders above €200.</strong></p><p>30 days to return.</p><p><a data-sw-bind=\"sw-63\" href=\"/en-at/pages/international-returns\" data-sid=\"57\">Learn more</a>.</p></div> </div> </div> </dna-product-purchase-controls> <dn…",
+          "reason": "lower_priority_plane"
+        }
+      ],
+      "price_status": "verified",
+      "stock_status": "verified",
+      "capture": {
+        "captured_at": "2026-10-18T09:40:40.576873+00:00",
+        "html_sha256": "45e5049d4b9be5a268e70fd6506a3b8d9229a1bed1d6387efede181132e0f307",
+        "screenshot": "reports/price_watch/evidence/2026-10-18/rothys_the-jodhpur-boot.png",
+        "final_url": "https://rothys.com/en-at/products/the-jodhpur-boot",
+        "http_status": 200,
+        "page_class": "Shadow DOM",
+        "html_chars": 68866,
+        "screenshot_bytes": 19237,
+        "screenshot_full_page": false
+      },
+      "requested_url": "https://www.rothys.com/products/the-jodhpur-boot",
+      "http_status": 200,
+      "variant": null,
+      "product_name_source": "jsonld",
+      "name_match_score": 1.0,
+      "name_match_detail": {
+        "score": 1.0,
+        "matched": [
+          "jodhpur",
+          "boot"
+        ],
+        "missing": [],
+        "single_token": false
+      },
+      "stock_evidence": {
+        "state": "out_of_stock",
+        "source": "dom",
+        "hits": [
+          "Out Of Stock",
+          "Add to cart"
+        ]
+      },
+      "evidence": {
+        "price": {
+          "plane": "og_meta",
+          "raw": "315,00",
+          "currency": "EUR",
+          "path": "og:price:amount",
+          "name_match": "match",
+          "status": "verified"
+        },
+        "capture": {
+          "captured_at": "2026-10-18T09:40:40.576873+00:00",
+          "html_sha256": "45e5049d4b9be5a268e70fd6506a3b8d9229a1bed1d6387efede181132e0f307",
+          "screenshot": "reports/price_watch/evidence/2026-10-18/rothys_the-jodhpur-boot.png",
+          "final_url": "https://rothys.com/en-at/products/the-jodhpur-boot",
+          "http_status": 200,
+          "page_class": "Shadow DOM",
+          "html_chars": 68866,
+          "screenshot_bytes": 19237,
+          "screenshot_full_page": false
+        }
+      }
+    },
+    {
+      "id": "rothys_the-driver-moc",
+      "kind": "shopify_pdp",
+      "url": "https://rothys.com/en-at/products/the-driver-moc",
+      "identity": "https://rothys.com/en-at/products/the-driver-moc",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Shadow DOM",
+      "title": "The Driver Moc",
+      "price_raw": "EUR 200,00",
+      "price_norm": 200.0,
+      "currency": "EUR",
+      "stock": "out_of_stock",
+      "promo": false,
+      "confidence": "high",
+      "needs_review": false,
+      "planes": [
+        "content_outline",
+        "og_meta"
+      ],
+      "product_name": "The Driver Moc",
+      "name_match": "match",
+      "price_plane": "og_meta",
+      "price_evidence": {
+        "plane": "og_meta",
+        "raw": "200,00",
+        "currency_raw": "EUR",
+        "path": "og:price:amount",
+        "value": 200.0,
+        "snippet": "<meta property=\"og:price:amount\" content=\"200,00\">",
+        "name_match": "match"
+      },
+      "price_candidates": [
+        {
+          "plane": "og_meta",
+          "raw": "200,00",
+          "currency": "EUR",
+          "path": "og:price:amount",
+          "value": 200.0,
+          "snippet": "<meta property=\"og:price:amount\" content=\"200,00\">"
+        },
+        {
+          "plane": "regex",
+          "raw": "€200",
+          "currency": "EUR",
+          "path": "content_outline#0",
+          "value": 200.0,
+          "snippet": "p44 | My Cart | card | 25t | Regular price EUR €200 Regular price EUR Sale price EUR €200 Unit price / per (i p62 | Change Your Shipping Country | feed | 37t | [iframe: https://rothys.com/web-pixels@9f5e2762wb720532ap19708c42m93b2bec3/custo p63 | Change Your Shipping Country | feed | 37t | [iframe: https://rothys.com/web-pixels@9f5e2762wb720532ap19708c42m93b2bec3/custo p64 | Change Your Shipping C…",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "€200",
+          "currency": "EUR",
+          "path": "html_regex#0",
+          "value": 200.0,
+          "snippet": "…-breadcrumb> </dna-breadcrumb> </div><section> <section> <div> <div> <dna-product-details> <p> The Driver Moc </p> <div> <dna-price> <div> <div> <span> Regular price </span><span> EUR </span><span> €200 </span> </div> <dl> <dt> Regular price </dt> <dd><s> EUR </s><s> </s> </dd> <dt> Sale price </dt> <dd><span> EUR </span><span> €200 </span> </dd> </dl> <small> <div>Unit price</div> <div> <span></s…",
+          "reason": "lower_priority_plane"
+        }
+      ],
+      "price_status": "verified",
+      "stock_status": "verified",
+      "capture": {
+        "captured_at": "2026-10-18T09:40:57.863835+00:00",
+        "html_sha256": "8424a2c127e7502867a5b0477912857744a6d3e03352b4c7684c6fb323a95c65",
+        "screenshot": "reports/price_watch/evidence/2026-10-18/rothys_the-driver-moc.png",
+        "final_url": "https://rothys.com/en-at/products/the-driver-moc",
+        "http_status": 200,
+        "page_class": "Shadow DOM",
+        "html_chars": 75173,
+        "screenshot_bytes": 19237,
+        "screenshot_full_page": false
+      },
+      "requested_url": "https://www.rothys.com/products/the-driver-moc",
+      "http_status": 200,
+      "variant": null,
+      "product_name_source": "jsonld",
+      "name_match_score": 1.0,
+      "name_match_detail": {
+        "score": 1.0,
+        "matched": [
+          "driver",
+          "moc"
+        ],
+        "missing": [],
+        "single_token": false
+      },
+      "stock_evidence": {
+        "state": "out_of_stock",
+        "source": "dom",
+        "hits": [
+          "Out Of Stock",
+          "Add to cart",
+          "unavailable"
+        ]
+      },
+      "evidence": {
+        "price": {
+          "plane": "og_meta",
+          "raw": "200,00",
+          "currency": "EUR",
+          "path": "og:price:amount",
+          "name_match": "match",
+          "status": "verified"
+        },
+        "capture": {
+          "captured_at": "2026-10-18T09:40:57.863835+00:00",
+          "html_sha256": "8424a2c127e7502867a5b0477912857744a6d3e03352b4c7684c6fb323a95c65",
+          "screenshot": "reports/price_watch/evidence/2026-10-18/rothys_the-driver-moc.png",
+          "final_url": "https://rothys.com/en-at/products/the-driver-moc",
+          "http_status": 200,
+          "page_class": "Shadow DOM",
+          "html_chars": 75173,
+          "screenshot_bytes": 19237,
+          "screenshot_full_page": false
+        }
+      }
+    },
+    {
+      "id": "rothys_the-block-heel-loafer",
+      "kind": "shopify_pdp",
+      "url": "https://rothys.com/en-at/products/the-block-heel-loafer",
+      "identity": "https://rothys.com/en-at/products/the-block-heel-loafer",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Shadow DOM",
+      "title": "The Block Heel Loafer",
+      "price_raw": "EUR 215,00",
+      "price_norm": 215.0,
+      "currency": "EUR",
+      "stock": "out_of_stock",
+      "promo": false,
+      "confidence": "high",
+      "needs_review": false,
+      "planes": [
+        "content_outline",
+        "og_meta"
+      ],
+      "product_name": "The Block Heel Loafer",
+      "name_match": "match",
+      "price_plane": "og_meta",
+      "price_evidence": {
+        "plane": "og_meta",
+        "raw": "215,00",
+        "currency_raw": "EUR",
+        "path": "og:price:amount",
+        "value": 215.0,
+        "snippet": "<meta property=\"og:price:amount\" content=\"215,00\">",
+        "name_match": "match"
+      },
+      "price_candidates": [
+        {
+          "plane": "og_meta",
+          "raw": "215,00",
+          "currency": "EUR",
+          "path": "og:price:amount",
+          "value": 215.0,
+          "snippet": "<meta property=\"og:price:amount\" content=\"215,00\">"
+        },
+        {
+          "plane": "regex",
+          "raw": "€215",
+          "currency": "EUR",
+          "path": "content_outline#0",
+          "value": 215.0,
+          "snippet": "p44 | My Cart | card | 25t | Regular price EUR €215 Regular price EUR Sale price EUR €215 Unit price / per (i p62 | Change Your Shipping Country | feed | 39t | [iframe: https://rothys.com/web-pixels@9f5e2762wb720532ap19708c42m93b2bec3/custo p63 | Change Your Shipping Country | feed | 38t | [iframe: https://rothys.com/web-pixels@9f5e2762wb720532ap19708c42m93b2bec3/custo p64 | Change Your Shipping C…",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "€215",
+          "currency": "EUR",
+          "path": "html_regex#0",
+          "value": 215.0,
+          "snippet": "…rumb> </dna-breadcrumb> </div><section> <section> <div> <div> <dna-product-details> <p> The Block Heel Loafer </p> <div> <dna-price> <div> <div> <span> Regular price </span><span> EUR </span><span> €215 </span> </div> <dl> <dt> Regular price </dt> <dd><s> EUR </s><s> </s> </dd> <dt> Sale price </dt> <dd><span> EUR </span><span> €215 </span> </dd> </dl> <small> <div>Unit price</div> <div> <span></s…",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "€200",
+          "currency": "EUR",
+          "path": "html_regex#1",
+          "value": 200.0,
+          "snippet": "…nd=\"sw-63\" type=\"hidden\" value=\"template--27918909210718__main\" name=\"section-id\" data-sid=\"57\"></form><div></div> <div> </div> <div></div> <div> <div> <div><p><strong>Free shipping on orders above €200.</strong></p><p>30 days to return.</p><p><a data-sw-bind=\"sw-64\" href=\"/en-at/pages/international-returns\" data-sid=\"58\">Learn more</a>.</p></div> </div> </div> </dna-product-purchase-controls> <dn…",
+          "reason": "lower_priority_plane"
+        }
+      ],
+      "price_status": "verified",
+      "stock_status": "verified",
+      "capture": {
+        "captured_at": "2026-10-18T09:41:15.204152+00:00",
+        "html_sha256": "6ec7e6aa57c8689be3f4f894f83d431946270d22f4ddbdda1f9905cdf4be2aae",
+        "screenshot": "reports/price_watch/evidence/2026-10-18/rothys_the-block-heel-loafer.png",
+        "final_url": "https://rothys.com/en-at/products/the-block-heel-loafer",
+        "http_status": 200,
+        "page_class": "Shadow DOM",
+        "html_chars": 75010,
+        "screenshot_bytes": 19237,
+        "screenshot_full_page": false
+      },
+      "requested_url": "https://www.rothys.com/products/the-block-heel-loafer",
+      "http_status": 200,
+      "variant": null,
+      "product_name_source": "jsonld",
+      "name_match_score": 1.0,
+      "name_match_detail": {
+        "score": 1.0,
+        "matched": [
+          "block",
+          "heel",
+          "loafer"
+        ],
+        "missing": [],
+        "single_token": false
+      },
+      "stock_evidence": {
+        "state": "out_of_stock",
+        "source": "dom",
+        "hits": [
+          "Out Of Stock",
+          "Add to cart",
+          "unavailable"
+        ]
+      },
+      "evidence": {
+        "price": {
+          "plane": "og_meta",
+          "raw": "215,00",
+          "currency": "EUR",
+          "path": "og:price:amount",
+          "name_match": "match",
+          "status": "verified"
+        },
+        "capture": {
+          "captured_at": "2026-10-18T09:41:15.204152+00:00",
+          "html_sha256": "6ec7e6aa57c8689be3f4f894f83d431946270d22f4ddbdda1f9905cdf4be2aae",
+          "screenshot": "reports/price_watch/evidence/2026-10-18/rothys_the-block-heel-loafer.png",
+          "final_url": "https://rothys.com/en-at/products/the-block-heel-loafer",
+          "http_status": 200,
+          "page_class": "Shadow DOM",
+          "html_chars": 75010,
+          "screenshot_bytes": 19237,
+          "screenshot_full_page": false
+        }
+      }
+    },
+    {
+      "id": "rothys_the-baby-moc",
+      "kind": "shopify_pdp",
+      "url": "https://rothys.com/en-at/products/the-baby-moc",
+      "identity": "https://rothys.com/en-at/products/the-baby-moc",
+      "ok": true,
+      "success": true,
+      "fail_reason": "",
+      "page_class": "Closed Shadow",
+      "title": "The Baby Moc",
+      "price_raw": "EUR 52,00",
+      "price_norm": 52.0,
+      "currency": "EUR",
+      "stock": "out_of_stock",
+      "promo": false,
+      "confidence": "high",
+      "needs_review": false,
+      "planes": [
+        "content_outline",
+        "og_meta"
+      ],
+      "product_name": "The Baby Moc",
+      "name_match": "match",
+      "price_plane": "og_meta",
+      "price_evidence": {
+        "plane": "og_meta",
+        "raw": "52,00",
+        "currency_raw": "EUR",
+        "path": "og:price:amount",
+        "value": 52.0,
+        "snippet": "<meta property=\"og:price:amount\" content=\"52,00\">",
+        "name_match": "match"
+      },
+      "price_candidates": [
+        {
+          "plane": "og_meta",
+          "raw": "52,00",
+          "currency": "EUR",
+          "path": "og:price:amount",
+          "value": 52.0,
+          "snippet": "<meta property=\"og:price:amount\" content=\"52,00\">"
+        },
+        {
+          "plane": "regex",
+          "raw": "€52",
+          "currency": "EUR",
+          "path": "content_outline#0",
+          "value": 52.0,
+          "snippet": "p44 | My Cart | card | 25t | Regular price EUR €52 Regular price EUR Sale price EUR €52 Unit price / per (inc p62 | Change Your Shipping Country | feed | 36t | [iframe: https://rothys.com/web-pixels@9f5e2762wb720532ap19708c42m93b2bec3/custo p63 | Change Your Shipping Country | feed | 36t | [iframe: https://rothys.com/web-pixels@9f5e2762wb720532ap19708c42m93b2bec3/custo p64 | Change Your Shipping C…",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "€52",
+          "currency": "EUR",
+          "path": "html_regex#0",
+          "value": 52.0,
+          "snippet": "…na-breadcrumb> </dna-breadcrumb> </div><section> <section> <div> <div> <dna-product-details> <p> The Baby Moc </p> <div> <dna-price> <div> <div> <span> Regular price </span><span> EUR </span><span> €52 </span> </div> <dl> <dt> Regular price </dt> <dd><s> EUR </s><s> </s> </dd> <dt> Sale price </dt> <dd><span> EUR </span><span> €52 </span> </dd> </dl> <small> <div>Unit price</div> <div> <span></spa…",
+          "reason": "lower_priority_plane"
+        },
+        {
+          "plane": "regex",
+          "raw": "€200",
+          "currency": "EUR",
+          "path": "html_regex#1",
+          "value": 200.0,
+          "snippet": "…nd=\"sw-48\" type=\"hidden\" value=\"template--27918909210718__main\" name=\"section-id\" data-sid=\"42\"></form><div></div> <div> </div> <div></div> <div> <div> <div><p><strong>Free shipping on orders above €200.</strong></p><p>30 days to return.</p><p><a data-sw-bind=\"sw-49\" href=\"/en-at/pages/international-returns\" data-sid=\"43\">Learn more</a>.</p></div> </div> </div> </dna-product-purchase-controls> <dn…",
+          "reason": "lower_priority_plane"
+        }
+      ],
+      "price_status": "verified",
+      "stock_status": "verified",
+      "capture": {
+        "captured_at": "2026-10-18T09:41:31.118822+00:00",
+        "html_sha256": "f2477db75a2617c8d5cf0c45372a5887a69a9d4f36d4a752082509a3c5cc0399",
+        "screenshot": "reports/price_watch/evidence/2026-10-18/rothys_the-baby-moc.png",
+        "final_url": "https://rothys.com/en-at/products/the-baby-moc",
+        "http_status": 200,
+        "page_class": "Closed Shadow",
+        "html_chars": 79768,
+        "screenshot_bytes": 396020,
+        "screenshot_full_page": false
+      },
+      "requested_url": "https://www.rothys.com/products/the-baby-moc",
+      "http_status": 200,
+      "variant": null,
+      "product_name_source": "jsonld",
+      "name_match_score": 1.0,
+      "name_match_detail": {
+        "score": 1.0,
+        "matched": [
+          "baby",
+          "moc"
+        ],
+        "missing": [],
+        "single_token": false
+      },
+      "stock_evidence": {
+        "state": "out_of_stock",
+        "source": "dom",
+        "hits": [
+          "Out Of Stock",
+          "Add to cart",
+          "unavailable"
+        ]
+      },
+      "evidence": {
+        "price": {
+          "plane": "og_meta",
+          "raw": "52,00",
+          "currency": "EUR",
+          "path": "og:price:amount",
+          "name_match": "match",
+          "status": "verified"
+        },
+        "capture": {
+          "captured_at": "2026-10-18T09:41:31.118822+00:00",
+          "html_sha256": "f2477db75a2617c8d5cf0c45372a5887a69a9d4f36d4a752082509a3c5cc0399",
+          "screenshot": "reports/price_watch/evidence/2026-10-18/rothys_the-baby-moc.png",
+          "final_url": "https://rothys.com/en-at/products/the-baby-moc",
+          "http_status": 200,
+          "page_class": "Closed Shadow",
+          "html_chars": 79768,
+          "screenshot_bytes": 396020,
+          "screenshot_full_page": false
+        }
+      }
+    }
+  ]
+}
