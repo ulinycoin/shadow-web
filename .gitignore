@@ -24,6 +24,7 @@ server.log
 reports/localpdf/
 
 # Internal / agent memory (not for public repo)
+AGENTS.md
 CLAUDE.md
 PLAN.md
 REVIEW.md
@@ -59,3 +60,12 @@ scripts/upwork_alert_extract.py
 scripts/upwork_alert_triage.py
 tests/test_upwork_alert_triage.py
 reports/research-2026/
+
+# Internal strategy / execution plans (business numbers, gates, prospect targets)
+docs/FAMILY_PLAN.md
+
+# Outreach + fulfilment tooling for the internal sales pipeline (repo is public)
+scripts/baseline_report.py
+scripts/outreach_*.py
+scripts/prospect_*.py
+reports/baselines/
