@@ -173,8 +173,8 @@ python3 -m uvicorn server.main:app --host 127.0.0.1 --port 8000
 - Одна браузерная сессия — новый `navigate` заменяет контекст (в MCP — per-session: у каждой MCP-сессии своё состояние и свой лок, v0.4.2).
 - `web_search` — Brave Search (+ Yahoo fallback), без API-ключей; headless с stealth UA.
 - Anti-bot / SparseShell в headless → стоп (см. preflight), не бесконечный retry.
-- **Camoufox живёт вне кэша:** `CAMOUFOX_INSTALL_DIR=~/Desktop/shadow-web/.camoufox` (инжектится в `~/.hermes/mcp-shadow-web-bridge.py`). Чистка диска стирает `~/Library/Caches/camoufox` вместе с браузером; после пересоздания `.venv` патч `camoufox/pkgman.py` (`INSTALL_DIR` из env) надо применить заново, затем `camoufox fetch`.
+- **Camoufox живёт вне кэша:** `CAMOUFOX_INSTALL_DIR=~/Desktop/shadow/web/.camoufox` (инжектится в `~/.hermes/mcp-shadow-web-bridge.py`). Чистка диска стирает `~/Library/Caches/camoufox` вместе с браузером; после пересоздания `.venv` патч `camoufox/pkgman.py` (`INSTALL_DIR` из env) надо применить заново, затем `camoufox fetch`.
 
 ## Отладка
 
-Output panel → **MCP Logs** (ищи `Browser: camoufox` vs fallback). Локально: `venv/bin/shadow-web-mcp`.
+Output panel → **MCP Logs** (ищи `Browser: camoufox` vs fallback). Локально: `.venv/bin/shadow-web-mcp`.
